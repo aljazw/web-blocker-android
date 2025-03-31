@@ -5,7 +5,10 @@ const iconMap: Record<string, any> = {
     Block: require('../assets/icons/block.png'),
     Profile: require('../assets/icons/user.png'),
     Search: require('../assets/icons/search.png'),
-    Close: require('../assets/icons/close.png')
+    Close: require('../assets/icons/close.png'),
+    Plus: require('../assets/icons/plus.png'),
+    Next: require('../assets/icons/next.png'),
+    Selected: require('../assets/icons/selected.png'),
 };
 
 interface IconProps {
