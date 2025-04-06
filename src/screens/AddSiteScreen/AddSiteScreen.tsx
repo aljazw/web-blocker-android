@@ -4,12 +4,12 @@ import { useState, useEffect } from "react";
 import SearchBar from "../../components/SearchBar";
 import GuideContainer from "./GuideContainer";
 import Icon from "../../components/Icon";
+import { useNavigation } from "@react-navigation/native";
+import { RootStackNavigation, Website } from "../../types/types";
+import NextButton from "../../components/NextButton";
 
 
-interface Website {
-    url: string;
-    favicon: string;
-}
+
 
 const AddSiteScreen: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -17,7 +17,13 @@ const AddSiteScreen: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [next, setNext] = useState(false);
 
+    
+    
+    const navigation = useNavigation<RootStackNavigation>();
 
+    const handlePressNext = () => {
+        navigation.navigate('Schedule', { website } );
+    }
     const getFaviconUrl = (url: string): string => {
         try {
             url = url.replace(/^https?:\/\//, "");
@@ -99,12 +105,7 @@ const AddSiteScreen: React.FC = () => {
                                 </View>
                             </Pressable>
                             {next && (
-                                <View style={styles.nextButtonContainer}>
-                                    <Pressable style={styles.nextButton}>
-                                            <Text style={styles.nextButtonText}>Next</Text>
-                                            <Icon name="Next" size={21} style={{ marginLeft: 5 }}/>
-                                    </Pressable>
-                                </View>
+                                <NextButton onPress={handlePressNext} />
                             )}
                         </View>
                     ) : (
@@ -137,9 +138,9 @@ const styles = StyleSheet.create({
         elevation: 3, // Shadow effect for Android
     },
     itemContainerSelected: {
-        borderColor: '#34C759', // Green border when selected
-        backgroundColor: '#E6F9EB', // Light green background
-        shadowColor: '#34C759', // Green shadow for effect
+        borderColor: '#34C759', 
+        backgroundColor: '#E6F9EB', 
+        shadowColor: '#34C759', 
         shadowOpacity: 0.3,
         shadowRadius: 5,
         elevation: 5,
@@ -163,33 +164,6 @@ const styles = StyleSheet.create({
     plusIconContainer: {
         alignItems: 'center',
         marginRight: 3,
-    },
-    nextButtonContainer: {
-        flexDirection: "row",
-        justifyContent: "flex-end",
-        paddingHorizontal: 20,
-        marginTop: 18,
-    },
-    nextButton: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        backgroundColor: "#34C759", 
-        paddingVertical: 15,
-        paddingHorizontal: 20,
-        borderRadius: 50, 
-        elevation: 6, // Stronger shadow for pop-out effect
-        shadowColor: "#34C759",
-        shadowOpacity: 0.4,
-        shadowOffset: { width: 0, height: 6 },
-        shadowRadius: 8,
-    },
-    nextButtonText: {
-        color: "#fff",
-        fontSize: 18,
-        fontWeight: "600",
-        letterSpacing: 0.8, 
-        textTransform: "uppercase", 
     },
 });
 
