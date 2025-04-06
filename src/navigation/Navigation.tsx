@@ -1,21 +1,33 @@
 import { NavigationContainer } from "@react-navigation/native"
 import { createStackNavigator } from "@react-navigation/stack"
-import BlockScreen from "../screens/BlockScreen";
-import HomeScreen from "../screens/HomeScreen";
 import BottomTabNavigator from "./BottomTabNavigator";
+import ScheduleScreen from "../screens/ScheduleScreen";
+import AddSiteScreen from "../screens/AddSiteScreen/AddSiteScreen";
+import { RootStackParamList } from "../types/types";
 
 
 
-const Stack = createStackNavigator();
+
+const Stack = createStackNavigator<RootStackParamList>();
 
 const Navigation: React.FC = () => {
     return (
         <NavigationContainer>
-            <Stack.Navigator initialRouteName="BottomTabs">
+            <Stack.Navigator initialRouteName="AddSite">
                 <Stack.Screen 
                     name="BottomTabs" 
                     component={BottomTabNavigator} 
                     options={{ headerShown: false}}
+                />
+                <Stack.Screen 
+                    name="AddSite"
+                    component={AddSiteScreen}
+                    options={{headerShown: false}}
+                />
+                <Stack.Screen 
+                    name="Schedule"
+                    component={ScheduleScreen}
+                    options={{headerShown: false}}
                 />
             </Stack.Navigator>
         </NavigationContainer>
