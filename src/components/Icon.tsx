@@ -9,6 +9,11 @@ const iconMap: Record<string, any> = {
     Plus: require('../assets/icons/plus.png'),
     Next: require('../assets/icons/next.png'),
     Selected: require('../assets/icons/selected.png'),
+    Calendar: require('../assets/icons/calendar.png'),
+    Time: require('../assets/icons/time.png'),
+    Down: require('../assets/icons/down.png'),
+    Up: require('../assets/icons/up.png'),
+
 };
 
 interface IconProps {
