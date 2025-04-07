@@ -11,8 +11,7 @@ const iconMap: Record<string, any> = {
     Selected: require('../assets/icons/selected.png'),
     Calendar: require('../assets/icons/calendar.png'),
     Time: require('../assets/icons/time.png'),
-    Down: require('../assets/icons/down.png'),
-    Up: require('../assets/icons/up.png'),
+    Arrow: require('../assets/icons/arrow.png'),
 
 };
 

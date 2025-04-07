@@ -1,11 +1,12 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import BaseScreen from "../components/BaseScreen";
 import React, { useState } from "react";
 import Icon from "../components/Icon";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import { RootStackNavigation, RootStackParamList } from "../types/types";
+import { NavigationProp, RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { RootStackNavigation, RootStackParamList, Website } from "../types/types";
 import TimeInput from "../components/TimeInput";
 import NextButton from "../components/NextButton";
+import { BlurView } from "@react-native-community/blur";
 
 const ScheduleScreen: React.FC = () => {
 
@@ -14,7 +15,7 @@ const ScheduleScreen: React.FC = () => {
     type ScheduleScreenRouteProp = RouteProp<RootStackParamList, 'Schedule'>;
 
     const route = useRoute<ScheduleScreenRouteProp>();
-    // const { website } = route.params;
+    const { website } = route.params;
 
     const [showMoreCalendar, setShowMoreCalendar] = useState(false);
     const [showMoreTime, setShowMoreTime] = useState(false);
@@ -28,7 +29,15 @@ const ScheduleScreen: React.FC = () => {
     
     const [endHour, setEndHour] = useState<string>('');
     const [endMinutes, setEndMinutes] = useState<string>('');
+
+    const [showPopup, setShowPopup] = useState(false);
     
+    const handleToggleCalendarArrow = () => {
+        setShowMoreCalendar(prev => !prev);
+        if (showMoreTime) {
+          setShowMoreTime(prev => !prev);
+        }
+    };
 
     const toggleDay = (index: number) => {
         setSelectedDays(prev => {
@@ -42,9 +51,15 @@ const ScheduleScreen: React.FC = () => {
         if (selectedDays.every(selectedDay => selectedDay)) {
             return 'Full Week';
         }
-
         const selectedNames = days.filter((_, index) => selectedDays[index]);
         return selectedNames.join(', ');
+    };
+
+    const handleToggleTimeArrow = () => {
+        setShowMoreTime(prev => !prev);
+        if (showMoreCalendar) {
+          setShowMoreCalendar(prev => !prev);
+        }
     };
 
     const getSelectedTimeText = () => {
@@ -72,12 +87,6 @@ const ScheduleScreen: React.FC = () => {
         setEndMinutes('');
     }
 
-
-    const handlePressNext = () => {
-        navigation.navigate('BottomTabs')
-    }
-    
-
     return (
         <BaseScreen title="Schedule">
             <View style={styles.itemContainer}>
@@ -89,20 +98,17 @@ const ScheduleScreen: React.FC = () => {
                             <Text style={styles.durationText}>{getSelectedDaysText()}</Text>
                         </View>
                     </View>
-                    {showMoreCalendar ? (
-                        <Pressable onPress={() => setShowMoreCalendar(prev => !prev)}>
-                            <View style={styles.arrowIconContainer}>
-                                <Icon name="Up" style={styles.rightIcon} size={20}/>
-                            </View>
-                            
-                        </Pressable>
-                    ) : (
-                        <Pressable onPress={() => setShowMoreCalendar(prev => !prev)}>
-                            <View style={styles.arrowIconContainer}>
-                                <Icon name="Down" style={styles.rightIcon} size={18}/>
-                            </View>
-                        </Pressable>
-                    )}
+                    <Pressable onPress={handleToggleCalendarArrow}>
+                        <View style={styles.arrowIconContainer}>
+                            <Icon name="Arrow" 
+                                size={18}
+                                style={[
+                                    styles.rightIcon,
+                                    {transform: [{rotate: showMoreCalendar ? '180deg' : '0deg'}]} 
+                                ]} 
+                            />
+                        </View>
+                    </Pressable>
                 </View>
                 {showMoreCalendar && (
                     <View style={styles.itemMoreContainer}>
@@ -136,20 +142,17 @@ const ScheduleScreen: React.FC = () => {
                             <Text style={styles.durationText}>{getSelectedTimeText()}</Text>
                         </View>
                     </View>
-                    {showMoreTime ? (
-                        <Pressable onPress={() => setShowMoreTime(prev => !prev)}>
-                            <View style={styles.arrowIconContainer}>
-                                <Icon name="Up" style={styles.rightIcon} size={20}/>
-                            </View>
-                            
-                        </Pressable>
-                    ) : (
-                        <Pressable onPress={() => setShowMoreTime(prev => !prev)}>
-                            <View style={styles.arrowIconContainer}>
-                                <Icon name="Down" style={styles.rightIcon} size={18}/>
-                            </View>
-                        </Pressable>
-                    )}
+                    <Pressable onPress={handleToggleTimeArrow}>
+                        <View style={styles.arrowIconContainer}>
+                            <Icon name="Arrow" 
+                                size={18}
+                                style={[
+                                    styles.rightIcon,
+                                    {transform: [{rotate: showMoreTime ? '180deg' : '0deg'}]} 
+                                ]} 
+                            />
+                        </View>
+                    </Pressable>
                 </View>
                 {showMoreTime && (
                     <View>
@@ -173,7 +176,15 @@ const ScheduleScreen: React.FC = () => {
                   </View>
                 )}
             </View>
-            <NextButton onPress={handlePressNext} />
+            <NextButton onPress={() => setShowPopup(true)} />
+            <Popup 
+                navigation={navigation}
+                visible={showPopup} 
+                onClose={() => setShowPopup(false)}  
+                days={getSelectedDaysText()}
+                time={getSelectedTimeText()}
+                website={website}
+            />
         </BaseScreen>
     );
 };
@@ -247,6 +258,115 @@ const styles = StyleSheet.create({
         color: 'red',
         marginTop: 3,
     },
+
+
+
+    blurContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      popup: {
+        backgroundColor: 'white',
+        padding: 20,
+        borderRadius: 10,
+        width: 300,
+        alignItems: 'center',
+      },
+      popupText: {
+        fontSize: 16,
+        marginBottom: 10,
+        textAlign: 'center',
+        opacity: 0.8,
+      },
+      bold: {
+        fontWeight: 'bold',
+        fontSize: 18,
+      },
+      buttonsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+      },
+      cancelButton: {
+        backgroundColor: '#f44336',
+        padding: 10,
+        borderRadius: 5,
+        marginRight: 10,
+        width: 80,
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      confirmButton: {
+        backgroundColor: '#4CAF50',
+        padding: 10,
+        borderRadius: 5,
+        width: 80,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      buttonText: {
+        color: 'white',
+        fontWeight: 'bold',
+      },
 });
 
 export default ScheduleScreen;
+
+interface PopupProps {
+    navigation: NavigationProp<RootStackParamList>;
+    visible: boolean;
+    onClose: () => void;
+    days: string;
+    time: string;
+    website: Website;
+}
+
+const Popup: React.FC<PopupProps> = ({
+    navigation,
+    visible,
+    onClose,
+    days, 
+    time,
+    website 
+}) => {
+
+    const onConfirm = () => {
+        navigation.navigate('BottomTabs')
+    }
+
+    return (
+        <Modal
+            animationType="fade"
+            transparent
+            visible={visible}
+            onRequestClose={onClose}
+        >
+            <BlurView 
+            blurType="light"
+            blurAmount={10}
+            style={styles.blurContainer}
+            >
+            <View style={styles.popup}>
+                <Text style={styles.popupText}>
+                Are you sure you want to put <Text style={styles.bold}>{website.url}</Text> on a block list?
+                </Text>
+                <Text style={styles.popupText}>
+                For the following days: <Text style={styles.bold}>{days}</Text>
+                </Text>
+                <Text style={styles.popupText}>
+                Blocking hour: <Text style={styles.bold}>{time}</Text>
+                </Text>
+    
+                <View style={styles.buttonsContainer}>
+                <Pressable style={styles.cancelButton} onPress={onClose}>
+                    <Text style={styles.buttonText}>Cancel</Text>
+                </Pressable>
+                <Pressable style={styles.confirmButton} onPress={onConfirm}>
+                    <Text style={styles.buttonText}>Confirm</Text>
+                </Pressable>
+                </View>
+            </View>
+            </BlurView>
+        </Modal>
+    );
+};

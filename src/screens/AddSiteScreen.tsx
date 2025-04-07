@@ -1,14 +1,11 @@
 import { StyleSheet, Text, View, Image, ActivityIndicator, Pressable } from "react-native";
-import BaseScreen from "../../components/BaseScreen";
+import BaseScreen from "../components/BaseScreen";
 import { useState, useEffect } from "react";
-import SearchBar from "../../components/SearchBar";
-import GuideContainer from "./GuideContainer";
-import Icon from "../../components/Icon";
+import SearchBar from "../components/SearchBar";
+import Icon from "../components/Icon";
 import { useNavigation } from "@react-navigation/native";
-import { RootStackNavigation, Website } from "../../types/types";
-import NextButton from "../../components/NextButton";
-
-
+import { RootStackNavigation, Website } from "../types/types";
+import NextButton from "../components/NextButton";
 
 
 const AddSiteScreen: React.FC = () => {
@@ -165,6 +162,50 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: 3,
     },
+    guideContainer: {
+        backgroundColor: '#f8f9fa', 
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#ddd',
+        margin: 16,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    guideTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 10,
+        color: '#333',
+    },
+    guideStep: {
+        fontSize: 14,
+        color: '#555',
+        marginBottom: 8,
+    },
+    guideHighlight: {
+        fontWeight: 'bold',
+        color: '#007bff',
+    }
 });
 
 export default AddSiteScreen;
+
+
+
+const GuideContainer = () => {
+    return (
+        <View style={styles.guideContainer}>
+            <Text style={styles.guideTitle}>Guide</Text>
+            <Text style={styles.guideStep}>
+                1. Enter the domain name or URL without "https://" or "www". Instead of adding <Text style={styles.guideHighlight}>https://www.facebook.com</Text>, just type <Text style={styles.guideHighlight}>facebook.com</Text>.
+            </Text>
+            <Text style={styles.guideStep}>
+                2. If you need a specific webpage or directory, type it directly. For example, enter <Text style={styles.guideHighlight}>facebook.com/home</Text> to access a particular section.
+            </Text>
+        </View>
+    );
+};
