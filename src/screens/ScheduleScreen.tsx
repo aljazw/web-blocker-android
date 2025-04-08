@@ -3,10 +3,11 @@ import BaseScreen from "../components/BaseScreen";
 import React, { useState } from "react";
 import Icon from "../components/Icon";
 import { NavigationProp, RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import { RootStackNavigation, RootStackParamList, Website } from "../types/types";
+import { BlockedWebsitesData, RootStackNavigation, RootStackParamList, Website } from "../types/types";
 import TimeInput from "../components/TimeInput";
 import NextButton from "../components/NextButton";
 import { BlurView } from "@react-native-community/blur";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ScheduleScreen: React.FC = () => {
 
@@ -330,9 +331,27 @@ const Popup: React.FC<PopupProps> = ({
     website 
 }) => {
 
-    const onConfirm = () => {
-        navigation.navigate('BottomTabs')
-    }
+    const onConfirm = async () => {
+        const newBlockedData: BlockedWebsitesData = {
+            days,
+            time,
+            website,
+            visible: true,
+        };
+
+        try {
+            const existingData = await AsyncStorage.getItem('@blocked_websites');
+            const websites = existingData ? JSON.parse(existingData) : [];
+
+            websites.push(newBlockedData);
+
+            await AsyncStorage.setItem('@blocked_websites', JSON.stringify(websites));
+
+            navigation.navigate('BottomTabs')
+        } catch (error) {
+            console.error('Error saving blocked website data', error);
+        }
+    };
 
     return (
         <Modal

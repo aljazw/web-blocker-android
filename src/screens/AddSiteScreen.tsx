@@ -6,6 +6,7 @@ import Icon from "../components/Icon";
 import { useNavigation } from "@react-navigation/native";
 import { RootStackNavigation, Website } from "../types/types";
 import NextButton from "../components/NextButton";
+import ItemContainer from "../components/itemContainer";
 
 
 const AddSiteScreen: React.FC = () => {
@@ -87,7 +88,7 @@ const AddSiteScreen: React.FC = () => {
                     ) : (website.url.length > 0) ? (
                         <View>
                             <Pressable onPress={() => setNext(prev => !prev)}>
-                                <View style={[styles.itemContainer, next && styles.itemContainerSelected]}>
+                                <ItemContainer style={next ? styles.itemContainerSelected : {}}>
                                     <View style={styles.websiteContainer}>
                                         <Image source={{ uri: website.favicon }} style={styles.favicon} />
                                         <Text style={styles.urlText}>{website.url}</Text>
@@ -99,7 +100,7 @@ const AddSiteScreen: React.FC = () => {
                                                 <Icon name="Plus" size={20} style={{opacity: 0.5}}/>
                                             )}
                                     </View>
-                                </View>
+                                </ItemContainer>
                             </Pressable>
                             {next && (
                                 <NextButton onPress={handlePressNext} />
@@ -116,23 +117,6 @@ const AddSiteScreen: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
-    },
-    itemContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginHorizontal: 10,
-        marginTop: 20,
-        alignItems: 'center',
-        padding: 15,
-        borderRadius: 10,
-        backgroundColor: '#f9f9f9',  
-        borderWidth: 1,  
-        borderColor: '#e0e0e0',
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 4,
-        elevation: 3, // Shadow effect for Android
     },
     itemContainerSelected: {
         borderColor: '#34C759', 

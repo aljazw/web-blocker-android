@@ -11,4 +11,11 @@ export type RootStackParamList = {
     Schedule: { website: Website };
 };
 
+export interface BlockedWebsitesData{
+    days: string;
+    time: string;
+    website:Website;
+    visible: boolean;
+};
+
 export type RootStackNavigation = NavigationProp<RootStackParamList>;
