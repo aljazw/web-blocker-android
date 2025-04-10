@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BlockedWebsitesData } from "../types/types";
 import ItemContainer from "../components/itemContainer";
+import Favicon from "../components/Favicon";
 
 
 
@@ -34,13 +35,14 @@ const HomeScreen: React.FC = () => {
                 ) :  (
                     <View>
                         {websites.map((website, index) => (
-                            <ItemContainer >
-                                <Text key={index}>{website.website.url}</Text>
+                            <ItemContainer key={index}>
+                                <View style={styles.innerLeftContainer}>
+                                    <Favicon url={website.websiteUrl}/>
+                                    <Text>{website.websiteUrl}</Text>
+                                </View>
                             </ItemContainer>
-                            
                         ))}
                     </View>
-                   
                 )}
             </View>
         </BaseScreen>
@@ -48,8 +50,9 @@ const HomeScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
+    innerLeftContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
 });
 

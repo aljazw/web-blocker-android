@@ -1,17 +1,18 @@
-import { StyleSheet, Text, View, Image, ActivityIndicator, Pressable } from "react-native";
+import { StyleSheet, Text, View, ActivityIndicator, Pressable } from "react-native";
 import BaseScreen from "../components/BaseScreen";
 import { useState, useEffect } from "react";
 import SearchBar from "../components/SearchBar";
 import Icon from "../components/Icon";
 import { useNavigation } from "@react-navigation/native";
-import { RootStackNavigation, Website } from "../types/types";
+import { RootStackNavigation } from "../types/types";
 import NextButton from "../components/NextButton";
 import ItemContainer from "../components/itemContainer";
+import Favicon from "../components/Favicon";
 
 
 const AddSiteScreen: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
-    const [website, setWebsite] = useState<Website>({url: "", favicon: ""});
+    const [websiteUrl, setWebsiteUrl] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [next, setNext] = useState(false);
 
@@ -20,17 +21,7 @@ const AddSiteScreen: React.FC = () => {
     const navigation = useNavigation<RootStackNavigation>();
 
     const handlePressNext = () => {
-        navigation.navigate('Schedule', { website } );
-    }
-    const getFaviconUrl = (url: string): string => {
-        try {
-            url = url.replace(/^https?:\/\//, "");
-            url = url.replace(/\/.*$/, "");
-            return `https://www.google.com/s2/favicons?domain=${url}`;
-        } catch (error) {
-            console.error("Ivalid URL:", error);
-            return "/default-favicon.ico" //Fallback favicon
-        }
+        navigation.navigate('Schedule',  {websiteUrl: websiteUrl});
     }
 
     const normalizeUrl = (url: string): string => {
@@ -47,16 +38,13 @@ const AddSiteScreen: React.FC = () => {
 
     const checkUrl = async (url: string) => {
         setLoading(true);
-        setWebsite({url: "", favicon: ""});
+        setWebsiteUrl('');
         const normalizedUrl = normalizeUrl(url);
 
         try {
           const response = await fetch(normalizedUrl);
           if (response.ok) {
-            setWebsite({
-                url: denormalizeUrl(normalizedUrl),
-                favicon: getFaviconUrl(url)
-            })
+            setWebsiteUrl(denormalizeUrl(normalizedUrl))
           } else {
             console.log('Error', 'The subdirectory does not exist.');
           }
@@ -85,13 +73,13 @@ const AddSiteScreen: React.FC = () => {
                 ) : (
                     loading? (
                         <ActivityIndicator size="large" color="#0000ff" />
-                    ) : (website.url.length > 0) ? (
+                    ) : (websiteUrl.length > 0) ? (
                         <View>
                             <Pressable onPress={() => setNext(prev => !prev)}>
                                 <ItemContainer style={next ? styles.itemContainerSelected : {}}>
                                     <View style={styles.websiteContainer}>
-                                        <Image source={{ uri: website.favicon }} style={styles.favicon} />
-                                        <Text style={styles.urlText}>{website.url}</Text>
+                                        <Favicon url={websiteUrl}/>
+                                        <Text style={styles.urlText}>{websiteUrl}</Text>
                                     </View>
                                     <View style={styles.plusIconContainer}>
                                             {next ? (
@@ -125,12 +113,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 5,
         elevation: 5,
-    },
-    favicon: {
-        width: 32,  
-        height: 32,
-        marginRight: 12,
-        borderRadius: 5, 
     },
     urlText: {
         fontSize: 16,

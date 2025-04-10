@@ -3,7 +3,7 @@ import BaseScreen from "../components/BaseScreen";
 import React, { useState } from "react";
 import Icon from "../components/Icon";
 import { NavigationProp, RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import { BlockedWebsitesData, RootStackNavigation, RootStackParamList, Website } from "../types/types";
+import { BlockedWebsitesData, RootStackNavigation, RootStackParamList } from "../types/types";
 import TimeInput from "../components/TimeInput";
 import NextButton from "../components/NextButton";
 import { BlurView } from "@react-native-community/blur";
@@ -16,7 +16,7 @@ const ScheduleScreen: React.FC = () => {
     type ScheduleScreenRouteProp = RouteProp<RootStackParamList, 'Schedule'>;
 
     const route = useRoute<ScheduleScreenRouteProp>();
-    const { website } = route.params;
+    const { websiteUrl } = route.params;
 
     const [showMoreCalendar, setShowMoreCalendar] = useState(false);
     const [showMoreTime, setShowMoreTime] = useState(false);
@@ -184,7 +184,7 @@ const ScheduleScreen: React.FC = () => {
                 onClose={() => setShowPopup(false)}  
                 days={getSelectedDaysText()}
                 time={getSelectedTimeText()}
-                website={website}
+                websiteUrl={websiteUrl}
             />
         </BaseScreen>
     );
@@ -319,7 +319,7 @@ interface PopupProps {
     onClose: () => void;
     days: string;
     time: string;
-    website: Website;
+    websiteUrl: string;
 }
 
 const Popup: React.FC<PopupProps> = ({
@@ -328,14 +328,14 @@ const Popup: React.FC<PopupProps> = ({
     onClose,
     days, 
     time,
-    website 
+    websiteUrl 
 }) => {
 
     const onConfirm = async () => {
         const newBlockedData: BlockedWebsitesData = {
             days,
             time,
-            website,
+            websiteUrl,
             visible: true,
         };
 
@@ -367,7 +367,7 @@ const Popup: React.FC<PopupProps> = ({
             >
             <View style={styles.popup}>
                 <Text style={styles.popupText}>
-                Are you sure you want to put <Text style={styles.bold}>{website.url}</Text> on a block list?
+                Are you sure you want to put <Text style={styles.bold}>{websiteUrl}</Text> on a block list?
                 </Text>
                 <Text style={styles.popupText}>
                 For the following days: <Text style={styles.bold}>{days}</Text>
