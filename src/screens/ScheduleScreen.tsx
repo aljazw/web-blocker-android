@@ -1,4 +1,4 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import BaseScreen from "../components/BaseScreen";
 import React, { useState } from "react";
 import Icon from "../components/Icon";
@@ -6,8 +6,9 @@ import { NavigationProp, RouteProp, useNavigation, useRoute } from "@react-navig
 import { BlockedWebsitesData, RootStackNavigation, RootStackParamList } from "../types/types";
 import TimeInput from "../components/TimeInput";
 import NextButton from "../components/NextButton";
-import { BlurView } from "@react-native-community/blur";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import ActionButton from "../components/ActionButton";
+import BlurModal from "../components/BlurModal";
 
 const ScheduleScreen: React.FC = () => {
 
@@ -31,7 +32,8 @@ const ScheduleScreen: React.FC = () => {
     const [endHour, setEndHour] = useState<string>('');
     const [endMinutes, setEndMinutes] = useState<string>('');
 
-    const [showPopup, setShowPopup] = useState(false);
+    const [popupVisible, setPopupVisible] = useState(false);
+    
     
     const handleToggleCalendarArrow = () => {
         setShowMoreCalendar(prev => !prev);
@@ -122,9 +124,11 @@ const ScheduleScreen: React.FC = () => {
                             ]}
                             onPress={() => toggleDay(index)}
                             >
-                                <Text style={[
-                                    styles.dayText,
-                                    !selectedDays[index] && styles.selectedDayText
+                                <Text
+                                    style={[
+                                        {fontSize: 14, fontWeight: 'bold'},
+                                        selectedDays[index] ? { color: 'white' } : {},
+                                        !selectedDays[index] ? { opacity: 0.6 } : {},
                                     ]}
                                 >
                                     {day.charAt(0)}
@@ -158,18 +162,18 @@ const ScheduleScreen: React.FC = () => {
                 {showMoreTime && (
                     <View>
                         <TimeInput 
-                        label="Start Time (HH:mm)"
-                        hourValue={startHour}
-                        minutesValue={startMinutes}
-                        setHour={setStartHour}
-                        setMinutes={setStartMinutes}
+                            label="Start Time (HH:mm)"
+                            hourValue={startHour}
+                            minutesValue={startMinutes}
+                            setHour={setStartHour}
+                            setMinutes={setStartMinutes}
                         />
                         <TimeInput
-                        label="End Time (HH:mm)"
-                        hourValue={endHour}
-                        minutesValue={endMinutes}
-                        setHour={setEndHour}
-                        setMinutes={setEndMinutes}
+                            label="End Time (HH:mm)"
+                            hourValue={endHour}
+                            minutesValue={endMinutes}
+                            setHour={setEndHour}
+                            setMinutes={setEndMinutes}
                         />
                         <Pressable onPress={clearTime}>
                             <Text style={styles.clearText}>Clear</Text>
@@ -177,18 +181,80 @@ const ScheduleScreen: React.FC = () => {
                   </View>
                 )}
             </View>
-            <NextButton onPress={() => setShowPopup(true)} />
+            <NextButton onPress={() => setPopupVisible(true)} />
             <Popup 
                 navigation={navigation}
-                visible={showPopup} 
-                onClose={() => setShowPopup(false)}  
+                visible={popupVisible}  
                 days={getSelectedDaysText()}
                 time={getSelectedTimeText()}
                 websiteUrl={websiteUrl}
+                onClose={() => setPopupVisible(false)} 
             />
         </BaseScreen>
     );
 };
+
+interface PopupProps {
+    navigation: NavigationProp<RootStackParamList>;
+    visible: boolean;
+    days: string;
+    time: string;
+    websiteUrl: string;
+    onClose: () => void;
+}
+
+const Popup: React.FC<PopupProps> = ({
+    navigation,
+    visible,
+    days, 
+    time,
+    websiteUrl,
+    onClose,
+}) => {
+
+    const onConfirm = async () => {
+        const newBlockedData: BlockedWebsitesData = {
+            days,
+            time,
+            websiteUrl,
+            visible: true,
+        };
+
+        try {
+            const existingData = await AsyncStorage.getItem('@blocked_websites');
+            const websites = existingData ? JSON.parse(existingData) : [];
+
+            websites.push(newBlockedData);
+
+            await AsyncStorage.setItem('@blocked_websites', JSON.stringify(websites));
+
+            navigation.navigate('BottomTabs')
+        } catch (error) {
+            console.error('Error saving blocked website data', error);
+        }
+    };
+
+    return (
+        <BlurModal visible={visible} onClose={onClose}>
+            <Text style={styles.popUpText}>
+            Are you sure you want to put <Text style={styles.linkText}>{websiteUrl}</Text> on a block list?
+            </Text>
+            <Text style={styles.popUpText}>
+            For the following days: <Text style={{ fontWeight: 'bold' }}>{days}</Text>
+            </Text>
+            <Text style={styles.popUpText}>
+            Blocking hour: <Text style={{ fontWeight: 'bold' }}>{time}</Text>
+            </Text>
+            <View style={styles.buttonsContainer}>
+                <ActionButton variant="cancel" onPress={onClose} />
+                <ActionButton variant="confirm" onPress={onConfirm} />
+            </View>
+        </BlurModal>
+    );
+};
+
+
+
 
 const styles = StyleSheet.create({
     itemContainer: {
@@ -240,15 +306,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         backgroundColor: '#f0f0f0'
     },
-    dayText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 15,
-    },
-    selectedDayText: {
-        color: 'gray',
-        fontWeight: '600',  
-    },
     arrowIconContainer: {
         width: 30,
         height: 30,
@@ -259,133 +316,21 @@ const styles = StyleSheet.create({
         color: 'red',
         marginTop: 3,
     },
-
-
-
-    blurContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-      },
-      popup: {
-        backgroundColor: 'white',
-        padding: 20,
-        borderRadius: 10,
-        width: 300,
-        alignItems: 'center',
-      },
-      popupText: {
-        fontSize: 16,
+    buttonsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    popUpText: {
         marginBottom: 10,
         textAlign: 'center',
         opacity: 0.8,
-      },
-      bold: {
+    },
+    linkText: {
+        color: '#0000cd',    
         fontWeight: 'bold',
-        fontSize: 18,
-      },
-      buttonsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-      },
-      cancelButton: {
-        backgroundColor: '#f44336',
-        padding: 10,
-        borderRadius: 5,
-        marginRight: 10,
-        width: 80,
-        justifyContent: 'center',
-        alignItems: 'center',
-      },
-      confirmButton: {
-        backgroundColor: '#4CAF50',
-        padding: 10,
-        borderRadius: 5,
-        width: 80,
-        alignItems: 'center',
-        justifyContent: 'center',
-      },
-      buttonText: {
-        color: 'white',
-        fontWeight: 'bold',
-      },
+        fontSize: 17,
+    },
 });
 
+
 export default ScheduleScreen;
-
-interface PopupProps {
-    navigation: NavigationProp<RootStackParamList>;
-    visible: boolean;
-    onClose: () => void;
-    days: string;
-    time: string;
-    websiteUrl: string;
-}
-
-const Popup: React.FC<PopupProps> = ({
-    navigation,
-    visible,
-    onClose,
-    days, 
-    time,
-    websiteUrl 
-}) => {
-
-    const onConfirm = async () => {
-        const newBlockedData: BlockedWebsitesData = {
-            days,
-            time,
-            websiteUrl,
-            visible: true,
-        };
-
-        try {
-            const existingData = await AsyncStorage.getItem('@blocked_websites');
-            const websites = existingData ? JSON.parse(existingData) : [];
-
-            websites.push(newBlockedData);
-
-            await AsyncStorage.setItem('@blocked_websites', JSON.stringify(websites));
-
-            navigation.navigate('BottomTabs')
-        } catch (error) {
-            console.error('Error saving blocked website data', error);
-        }
-    };
-
-    return (
-        <Modal
-            animationType="fade"
-            transparent
-            visible={visible}
-            onRequestClose={onClose}
-        >
-            <BlurView 
-            blurType="light"
-            blurAmount={10}
-            style={styles.blurContainer}
-            >
-            <View style={styles.popup}>
-                <Text style={styles.popupText}>
-                Are you sure you want to put <Text style={styles.bold}>{websiteUrl}</Text> on a block list?
-                </Text>
-                <Text style={styles.popupText}>
-                For the following days: <Text style={styles.bold}>{days}</Text>
-                </Text>
-                <Text style={styles.popupText}>
-                Blocking hour: <Text style={styles.bold}>{time}</Text>
-                </Text>
-    
-                <View style={styles.buttonsContainer}>
-                <Pressable style={styles.cancelButton} onPress={onClose}>
-                    <Text style={styles.buttonText}>Cancel</Text>
-                </Pressable>
-                <Pressable style={styles.confirmButton} onPress={onConfirm}>
-                    <Text style={styles.buttonText}>Confirm</Text>
-                </Pressable>
-                </View>
-            </View>
-            </BlurView>
-        </Modal>
-    );
-};

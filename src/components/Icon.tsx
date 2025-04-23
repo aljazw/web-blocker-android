@@ -12,7 +12,7 @@ const iconMap: Record<string, any> = {
     Calendar: require('../assets/icons/calendar.png'),
     Time: require('../assets/icons/time.png'),
     Arrow: require('../assets/icons/arrow.png'),
-
+    Trash: require('../assets/icons/delete.png'),
 };
 
 interface IconProps {

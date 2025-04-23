@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, ActivityIndicator, Pressable } from "react-native";
 import BaseScreen from "../components/BaseScreen";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import SearchBar from "../components/SearchBar";
 import Icon from "../components/Icon";
 import { useNavigation } from "@react-navigation/native";
@@ -8,6 +8,9 @@ import { RootStackNavigation } from "../types/types";
 import NextButton from "../components/NextButton";
 import ItemContainer from "../components/itemContainer";
 import Favicon from "../components/Favicon";
+import BlurModal from "../components/BlurModal";
+import ActionButton from "../components/ActionButton";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
 const AddSiteScreen: React.FC = () => {
@@ -15,14 +18,28 @@ const AddSiteScreen: React.FC = () => {
     const [websiteUrl, setWebsiteUrl] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [next, setNext] = useState(false);
+    const [errorPopupVisible ,setErrorPopupVisible] = useState(false);
 
-    
-    
     const navigation = useNavigation<RootStackNavigation>();
 
-    const handlePressNext = () => {
+    const handlePressNext = async () => {
+        try {
+            const existingData = await AsyncStorage.getItem('@blocked_websites');
+            const websites = existingData ? JSON.parse(existingData) : [];
+
+            const alreadyBlocked = websites.some((site: {websiteUrl: string }) => site.websiteUrl === websiteUrl);
+
+            if (alreadyBlocked) {
+                setErrorPopupVisible(true);
+                return;
+            }
+            navigation.navigate('BottomTabs')
+        } catch (error) {
+            console.error('Error saving blocked website data', error);
+        }
+
         navigation.navigate('Schedule',  {websiteUrl: websiteUrl});
-    }
+    };
 
     const normalizeUrl = (url: string): string => {
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -79,7 +96,7 @@ const AddSiteScreen: React.FC = () => {
                                 <ItemContainer style={next ? styles.itemContainerSelected : {}}>
                                     <View style={styles.websiteContainer}>
                                         <Favicon url={websiteUrl}/>
-                                        <Text style={styles.urlText}>{websiteUrl}</Text>
+                                        <Text style={styles.websiteUrlText} >{websiteUrl}</Text>
                                     </View>
                                     <View style={styles.plusIconContainer}>
                                             {next ? (
@@ -98,7 +115,42 @@ const AddSiteScreen: React.FC = () => {
                         <Text>No results found for "{searchQuery}"</Text>
                     )
                 )} 
+            <ErrorPopup 
+                visible={errorPopupVisible}
+                websiteUrl={websiteUrl}
+                onClose={() => setErrorPopupVisible(false)}
+            />
         </BaseScreen>
+    );
+};
+
+const GuideContainer = () => {
+    return (
+        <ItemContainer style={{ flexDirection: 'column', alignItems: 'flex-start'}}>
+            <Text style={styles.guideTitleText}>Guide</Text>
+            <Text style={styles.guideText} >
+                1. Enter the domain name or URL without "https://" or "www". Instead of adding <Text style={styles.guideLinkText}>https://www.facebook.com</Text>, just type <Text style={styles.guideLinkText}>facebook.com</Text>.
+            </Text>
+            <Text style={styles.guideText} >
+                2. If you need a specific webpage or directory, type it directly. For example, enter <Text style={styles.guideLinkText}>facebook.com/home</Text> to access a particular section.
+            </Text>
+        </ItemContainer>
+    );
+};
+
+
+interface ErrorPopupProps {
+    visible: boolean;
+    websiteUrl: string;
+    onClose: () => void;
+}
+
+const ErrorPopup:React.FC<ErrorPopupProps> = ({ visible, websiteUrl, onClose }) => {
+    return (
+        <BlurModal visible={visible} onClose={onClose} >
+            <Text style={styles.errorPopoutText}><Text style={styles.errorPopupLinkText}>{websiteUrl}</Text> is already blocked. No need to add it again!</Text>
+            <ActionButton variant="cancel" onPress={onClose} />
+        </BlurModal>
     );
 };
 
@@ -114,11 +166,6 @@ const styles = StyleSheet.create({
         shadowRadius: 5,
         elevation: 5,
     },
-    urlText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',  
-    },
     websiteContainer: {
         flex: 1,
         flexDirection: 'row',
@@ -128,50 +175,37 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: 3,
     },
-    guideContainer: {
-        backgroundColor: '#f8f9fa', 
-        padding: 16,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#ddd',
-        margin: 16,
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 4,
-        elevation: 3,
+    websiteUrlText: {
+        fontWeight: '600',
+        fontSize: 16,
+        color: '#2f4f4f'
     },
-    guideTitle: {
-        fontSize: 18,
+    guideTitleText: {
         fontWeight: 'bold',
-        marginBottom: 10,
+        fontSize: 18,
         color: '#333',
+        marginBottom: 10,
     },
-    guideStep: {
+    guideText: {
         fontSize: 14,
         color: '#555',
-        marginBottom: 8,
+        marginBottom: 10,
     },
-    guideHighlight: {
+    guideLinkText: {
+        color: '#1E90FF',    
         fontWeight: 'bold',
-        color: '#007bff',
-    }
+    },
+    errorPopoutText: {
+        textAlign: 'center',
+        marginBottom: 18,
+        fontSize: 14,
+    },
+    errorPopupLinkText: {
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+
 });
 
+
 export default AddSiteScreen;
-
-
-
-const GuideContainer = () => {
-    return (
-        <View style={styles.guideContainer}>
-            <Text style={styles.guideTitle}>Guide</Text>
-            <Text style={styles.guideStep}>
-                1. Enter the domain name or URL without "https://" or "www". Instead of adding <Text style={styles.guideHighlight}>https://www.facebook.com</Text>, just type <Text style={styles.guideHighlight}>facebook.com</Text>.
-            </Text>
-            <Text style={styles.guideStep}>
-                2. If you need a specific webpage or directory, type it directly. For example, enter <Text style={styles.guideHighlight}>facebook.com/home</Text> to access a particular section.
-            </Text>
-        </View>
-    );
-};
