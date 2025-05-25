@@ -7,12 +7,38 @@ import android.net.Uri
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import java.util.concurrent.atomic.AtomicBoolean
+import android.content.Context
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 
 
 class BlockAccessibilityService : AccessibilityService() {
 
-    private val blockedUrls = arrayOf("123moviestv.net", "instagram.com", "youtube.com", "google.com")
+    data class BlockedWebsite(
+        val days: String,
+        val time: String,
+        val websiteUrl: String,
+        val visible: Boolean
+    )
+
+    private lateinit var blockedList: List<BlockedWebsite>
+
+    private fun loadBlockedList() {
+        val sharedPref = applicationContext.getSharedPreferences("BlockedPrefs", Context.MODE_PRIVATE)
+        val jsonData = sharedPref.getString("@blocked_websites", null)
+
+        if (jsonData != null) {
+            try {
+                val gson = Gson()
+                val type = object : TypeToken<List<BlockedWebsite>>() {}.type
+                blockedList = gson.fromJson(jsonData, type)
+            } catch (e: Exception) {
+                Log.e("BlockedService", "Failed to parse blocked list", e)
+            }
+        }
+    }
+
     private var lastProcessedTime: Long = 0
     private val debounceInterval = 1000L
 
@@ -23,9 +49,14 @@ class BlockAccessibilityService : AccessibilityService() {
         }
         lastProcessedTime = System.currentTimeMillis()
 
-        event?.let {
-            Log.d("Randomwords", "\nEvent type: ${AccessibilityEvent.eventTypeToString(it.eventType)}")
+        val packageName = event?.packageName?.toString()
+
+        if (!isBrowser(packageName)) {
+            return
         }
+
+        // Log.d("BlockedSite", "Browser detected: $packageName")
+        loadBlockedList()
 
         val rootNode = rootInActiveWindow
         if (rootNode != null) {
@@ -33,29 +64,23 @@ class BlockAccessibilityService : AccessibilityService() {
             traverseNode(rootNode, foundFirstEditText)  
         }
     }
-        
-        
-    // if (event?.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED && event.text != null) {
-    //     val eventText = event.text.joinToString(" ").toLowerCase()
-    //     Log.d("Randomwords", "Content Changed: ${event.text}")
-
-    //     for (url in blockedUrls) {
-    //         if (eventText.contains(url)) {
-    //             val intent = Intent(Intent.ACTION_VIEW)
-    //             intent.data = Uri.parse("yourapp://blocked") // Custom scheme
-    //             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    //             startActivity(intent)
-
-    //             Log.d("Randomwords", "Redirecting to blocked screen")
-    //             break
-    //         }
-    //     }
-    // }
-    
 
     override fun onInterrupt() {
-        // Handle interruption if needed
+    // You can leave this empty if you don't need to handle interruptions
     }
+
+    private fun isBrowser(packageName: String?): Boolean {
+        if (packageName == null) return false
+
+        val browserPackages = listOf(
+            "com.android.chrome",
+            "org.mozilla.firefox",
+            "com.brave.browser",
+            "com.opera.browser",
+        )
+
+    return browserPackages.contains(packageName)
+}
 
 
     private fun traverseNode(node: AccessibilityNodeInfo?, foundFirstEditText: AtomicBoolean) {
@@ -64,20 +89,23 @@ class BlockAccessibilityService : AccessibilityService() {
 
         if(node.className == "android.widget.EditText" && !node.isFocused){
             foundFirstEditText.set(true)
-            for (url in blockedUrls) {
-                if (node.text?.contains(url) == true ) {
-                    Log.d("Randomwords", "Node: ${node.className}, Text: ${node.text}")
+            for (item in blockedList) {
+                if (node.text?.contains(item.websiteUrl) == true ) {
+
+                    // Log.d("BlockedSite", "Node: ${node.className}, Text: ${node.text}")
+
+                    val intent = Intent()
+                    intent.setClassName("com.blocksiteapp", "com.blocksiteapp.BlockedPageActivity")
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    intent.putExtra("blocked_url", item.websiteUrl)
+                    applicationContext.startActivity(intent)
+
                 }
             }
         } 
-
-
-        // Log.d("Randomwords", "Node: ${node.className}, Text: ${node.text}")
-
         for (i in 0 until node.childCount) {
             traverseNode(node.getChild(i), foundFirstEditText)
         }
     }
-
 }
 
