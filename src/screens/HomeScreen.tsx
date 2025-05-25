@@ -1,7 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { NativeModules, Pressable, StyleSheet, Text, View } from "react-native";
 import BaseScreen from "../components/BaseScreen"
 import React, { useEffect, useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BlockedWebsitesData } from "../types/types";
 import ItemContainer from "../components/itemContainer";
 import Favicon from "../components/Favicon";
@@ -9,6 +8,7 @@ import Icon from "../components/Icon";
 import ActionButton from "../components/ActionButton";
 import BlurModal from "../components/BlurModal";
 
+const { SharedStorage} = NativeModules;
 
 
 const HomeScreen: React.FC = () => {
@@ -18,7 +18,7 @@ const HomeScreen: React.FC = () => {
 
     const getWebsitesData = async () => {
         try {
-            const existingData = await AsyncStorage.getItem('@blocked_websites');
+            const existingData = await SharedStorage.getItem('@blocked_websites');
             const websitesData = existingData ? JSON.parse(existingData) : [];
             setWebsites(websitesData);
         } catch (error) {
@@ -77,11 +77,11 @@ const Popup: React.FC<PopupProps> = ({url, visible, onClose, setSelectedWebsites
 
     const onConfirm = async () => {
         try {
-            const existingData = await AsyncStorage.getItem('@blocked_websites');
+            const existingData = await SharedStorage.getItem('@blocked_websites');
             const websites = existingData ? JSON.parse(existingData) : [];
             const updatedWebsites = websites.filter((site: { websiteUrl: string }) => site.websiteUrl !== url);
 
-            await AsyncStorage.setItem('@blocked_websites', JSON.stringify(updatedWebsites));
+            await SharedStorage.setItem('@blocked_websites', JSON.stringify(updatedWebsites));
             setSelectedWebsites(null);
             getWebsitesData();
             onClose();

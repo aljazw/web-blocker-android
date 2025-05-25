@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, NativeModules } from "react-native";
 import BaseScreen from "../components/BaseScreen";
 import React, { useState } from "react";
 import Icon from "../components/Icon";
@@ -6,9 +6,10 @@ import { NavigationProp, RouteProp, useNavigation, useRoute } from "@react-navig
 import { BlockedWebsitesData, RootStackNavigation, RootStackParamList } from "../types/types";
 import TimeInput from "../components/TimeInput";
 import NextButton from "../components/NextButton";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import ActionButton from "../components/ActionButton";
 import BlurModal from "../components/BlurModal";
+
+const { SharedStorage} = NativeModules;
 
 const ScheduleScreen: React.FC = () => {
 
@@ -221,14 +222,21 @@ const Popup: React.FC<PopupProps> = ({
         };
 
         try {
-            const existingData = await AsyncStorage.getItem('@blocked_websites');
+            const existingData = await SharedStorage.getItem('@blocked_websites');
             const websites = existingData ? JSON.parse(existingData) : [];
 
             websites.push(newBlockedData);
 
-            await AsyncStorage.setItem('@blocked_websites', JSON.stringify(websites));
+            const success = await SharedStorage.setItem('@blocked_websites', JSON.stringify(websites));
 
-            navigation.navigate('BottomTabs')
+            if (success) {
+                console.log("Data saved successfully")
+                navigation.navigate('BottomTabs');
+            } else {
+                console.error('Failed to save blocked website data');
+            }
+
+            
         } catch (error) {
             console.error('Error saving blocked website data', error);
         }

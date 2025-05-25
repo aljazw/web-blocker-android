@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, ActivityIndicator, Pressable } from "react-native";
+import { StyleSheet, Text, View, ActivityIndicator, Pressable, NativeModules } from "react-native";
 import BaseScreen from "../components/BaseScreen";
 import React, { useState, useEffect } from "react";
 import SearchBar from "../components/SearchBar";
@@ -10,7 +10,9 @@ import ItemContainer from "../components/itemContainer";
 import Favicon from "../components/Favicon";
 import BlurModal from "../components/BlurModal";
 import ActionButton from "../components/ActionButton";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { denormalizeUrl, normalizeUrl } from "../utils/urlHelpers";
+
+const { SharedStorage} = NativeModules;
 
 
 const AddSiteScreen: React.FC = () => {
@@ -24,7 +26,7 @@ const AddSiteScreen: React.FC = () => {
 
     const handlePressNext = async () => {
         try {
-            const existingData = await AsyncStorage.getItem('@blocked_websites');
+            const existingData = await SharedStorage.getItem('@blocked_websites');
             const websites = existingData ? JSON.parse(existingData) : [];
 
             const alreadyBlocked = websites.some((site: {websiteUrl: string }) => site.websiteUrl === websiteUrl);
@@ -40,18 +42,6 @@ const AddSiteScreen: React.FC = () => {
 
         navigation.navigate('Schedule',  {websiteUrl: websiteUrl});
     };
-
-    const normalizeUrl = (url: string): string => {
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-          return `https://${url}`;
-        }
-        return url;
-    };
-
-    const denormalizeUrl = (url: string): string => {
-        return url.replace(/^(https?:\/\/)?(www\.)?/, '');
-    };
-    
 
     const checkUrl = async (url: string) => {
         setLoading(true);
