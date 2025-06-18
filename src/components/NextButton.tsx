@@ -19,7 +19,7 @@ const NextButton: React.FC<NextButtonProps> = ({
     <View style={[styles.nextButtonContainer, buttonContainer]}>
         <Pressable style={[styles.nextButton, buttonStyle]} onPress={onPress}>
                 <Text style={[styles.nextButtonText, textStyle]}>Next</Text>
-                <Icon name="Next" size={21} style={[{ marginLeft: 5 }, iconStyle]}/>
+                <Icon name="Next" size={21} tint={false} style={[{ marginLeft: 5 }, iconStyle]}/>
         </Pressable>
     </View>
 )
@@ -39,14 +39,14 @@ const styles = StyleSheet.create({
         paddingVertical: 15,
         paddingHorizontal: 20,
         borderRadius: 50, 
-        elevation: 6, // Stronger shadow for pop-out effect
+        elevation: 3, // Stronger shadow for pop-out effect
         shadowColor: '#34C759',
         shadowOpacity: 0.4,
         shadowOffset: { width: 0, height: 6 },
         shadowRadius: 8,
     },
     nextButtonText: {
-        color: '#fff',
+        color: '#FAFAFA',
         fontSize: 18,
         fontWeight: '600',
         letterSpacing: 0.8, 

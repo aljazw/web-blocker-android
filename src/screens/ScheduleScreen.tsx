@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View, NativeModules } from "react-native";
+import { Pressable, StyleSheet, View, NativeModules } from "react-native";
 import BaseScreen from "../components/BaseScreen";
 import React, { useState } from "react";
 import Icon from "../components/Icon";
@@ -8,6 +8,8 @@ import TimeInput from "../components/TimeInput";
 import NextButton from "../components/NextButton";
 import ActionButton from "../components/ActionButton";
 import BlurModal from "../components/BlurModal";
+import { shapes, useTheme } from "../theme";
+import { ThemedText } from "../components/ThemedText";
 
 const { SharedStorage} = NativeModules;
 
@@ -91,15 +93,18 @@ const ScheduleScreen: React.FC = () => {
         setEndMinutes('');
     }
 
+    const { theme } = useTheme();
+
+
     return (
         <BaseScreen title="Schedule">
             <View style={styles.itemContainer}>
                 <View style={styles.itemLessContainer}>
                     <View style={styles.itemInnerLeftContainer}>
-                        <Icon name="Calendar" style={styles.leftIcon} size={30}/>
+                        <Icon name="Calendar" tint={false} style={styles.leftIcon} size={30}/>
                         <View>
-                            <Text>Days</Text>
-                            <Text style={styles.durationText}>{getSelectedDaysText()}</Text>
+                            <ThemedText>Days</ThemedText>
+                            <ThemedText opacity="faded">{getSelectedDaysText()}</ThemedText>
                         </View>
                     </View>
                     <Pressable onPress={handleToggleCalendarArrow}>
@@ -121,19 +126,24 @@ const ScheduleScreen: React.FC = () => {
                             key={index} 
                             style={[
                                 styles.dayContainer,
-                                !selectedDays[index] && styles.selectedDayContainer
+                                !selectedDays[index] && {
+                                    backgroundColor: theme.colors.card, 
+                                    borderWidth: shapes.borderWidth.thin, 
+                                    borderColor: theme.colors.border
+                                }
                             ]}
                             onPress={() => toggleDay(index)}
                             >
-                                <Text
+                                <ThemedText
+                                    size="small"
+                                    weight="strong"
                                     style={[
-                                        {fontSize: 14, fontWeight: 'bold'},
                                         selectedDays[index] ? { color: 'white' } : {},
                                         !selectedDays[index] ? { opacity: 0.6 } : {},
                                     ]}
                                 >
                                     {day.charAt(0)}
-                                </Text>
+                                </ThemedText>
                             </Pressable>
                         ))}
                     </View>
@@ -144,8 +154,8 @@ const ScheduleScreen: React.FC = () => {
                     <View style={styles.itemInnerLeftContainer}>
                         <Icon name="Time" style={styles.leftIcon} size={28}/>
                         <View>
-                            <Text>Time</Text>
-                            <Text style={styles.durationText}>{getSelectedTimeText()}</Text>
+                            <ThemedText>Time</ThemedText>
+                            <ThemedText opacity="faded">{getSelectedTimeText()}</ThemedText>
                         </View>
                     </View>
                     <Pressable onPress={handleToggleTimeArrow}>
@@ -177,7 +187,7 @@ const ScheduleScreen: React.FC = () => {
                             setMinutes={setEndMinutes}
                         />
                         <Pressable onPress={clearTime}>
-                            <Text style={styles.clearText}>Clear</Text>
+                            <ThemedText color="primaryRed" style={styles.clearText}>Clear</ThemedText>
                         </Pressable>
                   </View>
                 )}
@@ -244,15 +254,15 @@ const Popup: React.FC<PopupProps> = ({
 
     return (
         <BlurModal visible={visible} onClose={onClose}>
-            <Text style={styles.popUpText}>
-            Are you sure you want to put <Text style={styles.linkText}>{websiteUrl}</Text> on a block list?
-            </Text>
-            <Text style={styles.popUpText}>
-            For the following days: <Text style={{ fontWeight: 'bold' }}>{days}</Text>
-            </Text>
-            <Text style={styles.popUpText}>
-            Blocking hour: <Text style={{ fontWeight: 'bold' }}>{time}</Text>
-            </Text>
+            <ThemedText style={styles.popUpText}>
+            Are you sure you want to put <ThemedText color="primaryBlue" size="large" weight="strong">{websiteUrl}</ThemedText> on a block list?
+            </ThemedText>
+            <ThemedText style={styles.popUpText}>
+            For the following days: <ThemedText weight="medium">{days}</ThemedText>
+            </ThemedText>
+            <ThemedText style={styles.popUpText}>
+            Blocking hour: <ThemedText weight="medium">{time}</ThemedText>
+            </ThemedText>
             <View style={styles.buttonsContainer}>
                 <ActionButton variant="cancel" onPress={onClose} />
                 <ActionButton variant="confirm" onPress={onConfirm} />
@@ -295,9 +305,6 @@ const styles = StyleSheet.create({
     rightIcon: {
         opacity: 0.5,
     },
-    durationText: {
-        opacity: 0.5
-    },
     dayContainer: {
         marginTop: 10,
         marginHorizontal: 5,
@@ -309,11 +316,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#009a26',
     },
-    selectedDayContainer: {
-        borderColor: '#ccc',      
-        borderWidth: 1,
-        backgroundColor: '#f0f0f0'
-    },
     arrowIconContainer: {
         width: 30,
         height: 30,
@@ -321,7 +323,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     clearText: {
-        color: 'red',
         marginTop: 3,
     },
     buttonsContainer: {
@@ -331,12 +332,6 @@ const styles = StyleSheet.create({
     popUpText: {
         marginBottom: 10,
         textAlign: 'center',
-        opacity: 0.8,
-    },
-    linkText: {
-        color: '#0000cd',    
-        fontWeight: 'bold',
-        fontSize: 17,
     },
 });
 

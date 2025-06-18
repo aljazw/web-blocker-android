@@ -5,16 +5,19 @@
  * @format
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 
 import Navigation from './src/navigation/Navigation';
-
+import { ThemeProvider } from './src/theme';
 
 
 function App(): React.JSX.Element {
-
+  
   return (
-    <Navigation/>
+    <ThemeProvider>
+      <Navigation/>
+    </ThemeProvider>
+    
   );
 
 }; 

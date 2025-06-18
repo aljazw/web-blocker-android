@@ -2,7 +2,6 @@ import { NavigationContainer } from "@react-navigation/native"
 import { createStackNavigator } from "@react-navigation/stack"
 import BottomTabNavigator from "./BottomTabNavigator";
 import ScheduleScreen from "../screens/ScheduleScreen";
-import AddSiteScreen from "../screens/AddSiteScreen";
 import { RootStackParamList } from "../types/types";
 
 
@@ -18,11 +17,6 @@ const Navigation: React.FC = () => {
                     name="BottomTabs" 
                     component={BottomTabNavigator} 
                     options={{ headerShown: false}}
-                />
-                <Stack.Screen 
-                    name="AddSite"
-                    component={AddSiteScreen}
-                    options={{headerShown: false}}
                 />
                 <Stack.Screen 
                     name="Schedule"

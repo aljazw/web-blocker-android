@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import Icon from "./Icon";
+import { shapes, spacing, useTheme } from "../theme";
 
 
 interface SearchBarProps {
@@ -18,12 +19,15 @@ const SearchBar: React.FC<SearchBarProps> = ({ placeholder = "Search...", onSear
         onSearch("");
     };
 
+    const { theme } = useTheme();
+
     return (
-        <View style={styles.container}>
-            <Icon name={"Search"} size={30} style={styles.iconSearch}/>
+        <View style={[styles.container, {backgroundColor: theme.colors.card, borderColor: theme.colors.border}]}>
+            <Icon name={"Search"} size={30} opacity="faded" style={styles.iconSearch}/>
             <TextInput
-                style={styles.input}
+                style={[styles.input, {color: theme.colors.text, fontSize: 18}]}
                 placeholder={placeholder}
+                placeholderTextColor="#888888"
                 onChangeText={(text) => {
                     setQuery(text);
                     onSearch(text);
@@ -34,7 +38,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ placeholder = "Search...", onSear
                 keyboardType="url"
             />
             <Pressable onPress={handleClear}>
-                <Icon name={"Close"} size={18} style={styles.iconClose}/>
+                <Icon name={"Close"} size={17} opacity="faded" style={styles.iconClose}/>
             </Pressable>
             
         </View>
@@ -45,24 +49,20 @@ const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#A0A0A0',
-        padding: 4,
-        borderRadius: 20,
-        marginHorizontal: 4,
+        padding: spacing.xs,
+        borderRadius: shapes.borderRadius.large,
+        marginHorizontal: spacing.xs,
+        borderWidth: shapes.borderWidth.thin,
     },
     input: {
         flex: 1,
-        fontSize: 18,
         textAlignVertical: 'center',
-        color: 'white',
     },
     iconSearch: {
-        marginHorizontal: 5,
-        opacity: 0.5,
+        marginHorizontal: spacing.xs,
     },
     iconClose: {
-        marginHorizontal: 12,
-        opacity: 0.4
+        marginHorizontal: spacing.sm,
     }
 });
 

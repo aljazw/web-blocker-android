@@ -1,4 +1,4 @@
-import { NativeModules, Pressable, StyleSheet, Text, View } from "react-native";
+import { NativeModules, Pressable, StyleSheet, View } from "react-native";
 import BaseScreen from "../components/BaseScreen"
 import React, { useEffect, useState } from "react";
 import { BlockedWebsitesData } from "../types/types";
@@ -7,6 +7,9 @@ import Favicon from "../components/Favicon";
 import Icon from "../components/Icon";
 import ActionButton from "../components/ActionButton";
 import BlurModal from "../components/BlurModal";
+import { spacing } from "../theme";
+import { ThemedText } from "../components/ThemedText";
+
 
 const { SharedStorage} = NativeModules;
 
@@ -14,7 +17,7 @@ const { SharedStorage} = NativeModules;
 const HomeScreen: React.FC = () => {
 
     const [websites, setWebsites] = useState<BlockedWebsitesData[]>([]);
-    const [selectedWebsite, setSelectedWebsite] = useState<string | null>(null)
+    const [selectedWebsite, setSelectedWebsite] = useState<string | null>(null);
 
     const getWebsitesData = async () => {
         try {
@@ -35,14 +38,14 @@ const HomeScreen: React.FC = () => {
         <BaseScreen title="Home Screen">
             <View>
                 {websites.length === 0 ? (
-                    <Text>No Blocked Webistes</Text>
+                    <ThemedText>No Blocked Webistes</ThemedText>
                 ) :  (
                     <View>
                         {websites.map((website, index) => (
                             <ItemContainer key={index}>
                                 <View style={styles.innerLeftContainer}>
                                     <Favicon url={website.websiteUrl}/>
-                                    <Text style={styles.websiteUrlText}>{website.websiteUrl}</Text>
+                                    <ThemedText weight="medium" size="large">{website.websiteUrl}</ThemedText>
                                 </View>
                                 <Pressable onPress={() => setSelectedWebsite(website.websiteUrl) } >
                                     <Icon name={"Trash"} style={styles.trashIcon}/>
@@ -92,7 +95,7 @@ const Popup: React.FC<PopupProps> = ({url, visible, onClose, setSelectedWebsites
 
     return(
         <BlurModal visible={visible} onClose={onClose}>
-            <Text style={styles.popupText}>Are you sure you want to remove <Text style={styles.popupLinkText}>{url}</Text> from your block list?</Text>
+            <ThemedText style={{textAlign: 'center'}}>Are you sure you want to remove <ThemedText color="primaryBlue" weight="strong" size="large">{url}</ThemedText> from your block list?</ThemedText>
             <View style={styles.popupButtonsContainer}> 
                 <ActionButton variant="cancel" onPress={onClose} />
                 <ActionButton variant="confirm" onPress={onConfirm} />
@@ -112,22 +115,7 @@ const styles = StyleSheet.create({
     popupButtonsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-    },
-    websiteUrlText: {
-        fontWeight: '600',
-        fontSize: 17,
-        color: '#2f4f4f'
-    },
-    popupText: {
-        textAlign: 'center',
-        opacity: 0.8,
-        marginBottom: 18,
-        fontSize: 14,
-    },
-    popupLinkText: {
-        color: '#0000cd',    
-        fontWeight: 'bold',
-        fontSize: 16,
+        marginTop: spacing.lg,
     },
 });
 

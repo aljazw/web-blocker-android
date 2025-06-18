@@ -1,12 +1,12 @@
 import React from "react";
-import { ActivityIndicator, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, SafeAreaView, StyleSheet, View } from "react-native";
+import { shapes, spacing, useTheme } from "../theme";
+import { ThemedText } from "./ThemedText";
 
 
 interface BaseScreenProps {
     children: React.ReactNode;
     title?: string;
-    backgroundColor?: string;
-    padding?: number;
     isLoading?: boolean;
     customStyles?: object;
     showHeader?: boolean;
@@ -15,21 +15,22 @@ interface BaseScreenProps {
 const BaseScreen: React.FC<BaseScreenProps> = ({
     children,
     title,
-    backgroundColor = '#f8f8f8',
-    padding =  16,
     isLoading = false,
     customStyles = {},
     showHeader = true
 }) => {
+
+    const { theme } = useTheme();
+
     return (
-        <SafeAreaView style={[styles.container, {backgroundColor}]}>
+        <SafeAreaView style={[styles.container, {backgroundColor: theme.colors.background}, customStyles]}>
             {showHeader && (
-                <View style={styles.header}>
-                    {title && <Text style={styles.title}>{title}</Text>}
+                <View style={[styles.header, {borderBottomColor: theme.colors.border}]}>
+                    {title && <ThemedText size="xlarge" weight="strong">{title}</ThemedText>}
                 </View>
             )}
 
-            <View style={[styles.content, {padding}, customStyles]}>
+            <View style={[styles.content, customStyles]}>
                 {isLoading ? (
                     <ActivityIndicator size="large" color="#0000ff" />
                 ) : (
@@ -45,14 +46,8 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     header: {
-        padding: 16,
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderBottomColor: '#ddd',
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold', 
+        padding: spacing.md,
+        borderWidth: shapes.borderWidth.thin,
     },
     content: {
         flex: 1,

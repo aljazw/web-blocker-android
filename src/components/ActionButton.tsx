@@ -1,9 +1,10 @@
 import { Pressable, StyleSheet, Text, ViewStyle } from "react-native"
+import { shapes, spacing } from "../theme";
 
 type ActionVariant = 'cancel' | 'confirm';
 
 const variantConfig: Record<ActionVariant, { title: string; color: string }> = {
-    cancel: { title: 'Cancel', color: '#f44336'},
+    cancel: { title: 'Cancel', color: '#d7372f'},
     confirm: {title: 'Confirm', color: '#4CAF50'}
 };
 
@@ -28,9 +29,9 @@ const ActionButton: React.FC<CancelButtonProps> = ({variant, style, onPress}) =>
 const styles = StyleSheet.create({
     cancelButton: {
         backgroundColor: '#f44336',
-        padding: 10,
-        borderRadius: 5,
-        marginRight: 10,
+        padding: spacing.sm,
+        borderRadius: shapes.borderRadius.small,
+        marginRight: spacing.sm,
         width: 80,
         justifyContent: 'center',
         alignItems: 'center',
@@ -39,7 +40,6 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: 'bold',
     },
-    
 });
 
 export default ActionButton;

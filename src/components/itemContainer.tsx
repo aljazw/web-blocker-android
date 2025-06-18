@@ -1,4 +1,5 @@
 import { StyleSheet, View, ViewStyle } from "react-native";
+import { shapes, spacing, useTheme } from "../theme";
 
 interface ItemContainerProps {
     children: React.ReactNode;
@@ -6,7 +7,9 @@ interface ItemContainerProps {
 }
 
 const ItemContainer: React.FC<ItemContainerProps> = ({children, style}) => {
-    return <View style={[styles.itemContainer, style]}>{children}</View>
+    const { theme } = useTheme();
+
+    return <View style={[styles.itemContainer, style, {backgroundColor: theme.colors.card, borderColor: theme.colors.border}]}>{children}</View>
 };
 
 
@@ -14,19 +17,17 @@ const styles = StyleSheet.create({
     itemContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginHorizontal: 10,
-        marginTop: 20,
+        marginHorizontal: spacing.sm,
+        marginTop: spacing.md,
         alignItems: 'center',
-        padding: 15,
-        borderRadius: 10,
-        backgroundColor: '#f9f9f9',  
-        borderWidth: 1,  
-        borderColor: '#e0e0e0',
+        padding: spacing.md,
+        borderRadius: shapes.borderRadius.medium, 
+        borderWidth: shapes.borderWidth.thin,  
         shadowColor: '#000',
         shadowOpacity: 0.1,
         shadowOffset: { width: 0, height: 2 },
         shadowRadius: 4,
-        elevation: 3, // Shadow effect for Android
+        elevation: shapes.elevation.medium, // Shadow effect for Android
     },
 })
 
