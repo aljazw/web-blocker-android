@@ -83,7 +83,7 @@ const ScheduleScreen: React.FC = () => {
             return 'Invalid Time';
         }
       
-        return `${startHour}:${startMinutes} - ${endHour}:${endMinutes}`;
+        return `${startHour.padStart(2, '0')}:${startMinutes.padStart(2, '0')} - ${endHour.padStart(2, '0')}:${endMinutes.padStart(2, '0')}`;
     };
 
     const clearTime = () => {
@@ -222,6 +222,8 @@ const Popup: React.FC<PopupProps> = ({
     websiteUrl,
     onClose,
 }) => {
+
+    const timeNormalized = time;
 
     const onConfirm = async () => {
         const newBlockedData: BlockedWebsitesData = {
