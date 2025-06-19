@@ -5,7 +5,7 @@ import { Text } from "react-native-gesture-handler";
 type TextSize = 'small' | 'normal' | 'large' | 'xlarge';
 type TextWeight = 'light' | 'regular' | 'medium' | 'strong';
 type TextOpacity = 'normal' | 'muted' | 'faded';
-type ColorToken = 'text' | 'primaryRed' | 'primaryBlue';
+type ColorToken = 'text' | 'primaryRed' | 'primaryBlue' | 'primaryGreen';
 
 
 interface Props extends TextProps {

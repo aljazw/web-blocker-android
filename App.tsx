@@ -5,21 +5,22 @@
  * @format
  */
 
-import React, { useEffect } from 'react';
+import React from 'react';
 
 import Navigation from './src/navigation/Navigation';
 import { ThemeProvider } from './src/theme';
+import { PassphraseProvider } from './src/context/PassphraseContext';
 
 
 function App(): React.JSX.Element {
   
-  return (
-    <ThemeProvider>
-      <Navigation/>
-    </ThemeProvider>
-    
-  );
-
+    return (
+        <ThemeProvider>
+            <PassphraseProvider>
+                <Navigation/>
+            </PassphraseProvider>
+        </ThemeProvider>
+    );
 }; 
 
 export default App;

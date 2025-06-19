@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import Icon from "./Icon";
 import { shapes, spacing, useTheme } from "../theme";
+import { ThemedView } from "./ThemedView";
 
 
 interface SearchBarProps {
@@ -22,7 +23,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ placeholder = "Search...", onSear
     const { theme } = useTheme();
 
     return (
-        <View style={[styles.container, {backgroundColor: theme.colors.card, borderColor: theme.colors.border}]}>
+        <ThemedView withBorder style={styles.container}>
             <Icon name={"Search"} size={30} opacity="faded" style={styles.iconSearch}/>
             <TextInput
                 style={[styles.input, {color: theme.colors.text, fontSize: 18}]}
@@ -41,7 +42,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ placeholder = "Search...", onSear
                 <Icon name={"Close"} size={17} opacity="faded" style={styles.iconClose}/>
             </Pressable>
             
-        </View>
+        </ThemedView>
     );
 };
 

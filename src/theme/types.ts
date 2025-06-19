@@ -5,6 +5,7 @@ export type Theme = {
         text: string;
         primaryRed: string,    
         primaryBlue: string,
+        primaryGreen: string,
         card: string;
         border: string;
     };

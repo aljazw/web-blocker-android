@@ -123,16 +123,16 @@ const ScheduleScreen: React.FC = () => {
                     <View style={styles.itemMoreContainer}>
                         {days.map((day, index) => (
                             <Pressable 
-                            key={index} 
-                            style={[
-                                styles.dayContainer,
-                                !selectedDays[index] && {
-                                    backgroundColor: theme.colors.card, 
-                                    borderWidth: shapes.borderWidth.thin, 
-                                    borderColor: theme.colors.border
-                                }
-                            ]}
-                            onPress={() => toggleDay(index)}
+                                key={index} 
+                                style={[
+                                    styles.dayContainer,
+                                    !selectedDays[index] && {
+                                        backgroundColor: theme.colors.card, 
+                                        borderWidth: shapes.borderWidth.thin, 
+                                        borderColor: theme.colors.border
+                                    }
+                                ]}
+                                onPress={() => toggleDay(index)}
                             >
                                 <ThemedText
                                     size="small"

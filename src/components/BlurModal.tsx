@@ -1,7 +1,8 @@
 import { BlurView } from "@react-native-community/blur";
 import { ReactNode } from "react";
-import { Modal, StyleSheet, View } from "react-native";
-import { shapes, spacing, useTheme } from "../theme";
+import { Modal, StyleSheet } from "react-native";
+import { shapes, spacing } from "../theme";
+import { ThemedView } from "./ThemedView";
 
 interface BlurModalProps {
     children: ReactNode;
@@ -9,8 +10,6 @@ interface BlurModalProps {
     onClose: () => void;
 }
 const BlurModal: React.FC<BlurModalProps> = ({ children, visible, onClose }) => {
-
-    const { theme } = useTheme();
 
     return (
         <Modal
@@ -24,9 +23,9 @@ const BlurModal: React.FC<BlurModalProps> = ({ children, visible, onClose }) => 
                 blurAmount={10}
                 style={styles.blurContainer}
             >
-                <View style={[styles.popoutContainer, {backgroundColor: theme.colors.background, borderColor: theme.colors.border}]}>
+                <ThemedView color="background" withBorder style={styles.popoutContainer}>
                     {children}
-                </View>
+                </ThemedView>
                 
             </BlurView>
         </Modal>
@@ -44,8 +43,8 @@ const styles = StyleSheet.create({
         borderRadius: shapes.borderRadius.medium,
         borderWidth: shapes.borderWidth.thin,
         elevation: shapes.elevation.medium,
-        width: 300,
         alignItems: 'center',
+        maxWidth: '80%'
     },
 
 });

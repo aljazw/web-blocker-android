@@ -1,5 +1,6 @@
-import { StyleSheet, View, ViewStyle } from "react-native";
-import { shapes, spacing, useTheme } from "../theme";
+import { StyleSheet, ViewStyle } from "react-native";
+import { shapes, spacing } from "../theme";
+import { ThemedView } from "./ThemedView";
 
 interface ItemContainerProps {
     children: React.ReactNode;
@@ -7,9 +8,7 @@ interface ItemContainerProps {
 }
 
 const ItemContainer: React.FC<ItemContainerProps> = ({children, style}) => {
-    const { theme } = useTheme();
-
-    return <View style={[styles.itemContainer, style, {backgroundColor: theme.colors.card, borderColor: theme.colors.border}]}>{children}</View>
+    return <ThemedView withBorder style={[styles.itemContainer, style]}>{children}</ThemedView>
 };
 
 
