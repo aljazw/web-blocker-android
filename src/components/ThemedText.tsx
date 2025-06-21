@@ -5,13 +5,16 @@ import { Text } from "react-native-gesture-handler";
 type TextSize = 'small' | 'normal' | 'large' | 'xlarge';
 type TextWeight = 'light' | 'regular' | 'medium' | 'strong';
 type TextOpacity = 'normal' | 'muted' | 'faded';
+type TextAlign = 'left' | 'center' | 'right' | 'auto';
 type ColorToken = 'text' | 'primaryRed' | 'primaryBlue' | 'primaryGreen';
+
 
 
 interface Props extends TextProps {
     size?: TextSize;
     weight?: TextWeight;
     opacity?: TextOpacity;
+    align?: TextAlign;
     color?: ColorToken;
     style?: TextStyle | TextStyle[];
     children: React.ReactNode
@@ -21,6 +24,7 @@ export const ThemedText: React.FC<Props> = ({
     size = 'normal',
     weight = 'regular',
     opacity = 'normal',
+    align = 'auto',
     color = 'text',
     style,
     children,
@@ -48,9 +52,11 @@ export const ThemedText: React.FC<Props> = ({
         faded: 0.6,
     };
 
+
     const fontSize = sizeMap[size];
     const fontWeight = weightMap[weight];
     const fontOpacity = opacityMap[opacity];
+    const textAlign = align;
     const fontColor = theme.colors[color];
 
 
@@ -61,7 +67,8 @@ export const ThemedText: React.FC<Props> = ({
                 { 
                     fontSize, 
                     fontWeight, 
-                    opacity: fontOpacity,  
+                    opacity: fontOpacity,
+                    textAlign: textAlign,  
                     color: fontColor 
                 },
                 style,

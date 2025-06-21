@@ -14,6 +14,7 @@ const iconMap: Record<string, any> = {
     Time: require('../assets/icons/time.png'),
     Arrow: require('../assets/icons/arrow.png'),
     Trash: require('../assets/icons/delete.png'),
+    Hide: require('../assets/icons/hide.png'),
 };
 
 type IconOpacity = 'normal' | 'muted' | 'faded';

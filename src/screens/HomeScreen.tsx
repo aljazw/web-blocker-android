@@ -19,7 +19,8 @@ const { SharedStorage} = NativeModules;
 const HomeScreen: React.FC = () => {
 
     const [websites, setWebsites] = useState<BlockedWebsitesData[]>([]);
-    const [selectedWebsite, setSelectedWebsite] = useState<string | null>(null);
+    const [removeSelectedWebsite, setRemoveSelectedWebsite] = useState<string | null>(null);
+    const [hideSelectedWebsite, setHideSelectedWebsite] = useState<string | null>(null);
 
     const getWebsitesData = async () => {
         try {
@@ -44,25 +45,41 @@ const HomeScreen: React.FC = () => {
                 ) :  (
                     <View>
                         {websites.map((website, index) => (
-                            <ItemContainer key={index}>
-                                <View style={styles.innerLeftContainer}>
-                                    <Favicon url={website.websiteUrl}/>
-                                    <ThemedText weight="medium" size="large">{website.websiteUrl}</ThemedText>
-                                </View>
-                                <Pressable onPress={() => setSelectedWebsite(website.websiteUrl) } >
-                                    <Icon name={"Trash"} style={styles.trashIcon}/>
-                                </Pressable>
-                            </ItemContainer>
+                            website.visible && (
+                                <ItemContainer key={index}>
+                                    <View style={styles.innerLeftContainer}>
+                                        <Favicon url={website.websiteUrl}/>
+                                        <ThemedText weight="medium" size="large">{website.websiteUrl}</ThemedText>
+                                    </View>
+                                    <View style={{flexDirection: 'row'}}>
+                                        <Pressable onPress={() => setHideSelectedWebsite(website.websiteUrl) } >
+                                            <Icon name={"Hide"} opacity="faded" style={styles.hideIcon}/>
+                                        </Pressable>
+                                        <Pressable onPress={() => setRemoveSelectedWebsite(website.websiteUrl) } >
+                                            <Icon name={"Trash"} opacity="faded"/>
+                                        </Pressable>
+                                    </View>
+                                </ItemContainer>
+                            )
                         ))}
                     </View>
                 )}
             </View>
-            {selectedWebsite && (
-                <Popup
-                    url={selectedWebsite}
-                    visible={!!selectedWebsite}
-                    onClose={() => setSelectedWebsite(null)}
-                    setSelectedWebsites={setSelectedWebsite}
+            {removeSelectedWebsite && (
+                <PopupRemove
+                    visible={!!removeSelectedWebsite}
+                    onClose={() => setRemoveSelectedWebsite(null)}
+                    url={removeSelectedWebsite}
+                    setRemoveSelectedWebsites={setRemoveSelectedWebsite}
+                    getWebsitesData={getWebsitesData}
+                />
+            )}
+            {hideSelectedWebsite && (
+                <PopupHide 
+                    onClose={() => setHideSelectedWebsite(null)}
+                    visible={!!hideSelectedWebsite}
+                    url={hideSelectedWebsite}
+                    setHideSelectedWebsite={() => setHideSelectedWebsite(null)}
                     getWebsitesData={getWebsitesData}
                 />
             )}
@@ -70,19 +87,19 @@ const HomeScreen: React.FC = () => {
     );
 };
 
-interface PopupProps {
+interface PopupRemoveProps {
     url: string;
     visible: boolean;
     onClose: () => void;
-    setSelectedWebsites: React.Dispatch<React.SetStateAction<string | null>>;
+    setRemoveSelectedWebsites: React.Dispatch<React.SetStateAction<string | null>>;
     getWebsitesData: () => void;
 }
 
-const Popup: React.FC<PopupProps> = ({
+const PopupRemove: React.FC<PopupRemoveProps> = ({
     url,
     visible,
     onClose,
-    setSelectedWebsites,
+    setRemoveSelectedWebsites: setSelectedWebsites,
     getWebsitesData
 }) => {
 
@@ -123,10 +140,7 @@ const Popup: React.FC<PopupProps> = ({
                 <ThemedText style={{textAlign: 'center'}}>Are you sure you want to remove <ThemedText color="primaryBlue" weight="strong" size="large">{url}</ThemedText> from your block list?</ThemedText>
                 <View style={styles.popupButtonsContainer}> 
                     <ActionButton variant="cancel" onPress={onClose} />
-                    <ActionButton 
-                        variant="confirm" 
-                        onPress={handleInitialConfirm}
-                    />
+                    <ActionButton variant="confirm" onPress={handleInitialConfirm}/>
                 </View>
             </BlurModal>
 
@@ -139,13 +153,66 @@ const Popup: React.FC<PopupProps> = ({
     );
 };
 
+interface PopupVisibleProps {
+    onClose: () => void;
+    visible: boolean;
+    url: string;
+    setHideSelectedWebsite: React.Dispatch<React.SetStateAction<string | null>>;
+    getWebsitesData: () => void;
+};
+
+const PopupHide: React.FC<PopupVisibleProps> = ({
+    onClose, 
+    visible, 
+    url, 
+    setHideSelectedWebsite,
+    getWebsitesData
+}) => {
+
+    const onConfirm = async () => {
+        try {
+            const existingData = await SharedStorage.getItem('@blocked_websites');
+            const websites = existingData ? JSON.parse(existingData) : [];
+            const updatedWebsites = websites.map((site: { websiteUrl: string; visible: boolean }) => {
+                if (site.websiteUrl == url) {
+                    return {...site, visible: false};
+                }
+                return site;
+            });
+
+            await SharedStorage.setItem('@blocked_websites', JSON.stringify(updatedWebsites));
+            setHideSelectedWebsite(null);
+            getWebsitesData();
+            onClose();
+        } catch (error) {
+            console.log('Error deleting selected website', error)
+        }
+    }
+
+    return (
+        <BlurModal visible={visible} onClose={() => onClose}>
+            <ThemedText weight="strong" size="large" align="center">
+                Are you sure you want to make <ThemedText weight="strong" size="large" color="primaryBlue">{url}</ThemedText> invisible?
+            </ThemedText>
+            <ThemedText weight="strong" color="primaryRed" align="center" style={{marginTop: spacing.md}}>
+                Once hidden, you won’t be able to remove it unless you clear the app’s data 
+                through your device settings!
+            </ThemedText>
+            <View style={styles.popupButtonsContainer}> 
+                <ActionButton variant="cancel" onPress={onClose} />
+                <ActionButton variant="confirm" onPress={onConfirm}/>
+            </View>
+        </BlurModal>
+    );
+};
+
 const styles = StyleSheet.create({
     innerLeftContainer: {
         flexDirection: 'row',
         alignItems: 'center',
     },
-    trashIcon: {
-        opacity: 0.5,
+    hideIcon: {
+        marginRight: spacing.sm,
     },
     popupButtonsContainer: {
         flexDirection: 'row',
@@ -154,7 +221,10 @@ const styles = StyleSheet.create({
     },
     noBlockedWebsiteText: {
         marginLeft: spacing.md, marginTop: spacing.xs
-    }
+    },
+    hidePopupText: {
+        textAlign: 'center',
+    },
 });
 
 export default HomeScreen;
