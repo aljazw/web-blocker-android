@@ -2,6 +2,7 @@ import React from "react";
 import { ActivityIndicator, SafeAreaView, StyleSheet, View } from "react-native";
 import { shapes, spacing, useTheme } from "../theme";
 import { ThemedText } from "./ThemedText";
+import { ThemedView } from "./ThemedView";
 
 
 interface BaseScreenProps {
@@ -25,11 +26,11 @@ const BaseScreen: React.FC<BaseScreenProps> = ({
     return (
         <SafeAreaView style={[styles.container, {backgroundColor: theme.colors.background}, customStyles]}>
             {showHeader && (
-                <View style={[styles.header, {borderBottomColor: theme.colors.border}]}>
+                <View style={styles.header}>
                     {title && <ThemedText size="xlarge" weight="strong">{title}</ThemedText>}
                 </View>
             )}
-
+            <ThemedView withBorder style={styles.lineDivider}></ThemedView>
             <View style={[styles.content, customStyles]}>
                 {isLoading ? (
                     <ActivityIndicator size="large" color="#0000ff" />
@@ -47,7 +48,9 @@ const styles = StyleSheet.create({
     },
     header: {
         padding: spacing.md,
-        borderWidth: shapes.borderWidth.thin,
+    },
+    lineDivider: {
+        height: 1,
     },
     content: {
         flex: 1,

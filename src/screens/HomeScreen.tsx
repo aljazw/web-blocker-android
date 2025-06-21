@@ -9,6 +9,8 @@ import ActionButton from "../components/ActionButton";
 import BlurModal from "../components/BlurModal";
 import { spacing } from "../theme";
 import { ThemedText } from "../components/ThemedText";
+import PassphrasePopup from "../components/PassphrasePopup";
+import { usePassphrase } from "../context/PassphraseContext";
 
 
 const { SharedStorage} = NativeModules;
@@ -38,7 +40,7 @@ const HomeScreen: React.FC = () => {
         <BaseScreen title="Home Screen">
             <View>
                 {websites.length === 0 ? (
-                    <ThemedText>No Blocked Webistes</ThemedText>
+                    <ThemedText style={styles.noBlockedWebsiteText}>No Blocked Webistes</ThemedText>
                 ) :  (
                     <View>
                         {websites.map((website, index) => (
@@ -76,7 +78,29 @@ interface PopupProps {
     getWebsitesData: () => void;
 }
 
-const Popup: React.FC<PopupProps> = ({url, visible, onClose, setSelectedWebsites, getWebsitesData, }) => {
+const Popup: React.FC<PopupProps> = ({
+    url,
+    visible,
+    onClose,
+    setSelectedWebsites,
+    getWebsitesData
+}) => {
+
+    const { isEnabled } = usePassphrase();
+    const [showPassphrasePopup, setShowPassphrasePopup] = useState(false);
+
+    const handleInitialConfirm = () => {
+        if (isEnabled) {
+            setShowPassphrasePopup(true); 
+        } else {
+            onConfirm();
+        }
+    };
+
+    const handlePassphraseConfirm = () => {
+        setShowPassphrasePopup(false);
+        onConfirm();
+    };
 
     const onConfirm = async () => {
         try {
@@ -94,13 +118,24 @@ const Popup: React.FC<PopupProps> = ({url, visible, onClose, setSelectedWebsites
     }
 
     return(
-        <BlurModal visible={visible} onClose={onClose}>
-            <ThemedText style={{textAlign: 'center'}}>Are you sure you want to remove <ThemedText color="primaryBlue" weight="strong" size="large">{url}</ThemedText> from your block list?</ThemedText>
-            <View style={styles.popupButtonsContainer}> 
-                <ActionButton variant="cancel" onPress={onClose} />
-                <ActionButton variant="confirm" onPress={onConfirm} />
-            </View>
-        </BlurModal>
+        <>
+            <BlurModal visible={visible} onClose={onClose}>
+                <ThemedText style={{textAlign: 'center'}}>Are you sure you want to remove <ThemedText color="primaryBlue" weight="strong" size="large">{url}</ThemedText> from your block list?</ThemedText>
+                <View style={styles.popupButtonsContainer}> 
+                    <ActionButton variant="cancel" onPress={onClose} />
+                    <ActionButton 
+                        variant="confirm" 
+                        onPress={handleInitialConfirm}
+                    />
+                </View>
+            </BlurModal>
+
+            <PassphrasePopup 
+                visible={showPassphrasePopup}
+                onClose={() => setShowPassphrasePopup(false)}
+                onConfirm={handlePassphraseConfirm}
+            />
+        </>
     );
 };
 
@@ -117,6 +152,9 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginTop: spacing.lg,
     },
+    noBlockedWebsiteText: {
+        marginLeft: spacing.md, marginTop: spacing.xs
+    }
 });
 
 export default HomeScreen;

@@ -20,9 +20,14 @@ const PassphrasePopup: React.FC<PassphrasePopupProps> = ({
     onConfirm
 }) => {
 
+    // const getRandomText = () => {
+    //     const index = Math.floor(Math.random() * unblockMessages.length);
+    //     return unblockMessages[index]
+    // };
+
     const getRandomText = () => {
-        const index = Math.floor(Math.random() * unblockMessages.length);
-        return unblockMessages[index]
+        const index = Math.floor(Math.random() * sampleTexts.length);
+        return sampleTexts[index]
     };
 
     const [text, setText] = useState('');

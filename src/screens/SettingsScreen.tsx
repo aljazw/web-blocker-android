@@ -1,7 +1,7 @@
 import { StyleSheet, View } from "react-native";
 import BaseScreen from "../components/BaseScreen";
 import { Switch } from "react-native-gesture-handler";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { spacing, useTheme } from "../theme";
 import { ThemedText } from "../components/ThemedText";
 import BlurModal from "../components/BlurModal";
@@ -26,20 +26,20 @@ const SettingsScreen: React.FC = () => {
     };
     
     const confirmEnable = () => {
-        setEnabled(true);
         setShowEnablePopup(false);
         setPendingToggleValue(null);
+        setEnabled(true);
     };
 
     const cancelEnable = () => {
         setShowEnablePopup(false);
         setPendingToggleValue(null);
     };
-
+  
     const confirmDisable = () => {
-        setEnabled(false);
         setShowDisablePopup(false);
         setPendingToggleValue(null);
+        setEnabled(false);
     };
 
     const cancelDisable = () => {
@@ -50,7 +50,7 @@ const SettingsScreen: React.FC = () => {
 
     return (
         <BaseScreen title="Settings Screen">
-            <ThemedView withBorder color="background" style={styles.settingItem}>
+            <ThemedView color="background" style={styles.settingItem}>
                 <ThemedText>Dark Mode</ThemedText>
                 <Switch
                     value={isDarkMode}
@@ -59,15 +59,17 @@ const SettingsScreen: React.FC = () => {
                     thumbColor={isDarkMode ? '#3b82f6' : '#c0c0c0'}
                 />
             </ThemedView>
-            <ThemedView color="background" withBorder style={styles.settingItem}>
+            <ThemedView withBorder style={{height: 1}}/>
+            <ThemedView color="background" style={styles.settingItem}>
                 <ThemedText>Passphrase Protection</ThemedText>
                 <Switch 
-                    value={isEnabled}
+                    value={pendingToggleValue ?? isEnabled}
                     onValueChange={handleTogglePassphrase}
                     trackColor={{ false: '#767577', true: '#81b0ff' }}
-                    thumbColor={isEnabled ? '#3b82f6' : '#c0c0c0'}
+                    thumbColor={pendingToggleValue ?? isEnabled ? '#3b82f6' : '#c0c0c0'}
                 />
             </ThemedView>
+            <ThemedView withBorder style={{height: 1}}/>
             <PopUpPassphrase
                 visible={showEnablePopup}
                 onClose={cancelEnable}
@@ -113,7 +115,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: spacing.md,
-        borderBottomWidth: 1,
     },
     popupButtonsContainer: {
         flexDirection: 'row',
