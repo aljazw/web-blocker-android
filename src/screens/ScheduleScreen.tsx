@@ -24,7 +24,6 @@ const ScheduleScreen: React.FC = () => {
 
     const [showMoreCalendar, setShowMoreCalendar] = useState(false);
     const [showMoreTime, setShowMoreTime] = useState(false);
-
    
     const days: Array<string>= ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const [selectedDays, setSelectedDays] = useState<boolean[]>(Array(days.length).fill(true));
@@ -222,8 +221,6 @@ const Popup: React.FC<PopupProps> = ({
     websiteUrl,
     onClose,
 }) => {
-
-    const timeNormalized = time;
 
     const onConfirm = async () => {
         const newBlockedData: BlockedWebsitesData = {

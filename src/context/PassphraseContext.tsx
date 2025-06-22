@@ -8,7 +8,7 @@ type PassphraseContextType = {
 const PassphraseContext = createContext<PassphraseContextType | undefined>(undefined);
 
 export const PassphraseProvider = ({ children }: { children: ReactNode }) => {
-    const [isEnabled, setIsEnabled] = useState(true);
+    const [isEnabled, setIsEnabled] = useState(false);
 
     return (
         <PassphraseContext.Provider value={{isEnabled, setEnabled: setIsEnabled}}>
