@@ -6,7 +6,7 @@ import ActionButton from "./ActionButton";
 import { shapes, spacing, useTheme } from "../theme";
 import { TextInput } from "react-native-gesture-handler";
 import { ThemedView } from "./ThemedView";
-import { sampleTexts, unblockMessages } from "../assets/data/sampleTexts";
+import { sampleTexts, unblockMessages } from "../assets/data/textContent";
 
 interface PassphrasePopupProps {
     visible: boolean;

@@ -14,6 +14,8 @@ import com.facebook.soloader.SoLoader
 
 import com.blocksiteapp.modules.SharedStoragePackage
 import com.blocksiteapp.modules.AccessibilityStatusPackage
+import com.blocksiteapp.modules.IntentLauncherPackage
+
 
 
 class MainApplication : Application(), ReactApplication {
@@ -26,6 +28,7 @@ class MainApplication : Application(), ReactApplication {
               // add(MyReactNativePackage())
               add(SharedStoragePackage())
               add(AccessibilityStatusPackage())
+              add(IntentLauncherPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

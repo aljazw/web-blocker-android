@@ -6,6 +6,7 @@ export const spacing = {
     md: 16,
     lg: 20,
     xl: 28,
+    xxl: 60,
 };
 
 export const shapes = {

@@ -4,22 +4,12 @@ import HomeScreen from "../screens/HomeScreen";
 import BlockScreen from "../screens/BlockScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import { useTheme } from "../theme";
-import { useEffect } from "react";
-import changeNavigationBarColor from "react-native-navigation-bar-color";
 
 const Tab = createBottomTabNavigator();
 
 const BottomTabNavigator: React.FC = () => {
 
-    const { theme, isDarkMode } = useTheme();
-
-    useEffect(() => {
-        if (isDarkMode) {
-        changeNavigationBarColor("#000000", false);
-        } else {
-        changeNavigationBarColor("#FFFFFF", true);
-        }
-    }, [isDarkMode]);
+    const { theme } = useTheme();
 
     return(
         <Tab.Navigator

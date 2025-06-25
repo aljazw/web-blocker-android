@@ -12,3 +12,13 @@ export const sampleTexts = [
     "Keep coding!",
     "This is a sample text"
 ];
+
+export const notificationText = `🔧 Please enable Accessibility Service for BlockSiteApp:
+
+1️⃣ Open Accessibility settings (click here).
+2️⃣ Scroll to 'Installed Services' (or 'Downloaded Services').
+3️⃣ Find & tap 'BlockSiteApp'.
+4️⃣ Toggle it ON 
+5️⃣ Confirm any prompts.
+
+This lets the app block distracting sites and keep you focused! 🔒`;

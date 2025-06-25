@@ -1,5 +1,6 @@
 import notifee, { TimestampTrigger, TriggerType, AndroidBigTextStyle, AndroidStyle, AndroidLaunchActivityFlag } from '@notifee/react-native';
 import { checkAccessibilityEnabled } from './accessibility';
+import { notificationText } from '../assets/data/textContent';
 
 
 export async function scheduleDailyNotification() {
@@ -11,41 +12,18 @@ export async function scheduleDailyNotification() {
         return;
     }
 
-const text = `🔧 Please enable Accessibility Service for BlockSiteApp:
-
-1️⃣ Open Accessibility settings (click here).
-2️⃣ Scroll to 'Installed Services' (or 'Downloaded Services').
-3️⃣ Find & tap 'BlockSiteApp'.
-4️⃣ Toggle it ON 
-5️⃣ Confirm any prompts.
-
-This lets the app block distracting sites and keep you focused! 🔒`;
-
+    const text = notificationText;
 
     const bigTextStyle: AndroidBigTextStyle = {
         type: AndroidStyle.BIGTEXT,
         text: text
     };
 
-  // Show notification immediately
-    await notifee.displayNotification({
-        title: 'Accessibility Service Needed!',
-        android: {
-            channelId: 'default',
-            style: bigTextStyle,
-            pressAction: {
-                id: 'default',
-                launchActivity: 'com.blocksiteapp.OpenAccessibilityActivity',
-                launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
-            },
-        }
-    });
-
     // Schedule daily notification starting at 9:00 AM next time
     const date = new Date(Date.now());
-    date.setHours(9);
-    date.setMinutes(0);
-    date.setSeconds(0);
+    date.setHours(18);
+    date.setMinutes(17);
+    date.setSeconds(30);
 
     // If 9 AM has already passed today, schedule for tomorrow
     if (date.getTime() <= Date.now()) {
@@ -63,6 +41,7 @@ This lets the app block distracting sites and keep you focused! 🔒`;
             title: 'Accessibility Service Needed',
             android: {
                 channelId: 'default',
+                showTimestamp: true,
                 style: bigTextStyle,
                 pressAction: {
                     id: 'default',
