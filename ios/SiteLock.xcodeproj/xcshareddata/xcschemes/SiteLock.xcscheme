@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "BlockSiteApp.app"
-               BlueprintName = "BlockSiteApp"
-               ReferencedContainer = "container:BlockSiteApp.xcodeproj">
+               BuildableName = "SiteLock.app"
+               BlueprintName = "SiteLock"
+               ReferencedContainer = "container:SiteLock.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "BlockSiteAppTests.xctest"
-               BlueprintName = "BlockSiteAppTests"
-               ReferencedContainer = "container:BlockSiteApp.xcodeproj">
+               BuildableName = "SiteLockTests.xctest"
+               BlueprintName = "SiteLockTests"
+               ReferencedContainer = "container:SiteLock.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "BlockSiteApp.app"
-            BlueprintName = "BlockSiteApp"
-            ReferencedContainer = "container:BlockSiteApp.xcodeproj">
+            BuildableName = "SiteLock.app"
+            BlueprintName = "SiteLock"
+            ReferencedContainer = "container:SiteLock.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "BlockSiteApp.app"
-            BlueprintName = "BlockSiteApp"
-            ReferencedContainer = "container:BlockSiteApp.xcodeproj">
+            BuildableName = "SiteLock.app"
+            BlueprintName = "SiteLock"
+            ReferencedContainer = "container:SiteLock.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

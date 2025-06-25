@@ -1,16 +1,8 @@
 import notifee, { TimestampTrigger, TriggerType, AndroidBigTextStyle, AndroidStyle, AndroidLaunchActivityFlag } from '@notifee/react-native';
-import { checkAccessibilityEnabled } from './accessibility';
 import { notificationText } from '../assets/data/textContent';
 
 
 export async function scheduleDailyNotification() {
-
-    const isAccessibilityOn = await checkAccessibilityEnabled();
-
-    if (isAccessibilityOn) {
-        console.log('Accessibility service is ON — skipping notification');
-        return;
-    }
 
     const text = notificationText;
 
@@ -21,9 +13,9 @@ export async function scheduleDailyNotification() {
 
     // Schedule daily notification starting at 9:00 AM next time
     const date = new Date(Date.now());
-    date.setHours(18);
-    date.setMinutes(17);
-    date.setSeconds(30);
+    date.setHours(10);
+    date.setMinutes(0);
+    date.setSeconds(20);
 
     // If 9 AM has already passed today, schedule for tomorrow
     if (date.getTime() <= Date.now()) {
@@ -38,14 +30,17 @@ export async function scheduleDailyNotification() {
 
     await notifee.createTriggerNotification(
         {
+            id: 'accessibility-reminder',
             title: 'Accessibility Service Needed',
             android: {
                 channelId: 'default',
                 showTimestamp: true,
+                smallIcon: 'ic_stat_sitelock',
+                largeIcon: 'ic_stat_sitelock',
                 style: bigTextStyle,
                 pressAction: {
                     id: 'default',
-                    launchActivity: 'com.blocksiteapp.OpenAccessibilityActivity',
+                    launchActivity: 'com.sitelock.OpenAccessibilityActivity',
                     launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
                 },
             },

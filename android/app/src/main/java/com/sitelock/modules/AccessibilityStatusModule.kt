@@ -1,4 +1,4 @@
-package com.blocksiteapp.modules
+package com.sitelock.modules
 
 import android.content.ComponentName
 import android.content.Context
@@ -10,7 +10,7 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
 
 import android.util.Log
-import com.blocksiteapp.BlockAccessibilityService
+import com.sitelock.BlockAccessibilityService
 
 class AccessibilityStatusModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {

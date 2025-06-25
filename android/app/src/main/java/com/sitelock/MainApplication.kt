@@ -1,4 +1,4 @@
-package com.blocksiteapp
+package com.sitelock
 
 import android.app.Application
 import com.facebook.react.PackageList
@@ -12,9 +12,9 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
 
-import com.blocksiteapp.modules.SharedStoragePackage
-import com.blocksiteapp.modules.AccessibilityStatusPackage
-import com.blocksiteapp.modules.IntentLauncherPackage
+import com.sitelock.modules.SharedStoragePackage
+import com.sitelock.modules.AccessibilityStatusPackage
+import com.sitelock.modules.IntentLauncherPackage
 
 
 

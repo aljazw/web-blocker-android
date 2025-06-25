@@ -1,4 +1,4 @@
-package com.blocksiteapp
+package com.sitelock
 
 import android.app.Activity
 import android.os.Bundle

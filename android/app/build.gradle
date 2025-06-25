@@ -77,9 +77,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.blocksiteapp"
+    namespace "com.sitelock"
     defaultConfig {
-        applicationId "com.blocksiteapp"
+        applicationId "com.sitelock"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

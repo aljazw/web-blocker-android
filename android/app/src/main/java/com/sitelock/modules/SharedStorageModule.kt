@@ -1,4 +1,4 @@
-package com.blocksiteapp.modules
+package com.sitelock.modules
 
 import android.content.Context
 import android.content.SharedPreferences

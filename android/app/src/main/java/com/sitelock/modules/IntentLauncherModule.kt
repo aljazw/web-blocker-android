@@ -1,4 +1,4 @@
-package com.blocksiteapp.modules
+package com.sitelock.modules
 
 import android.content.Intent
 import com.facebook.react.bridge.ReactApplicationContext

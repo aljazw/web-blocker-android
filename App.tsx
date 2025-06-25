@@ -12,8 +12,9 @@ import { ThemeProvider } from './src/theme';
 import { PassphraseProvider } from './src/context/PassphraseContext';
 import { NativeModules, View } from 'react-native';
 import WelcomeScreen from './src/screens/WelcomeScreen';
-import { openAccessibilitySettings } from './src/utils/accessibility';
-
+import { checkAccessibilityEnabled, openAccessibilitySettings } from './src/utils/accessibility';
+import notifee from '@notifee/react-native';
+import { scheduleDailyNotification } from './src/utils/notificationService';
 
 
 function App(): React.JSX.Element {
@@ -22,12 +23,37 @@ function App(): React.JSX.Element {
    const { SharedStorage } = NativeModules;
 
     useEffect(() => {
-        const checkFirstLaunch = async () => {
+        const initializeApp = async () => {
+            // Check if welcome screen should be shown
             const hasSeenWelcome = await SharedStorage.getItem('@has_seen_welcome');
             setShowWelcome(hasSeenWelcome !== 'true');
+
+            // Create notification channel
+            await notifee.createChannel({
+                id: 'default',
+                name: 'Default Channel',
+            });
+
+            // Check if notification should be scheduled
+            const alreadyScheduled = await SharedStorage.getItem('@notification_scheduled');
+            const accessibilityEnabled = await checkAccessibilityEnabled();
+
+            if (!accessibilityEnabled) {
+                if (alreadyScheduled !== 'true') {
+                    await scheduleDailyNotification();
+                    await SharedStorage.setItem('@notification_scheduled', 'true');
+                } else {
+                    await SharedStorage.setItem('@notification_scheduled', 'false');
+                }
+            } else if (alreadyScheduled === 'true') {
+                await notifee.cancelTriggerNotification('accessibility-reminder');
+                await SharedStorage.setItem('@notification_scheduled', 'false');
+            }
         };
-        checkFirstLaunch();
+
+        initializeApp();
     }, []);
+
 
     const handleWelcomeComplete = async () => {
         await SharedStorage.setItem('@has_seen_welcome', 'true');

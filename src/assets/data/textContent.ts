@@ -13,11 +13,11 @@ export const sampleTexts = [
     "This is a sample text"
 ];
 
-export const notificationText = `🔧 Please enable Accessibility Service for BlockSiteApp:
+export const notificationText = `🔧 Please enable Accessibility Service for SiteLock:
 
 1️⃣ Open Accessibility settings (click here).
 2️⃣ Scroll to 'Installed Services' (or 'Downloaded Services').
-3️⃣ Find & tap 'BlockSiteApp'.
+3️⃣ Find & tap 'SiteLock'.
 4️⃣ Toggle it ON 
 5️⃣ Confirm any prompts.
 

@@ -1,4 +1,4 @@
-package com.blocksiteapp
+package com.sitelock
 
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
@@ -87,7 +87,7 @@ class BlockAccessibilityService : AccessibilityService() {
 
     private fun startBlockedActivity(url: String) {
         val intent = Intent()
-        intent.setClassName("com.blocksiteapp", "com.blocksiteapp.BlockedPageActivity")
+        intent.setClassName("com.sitelock", "com.sitelock.BlockedPageActivity")
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         intent.putExtra("blocked_url", url)
         applicationContext.startActivity(intent)

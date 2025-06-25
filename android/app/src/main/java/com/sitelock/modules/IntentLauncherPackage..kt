@@ -1,13 +1,13 @@
-package com.blocksiteapp.modules
+package com.sitelock.modules
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule
-import com.facebook.react.uimanager.ViewManager
 import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.uimanager.ViewManager
 
-class AccessibilityStatusPackage : ReactPackage {
+class IntentLauncherPackage : ReactPackage {
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
-        return listOf(AccessibilityStatusModule(reactContext))
+        return listOf(IntentLauncherModule(reactContext))
     }
 
     override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {

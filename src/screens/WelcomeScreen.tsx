@@ -1,9 +1,7 @@
-import React, { useEffect } from 'react';
-import { Text, StyleSheet, Image, TouchableOpacity, NativeModules, View } from 'react-native';
+import React from 'react';
+import { Text, StyleSheet, Image, TouchableOpacity, View } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
 import { ThemedText } from '../components/ThemedText';
-import { scheduleDailyNotification } from '../utils/notificationService';
-import notifee from '@notifee/react-native';
 import { shapes, spacing } from '../theme';
 
 
@@ -13,39 +11,16 @@ interface WelcomeScreenProps {
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
 
-    const { SharedStorage} = NativeModules;
-
-    useEffect(() => {
-        const setupNotifications = async () => {
-            // Step 1: Create the notification channel
-            await notifee.createChannel({
-                id: 'default',
-                name: 'Default Channel',
-            });
-
-            // Step 2: Check and schedule daily notification
-            const alreadyScheduled = await SharedStorage.getItem('@notification_scheduled');
-            if (alreadyScheduled !== 'true') {
-                await scheduleDailyNotification();
-                await SharedStorage.setItem('@notification_scheduled', 'true');
-            }
-        };
-
-        setupNotifications();
-    }, []);
-
-
-
   return (
     <BaseScreen showHeader={false}>
         <View style={styles.container}>
             <Image
-                source={require('../assets/icons/web-block-logo.png')}
+                source={require('../assets/icons/ic_sitelock.png')}
                 style={styles.image}
                 resizeMode="contain"
             />
             <ThemedText weight="strong" size="xlarge" align="center" style={styles.title}>
-                Welcome to FocusGuard
+                Welcome to SiteLock
             </ThemedText>
             <ThemedText align="center" size="large" weight="medium" style={styles.subtitle}>
                 To block distracting websites, please enable Accessibility permissions.
@@ -65,7 +40,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
  const steps = [
     'Open Accessibility settings (click below).',
     'Scroll to "Installed Services" (or "Downloaded Services").',
-    'Find & tap "BlockSiteApp".',
+    'Find & tap "SiteLock".',
     'Toggle it ON.',
     'Confirm any prompts.',
 ];
