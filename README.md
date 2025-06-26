@@ -63,8 +63,9 @@ If you're having issues getting the above steps to work, see the [Troubleshootin
 
 ## 📄 License
 
-*This project is licensed under the [MIT License](LICENSE).*
-*Feel free to use, modify, and distribute this code freely. See the `LICENSE` file for more details.*
+*This project is licensed under the [Apache License 2.0](LICENSE).*  
+*See the `LICENSE` file for details.*
+
 
 
 
