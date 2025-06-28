@@ -1,35 +1,32 @@
-import React, { useState } from "react";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import Icon from "./Icon";
-import { shapes, spacing, useTheme } from "../theme";
-import { ThemedView } from "./ThemedView";
-
+import React, { useState } from 'react';
+import { Pressable, StyleSheet, TextInput } from 'react-native';
+import Icon from './Icon';
+import { shapes, spacing, useTheme } from '../theme';
+import { ThemedView } from './ThemedView';
 
 interface SearchBarProps {
     placeholder?: string;
     onSearch: (query: string) => void;
 }
 
-
-const SearchBar: React.FC<SearchBarProps> = ({ placeholder = "Search...", onSearch}) => {
-
+const SearchBar: React.FC<SearchBarProps> = ({ placeholder = 'Search...', onSearch }) => {
     const [query, setQuery] = useState('');
 
     const handleClear = () => {
-        setQuery("");
-        onSearch("");
+        setQuery('');
+        onSearch('');
     };
 
     const { theme } = useTheme();
 
     return (
         <ThemedView withBorder style={styles.container}>
-            <Icon name={"Search"} size={30} opacity="faded" style={styles.iconSearch}/>
+            <Icon name={'Search'} size={30} opacity="faded" style={styles.iconSearch} />
             <TextInput
-                style={[styles.input, {color: theme.colors.text, fontSize: 18}]}
+                style={[styles.input, { color: theme.colors.text }]}
                 placeholder={placeholder}
                 placeholderTextColor="#888888"
-                onChangeText={(text) => {
+                onChangeText={text => {
                     setQuery(text);
                     onSearch(text);
                 }}
@@ -39,9 +36,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ placeholder = "Search...", onSear
                 keyboardType="url"
             />
             <Pressable onPress={handleClear}>
-                <Icon name={"Close"} size={17} opacity="faded" style={styles.iconClose}/>
+                <Icon name={'Close'} size={17} opacity="faded" style={styles.iconClose} />
             </Pressable>
-            
         </ThemedView>
     );
 };
@@ -58,13 +54,14 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         textAlignVertical: 'center',
+        fontSize: 18,
     },
     iconSearch: {
         marginHorizontal: spacing.xs,
     },
     iconClose: {
         marginHorizontal: spacing.sm,
-    }
+    },
 });
 
 export default SearchBar;

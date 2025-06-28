@@ -1,14 +1,12 @@
-import { TextProps, TextStyle } from "react-native";
-import { useTheme } from "../theme";
-import { Text } from "react-native-gesture-handler";
+import { TextProps, TextStyle } from 'react-native';
+import { useTheme } from '../theme';
+import { Text } from 'react-native-gesture-handler';
 
 type TextSize = 'small' | 'normal' | 'large' | 'xlarge';
 type TextWeight = 'light' | 'regular' | 'medium' | 'strong';
 type TextOpacity = 'normal' | 'muted' | 'faded';
 type TextAlign = 'left' | 'center' | 'right' | 'auto';
 type ColorToken = 'text' | 'primaryRed' | 'primaryBlue' | 'primaryGreen';
-
-
 
 interface Props extends TextProps {
     size?: TextSize;
@@ -17,7 +15,7 @@ interface Props extends TextProps {
     align?: TextAlign;
     color?: ColorToken;
     style?: TextStyle | TextStyle[];
-    children: React.ReactNode
+    children: React.ReactNode;
 }
 
 export const ThemedText: React.FC<Props> = ({
@@ -43,7 +41,7 @@ export const ThemedText: React.FC<Props> = ({
         light: '300',
         regular: '400',
         medium: '600',
-        strong: '800'
+        strong: '800',
     };
 
     const opacityMap: Record<TextOpacity, number> = {
@@ -52,28 +50,25 @@ export const ThemedText: React.FC<Props> = ({
         faded: 0.6,
     };
 
-
     const fontSize = sizeMap[size];
     const fontWeight = weightMap[weight];
     const fontOpacity = opacityMap[opacity];
     const textAlign = align;
     const fontColor = theme.colors[color];
 
-
     return (
         <Text
             {...rest}
             style={[
-                { 
-                    fontSize, 
-                    fontWeight, 
+                {
+                    fontSize,
+                    fontWeight,
                     opacity: fontOpacity,
-                    textAlign: textAlign,  
-                    color: fontColor 
+                    textAlign: textAlign,
+                    color: fontColor,
                 },
                 style,
-            ]}
-        >
+            ]}>
             {children}
         </Text>
     );

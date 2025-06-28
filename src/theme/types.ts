@@ -3,9 +3,9 @@ export type Theme = {
     colors: {
         background: string;
         text: string;
-        primaryRed: string,    
-        primaryBlue: string,
-        primaryGreen: string,
+        primaryRed: string;
+        primaryBlue: string;
+        primaryGreen: string;
         card: string;
         border: string;
     };

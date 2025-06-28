@@ -1,40 +1,37 @@
-import { Image, ImageStyle, StyleSheet } from "react-native";
-
+import { useState } from 'react';
+import { Image, ImageStyle } from 'react-native';
 
 interface FaviconsProps {
     url: string;
     size?: number;
     style?: ImageStyle;
-
 }
 
-const Favicon: React.FC<FaviconsProps> = ({ url, size = 24 , style }) => {
+const Favicon: React.FC<FaviconsProps> = ({ url, size = 24, style }) => {
+    const [useFallback, setUseFallback] = useState(false);
 
-    const getFaviconUrl = (url: string): string => {
-        try {
-            url = url.replace(/^https?\/\//, "");
-            url = url.replace(/\/.*$/, "");
-            return `https://www.google.com/s2/favicons?domain=${url}`;
-        } catch (error) {
-            console.error("Invalid URL:", error);
-            return '';
+    const getFaviconUrl = (cleanUrl: string): string | undefined => {
+        if (!cleanUrl) {
+            return undefined;
         }
-
+        try {
+            cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+            return `https://www.google.com/s2/favicons?domain=${cleanUrl}`;
+        } catch (error) {
+            return undefined;
+        }
     };
-   
+
+    const faviconUri = getFaviconUrl(url);
 
     return (
-        <Image source={{uri: getFaviconUrl(url)}} style={[styles.favicon, style, {width:size, height:size}]}/>
-    )
-}
+        <Image
+            source={useFallback || !faviconUri ? require('../assets/icons/default-favicon.png') : { uri: faviconUri }}
+            onError={() => setUseFallback(true)}
+            style={[{ width: size, height: size }, style]}
+            resizeMode="contain"
+        />
+    );
+};
 
 export default Favicon;
-
-const styles = StyleSheet.create({
-    favicon: {
-        resizeMode: 'contain',
-        margin: 2,
-        marginRight: 12,
-        borderRadius: 5, 
-    },
-});

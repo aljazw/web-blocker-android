@@ -16,19 +16,16 @@ import { checkAccessibilityEnabled, openAccessibilitySettings } from './src/util
 import notifee from '@notifee/react-native';
 import { scheduleDailyNotification } from './src/utils/notificationService';
 
+const { SharedStorage } = NativeModules;
 
 function App(): React.JSX.Element {
-
-   const [showWelcome, setShowWelcome] = useState<boolean | null>(null); // null = still loading
-   const { SharedStorage } = NativeModules;
+    const [showWelcome, setShowWelcome] = useState<boolean | null>(null); // null = still loading
 
     useEffect(() => {
         const initializeApp = async () => {
-            // Check if welcome screen should be shown
             const hasSeenWelcome = await SharedStorage.getItem('@has_seen_welcome');
             setShowWelcome(hasSeenWelcome !== 'true');
 
-            // Create notification channel
             await notifee.createChannel({
                 id: 'default',
                 name: 'Default Channel',
@@ -54,26 +51,23 @@ function App(): React.JSX.Element {
         initializeApp();
     }, []);
 
-
     const handleWelcomeComplete = async () => {
         await SharedStorage.setItem('@has_seen_welcome', 'true');
         openAccessibilitySettings();
         setShowWelcome(false);
     };
 
-    if (showWelcome === null) return <View/>
-    
+    if (showWelcome === null) {
+        return <View />;
+    }
+
     return (
         <ThemeProvider>
             <PassphraseProvider>
-                {showWelcome ? (
-                    <WelcomeScreen onContinue={handleWelcomeComplete} />
-                ) : (
-                <Navigation/>
-                )}
+                {showWelcome ? <WelcomeScreen onContinue={handleWelcomeComplete} /> : <Navigation />}
             </PassphraseProvider>
         </ThemeProvider>
     );
-}; 
+}
 
 export default App;

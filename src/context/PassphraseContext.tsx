@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useState } from "react";
+import { createContext, ReactNode, useContext, useState } from 'react';
 
 type PassphraseContextType = {
     isEnabled: boolean;
@@ -11,7 +11,7 @@ export const PassphraseProvider = ({ children }: { children: ReactNode }) => {
     const [isEnabled, setIsEnabled] = useState(false);
 
     return (
-        <PassphraseContext.Provider value={{isEnabled, setEnabled: setIsEnabled}}>
+        <PassphraseContext.Provider value={{ isEnabled, setEnabled: setIsEnabled }}>
             {children}
         </PassphraseContext.Provider>
     );
@@ -19,6 +19,8 @@ export const PassphraseProvider = ({ children }: { children: ReactNode }) => {
 
 export const usePassphrase = () => {
     const context = useContext(PassphraseContext);
-    if (!context) throw new Error('usePassphrase must be used within a PassphraseProvider');
+    if (!context) {
+        throw new Error('usePassphrase must be used within a PassphraseProvider');
+    }
     return context;
 };

@@ -2,10 +2,10 @@ import { Theme } from './types';
 
 export const darkTheme: Theme = {
     mode: 'dark',
-        colors: {
+    colors: {
         background: '#4c4f54',
         text: '#FCFCFC',
-        primaryRed: '#ff6f61',    
+        primaryRed: '#ff6f61',
         primaryBlue: '#61AFFF',
         primaryGreen: '#58D68D',
         card: '#565a60',

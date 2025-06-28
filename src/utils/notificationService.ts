@@ -1,23 +1,25 @@
-import notifee, { TimestampTrigger, TriggerType, AndroidBigTextStyle, AndroidStyle, AndroidLaunchActivityFlag } from '@notifee/react-native';
+import notifee, {
+    TimestampTrigger,
+    TriggerType,
+    AndroidBigTextStyle,
+    AndroidStyle,
+    AndroidLaunchActivityFlag,
+} from '@notifee/react-native';
 import { notificationText } from '../assets/data/textContent';
 
-
 export async function scheduleDailyNotification() {
-
     const text = notificationText;
 
     const bigTextStyle: AndroidBigTextStyle = {
         type: AndroidStyle.BIGTEXT,
-        text: text
+        text: text,
     };
 
-    // Schedule daily notification starting at 9:00 AM next time
     const date = new Date(Date.now());
     date.setHours(10);
     date.setMinutes(0);
     date.setSeconds(20);
 
-    // If 9 AM has already passed today, schedule for tomorrow
     if (date.getTime() <= Date.now()) {
         date.setDate(date.getDate() + 1);
     }
@@ -25,7 +27,7 @@ export async function scheduleDailyNotification() {
     const trigger: TimestampTrigger = {
         type: TriggerType.TIMESTAMP,
         timestamp: date.getTime(),
-        repeatFrequency: 1, // daily
+        repeatFrequency: 1,
     };
 
     await notifee.createTriggerNotification(
@@ -45,6 +47,6 @@ export async function scheduleDailyNotification() {
                 },
             },
         },
-        trigger
+        trigger,
     );
 }

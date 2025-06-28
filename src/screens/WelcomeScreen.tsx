@@ -4,40 +4,31 @@ import BaseScreen from '../components/BaseScreen';
 import { ThemedText } from '../components/ThemedText';
 import { shapes, spacing } from '../theme';
 
-
 interface WelcomeScreenProps {
     onContinue: () => void;
 }
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
-
-  return (
-    <BaseScreen showHeader={false}>
-        <View style={styles.container}>
-            <Image
-                source={require('../assets/icons/ic_sitelock.png')}
-                style={styles.image}
-                resizeMode="contain"
-            />
-            <ThemedText weight="strong" size="xlarge" align="center" style={styles.title}>
-                Welcome to SiteLock
-            </ThemedText>
-            <ThemedText align="center" size="large" weight="medium" style={styles.subtitle}>
-                To block distracting websites, please enable Accessibility permissions.
-            </ThemedText>
-            <StepList />
-            <TouchableOpacity
-                onPress={onContinue}
-                style={styles.button}
-            >
-                <Text style={styles.buttonText}>Enable Accessibility</Text>
-            </TouchableOpacity>
-        </View>
-    </BaseScreen>
-  );
+    return (
+        <BaseScreen showHeader={false}>
+            <View style={styles.container}>
+                <Image source={require('../assets/icons/ic_sitelock.png')} style={styles.image} resizeMode="contain" />
+                <ThemedText weight="strong" size="xlarge" align="center" style={styles.title}>
+                    Welcome to SiteLock
+                </ThemedText>
+                <ThemedText align="center" size="large" weight="medium" style={styles.subtitle}>
+                    To block distracting websites, please enable Accessibility permissions.
+                </ThemedText>
+                <StepList />
+                <TouchableOpacity onPress={onContinue} style={styles.button}>
+                    <Text style={styles.buttonText}>Enable Accessibility</Text>
+                </TouchableOpacity>
+            </View>
+        </BaseScreen>
+    );
 };
 
- const steps = [
+const steps = [
     'Open Accessibility settings (click below).',
     'Scroll to "Installed Services" (or "Downloaded Services").',
     'Find & tap "SiteLock".',
@@ -46,15 +37,15 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
 ];
 
 export function StepList() {
-  return (
-    <View>
-      {steps.map((step, index) => (
-        <ThemedText key={index} style={styles.item}>
-          {`${index + 1}️⃣ ${step}`}
-        </ThemedText>
-      ))}
-    </View>
-  );
+    return (
+        <View>
+            {steps.map((step, index) => (
+                <ThemedText key={index} style={styles.item}>
+                    {`${index + 1}️⃣ ${step}`}
+                </ThemedText>
+            ))}
+        </View>
+    );
 }
 
 const styles = StyleSheet.create({
@@ -79,15 +70,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 30,
         borderRadius: shapes.borderRadius.medium,
         backgroundColor: '#3b82f6', // a strong primary blue
-        elevation: shapes.elevation.medium,               // adds shadow on Android
-        shadowColor: '#000',        // iOS shadow
+        elevation: shapes.elevation.medium,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
         shadowRadius: shapes.elevation.medium,
         marginTop: spacing.xxl,
         alignSelf: 'center',
     },
-        buttonText: {
+    buttonText: {
         color: '#fff',
         fontWeight: 'bold',
         fontSize: 16,
@@ -96,8 +85,6 @@ const styles = StyleSheet.create({
     item: {
         marginVertical: 2,
     },
-
 });
-
 
 export default WelcomeScreen;

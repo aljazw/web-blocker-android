@@ -1,11 +1,11 @@
-import { Pressable, StyleSheet, Text, ViewStyle } from "react-native"
-import { shapes, spacing } from "../theme";
+import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
+import { shapes, spacing } from '../theme';
 
 type ActionVariant = 'cancel' | 'confirm';
 
 const variantConfig: Record<ActionVariant, { title: string; color: string }> = {
-    cancel: { title: 'Cancel', color: '#d7372f'},
-    confirm: {title: 'Confirm', color: '#4CAF50'}
+    cancel: { title: 'Cancel', color: '#d7372f' },
+    confirm: { title: 'Confirm', color: '#4CAF50' },
 };
 
 interface CancelButtonProps {
@@ -14,8 +14,7 @@ interface CancelButtonProps {
     onPress: () => void;
 }
 
-const ActionButton: React.FC<CancelButtonProps> = ({variant, style, onPress}) => {
-
+const ActionButton: React.FC<CancelButtonProps> = ({ variant, style, onPress }) => {
     const config = variantConfig[variant];
 
     return (
@@ -24,7 +23,6 @@ const ActionButton: React.FC<CancelButtonProps> = ({variant, style, onPress}) =>
         </Pressable>
     );
 };
-
 
 const styles = StyleSheet.create({
     cancelButton: {

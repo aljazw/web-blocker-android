@@ -1,5 +1,5 @@
-import { Image, ImageStyle, StyleProp } from "react-native";
-import { useTheme } from "../theme";
+import { Image, ImageStyle, StyleProp } from 'react-native';
+import { useTheme } from '../theme';
 
 const iconMap: Record<string, any> = {
     Home: require('../assets/icons/home.png'),
@@ -27,19 +27,12 @@ interface IconProps {
     style?: StyleProp<ImageStyle>;
 }
 
-const Icon: React.FC<IconProps> = ({ 
-    name, 
-    size = 24, 
-    opacity = 'normal',
-    tint,
-    style 
-}) => {
-
+const Icon: React.FC<IconProps> = ({ name, size = 24, opacity = 'normal', tint, style }) => {
     const { isDarkMode } = useTheme();
 
     let tintColorStyle: { tintColor?: string } = {};
     if (tint === false) {
-        tintColorStyle = {}
+        tintColorStyle = {};
     } else if (typeof tint === 'string') {
         tintColorStyle = { tintColor: isDarkMode ? tint : '#000' };
     } else {
@@ -54,18 +47,17 @@ const Icon: React.FC<IconProps> = ({
 
     const IconOpacityValue = opacityMap[opacity];
 
-   
     return (
         <Image
             source={iconMap[name]}
+            resizeMode="contain"
             style={[
                 {
-                    width: size, 
-                    height: size, 
-                    resizeMode: 'contain', 
-                    opacity: IconOpacityValue, 
-                    ...tintColorStyle
-                }, 
+                    width: size,
+                    height: size,
+                    opacity: IconOpacityValue,
+                    ...tintColorStyle,
+                },
                 style,
             ]}
         />

@@ -1,18 +1,16 @@
-import { NavigationProp } from "@react-navigation/native";
-
-
+import { NavigationProp } from '@react-navigation/native';
 
 export type RootStackParamList = {
-    BottomTabs: undefined; 
+    BottomTabs: undefined;
     AddSite: undefined;
-    Schedule: { websiteUrl: string } ;
+    Schedule: { websiteUrl: string };
 };
 
-export interface BlockedWebsitesData{
+export interface BlockedWebsitesData {
     days: string;
     time: string;
     websiteUrl: string;
     visible: boolean;
-};
+}
 
 export type RootStackNavigation = NavigationProp<RootStackParamList>;
