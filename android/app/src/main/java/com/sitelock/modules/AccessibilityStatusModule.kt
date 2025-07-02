@@ -9,7 +9,6 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
 
-import android.util.Log
 import com.sitelock.BlockAccessibilityService
 
 class AccessibilityStatusModule(private val reactContext: ReactApplicationContext) :
@@ -31,8 +30,6 @@ class AccessibilityStatusModule(private val reactContext: ReactApplicationContex
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
             )
             
-            // Log.e("Accessibility", "Accessibility enabled services: $enabledServicesSetting")
-
             val colonSplitter = TextUtils.SimpleStringSplitter(':')
             colonSplitter.setString(enabledServicesSetting ?: "")
 

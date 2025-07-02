@@ -3,16 +3,16 @@ package com.sitelock
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
 import android.content.Intent
-import android.net.Uri
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
-import java.util.concurrent.atomic.AtomicBoolean
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.time.LocalTime
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import android.content.SharedPreferences
+
 
 
 
@@ -26,9 +26,30 @@ class BlockAccessibilityService : AccessibilityService() {
     )
 
     private lateinit var blockedList: List<BlockedWebsite>
+    private lateinit var sharedPref: SharedPreferences
+
+    private var lastProcessedTime: Long = 0
+    private val debounceInterval = 500L
+
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "@blocked_websites") {
+            loadBlockedList()
+        }
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        sharedPref = applicationContext.getSharedPreferences("BlockedPrefs", Context.MODE_PRIVATE)
+        sharedPref.registerOnSharedPreferenceChangeListener(prefsListener)
+        loadBlockedList()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        sharedPref.unregisterOnSharedPreferenceChangeListener(prefsListener)
+    }
 
     private fun loadBlockedList() {
-        val sharedPref = applicationContext.getSharedPreferences("BlockedPrefs", Context.MODE_PRIVATE)
         val jsonData = sharedPref.getString("@blocked_websites", null)
 
         if (jsonData != null) {
@@ -42,29 +63,71 @@ class BlockAccessibilityService : AccessibilityService() {
         }
     }
 
-    private var lastProcessedTime: Long = 0
-    private val debounceInterval = 1000L
+    
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+
+        if (event == null) return
 
         if (System.currentTimeMillis() - lastProcessedTime < debounceInterval) {
             return
         }
         lastProcessedTime = System.currentTimeMillis()
 
-        val packageName = event?.packageName?.toString()
+        val packageName = event?.packageName?.toString() ?: return
 
-        if (!isBrowser(packageName)) {
-            return
-        }
+        if (!isBrowser(packageName)) return
 
-        // Log.d("BlockedSite", "Browser detected: $packageName")
-        loadBlockedList()
+        val rootNode = rootInActiveWindow ?: return
 
-        val rootNode = rootInActiveWindow
-        if (rootNode != null) {
-            var foundFirstEditText = AtomicBoolean(false)
-            traverseNode(rootNode, foundFirstEditText)  
+        val currentDay = java.time.LocalDate.now().dayOfWeek.name.take(3).lowercase()
+        val now = LocalTime.now()
+        val formatter = DateTimeFormatter.ofPattern("HH:mm")
+        val timePattern = Regex("""^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$""")
+
+        for (item in blockedList) {
+
+            val matchingNodes = rootNode.findAccessibilityNodeInfosByText(item.websiteUrl)
+            if (matchingNodes.isNullOrEmpty()) continue
+
+            val days: Set<String> = if (item.days == "Full Week") {
+                setOf("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+            } else {
+                item.days.split(",").map { it.trim().trim('\'').lowercase() }.toSet()
+            }
+
+            val isDayAllowed = currentDay in days
+
+            var isWithinTimeRange = true
+            if (!item.time.isNullOrEmpty()) {
+                if (item.time.equals("All Day Long", ignoreCase = true)) {
+                    isWithinTimeRange = true
+                } else if (timePattern.matches(item.time)) {
+                    val (startStr, endStr) = item.time.split(" - ").map { it.trim() }
+                    val startTime = LocalTime.parse(startStr, formatter)
+                    val endTime = LocalTime.parse(endStr, formatter)
+
+                    isWithinTimeRange = if (startTime <= endTime) {
+                        now.isAfter(startTime) && now.isBefore(endTime)
+                    } else {
+                        now.isAfter(startTime) || now.isBefore(endTime)
+                    }
+                } else {
+                    isWithinTimeRange = true
+                }
+            }
+
+            if (isDayAllowed && isWithinTimeRange) {
+                // Optionally, check if any matching node is an EditText and not focused
+                val validNode = matchingNodes.any { node -> 
+                    node.className == "android.widget.EditText" && !node.isFocused 
+                }
+
+                if (validNode) {
+                    startBlockedActivity(item.websiteUrl, packageName ?: "")
+                    break
+                }
+            }
         }
     }
 
@@ -75,84 +138,29 @@ class BlockAccessibilityService : AccessibilityService() {
     private fun isBrowser(packageName: String?): Boolean {
         if (packageName == null) return false
 
-        val browserPackages = listOf(
+        val browserPackages = setOf(
             "com.android.chrome",
             "org.mozilla.firefox",
             "com.brave.browser",
-            "com.opera.browser",
+            "com.opera.browser"
         )
 
-        return browserPackages.contains(packageName)
+        return packageName in browserPackages
     }
 
-    private fun startBlockedActivity(url: String) {
+    private fun startBlockedActivity(url: String, packageName: String) {
+        Thread.sleep(500)
+        performGlobalAction(GLOBAL_ACTION_BACK)
+        Thread.sleep(200)
         val intent = Intent()
         intent.setClassName("com.sitelock", "com.sitelock.BlockedPageActivity")
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         intent.putExtra("blocked_url", url)
+        intent.putExtra("package_name", packageName)
         applicationContext.startActivity(intent)
     }
 
-
-    private fun traverseNode(node: AccessibilityNodeInfo?, foundFirstEditText: AtomicBoolean) {
-        if (node == null || foundFirstEditText.get()) return 
-        
-        val currentDay = java.time.LocalDate.now().dayOfWeek.name.take(3).lowercase()
-        val now = LocalTime.now()
-
-        val formatter = DateTimeFormatter.ofPattern("HH:mm")
-        val timePattern = Regex("""^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$""")
-
-        if(node.className == "android.widget.EditText" && !node.isFocused){
-            foundFirstEditText.set(true)
-            for (item in blockedList) {
-                if (node.text?.contains(item.websiteUrl) == true) {
-
-                    val days: Array<String> = if (item.days == "Full Week") {
-                        arrayOf("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-                    } else {
-                        item.days
-                            .split(",")                      
-                            .map { it.trim().trim('\'').lowercase() }
-                            .toTypedArray()              
-                    }
-
-                    if (item.time != null && timePattern.matches(item.time)) {
-                        val timeRange = item.time
-                        val parts = timeRange.split(" - ")
-                        val startTime = LocalTime.parse(parts[0].trim(), formatter)
-                        val endTime = LocalTime.parse(parts[1].trim(), formatter)
-
-                         val isWithinTimeRange = if (startTime <= endTime) {
-                            // Normal range (same day)
-                            now.isAfter(startTime) && now.isBefore(endTime)
-                        } else {
-                            // Range crosses midnight
-                            now.isAfter(startTime) || now.isBefore(endTime)
-                        }
-
-                        if (currentDay in days && isWithinTimeRange) {
-                            startBlockedActivity(item.websiteUrl)
-                            break
-                        }
-
-                        if (currentDay in (days) && isWithinTimeRange) {
-                            startBlockedActivity(item.websiteUrl)
-                            break
-                        }
-                    } else {
-                        if (currentDay in (days)) {
-                            // Log.d("BlockedSite", "Node: ${node.className}, Text: ${node.text}")
-                            startBlockedActivity(item.websiteUrl)
-                            break
-                        }
-                    }
-                }
-            }
-        } 
-        for (i in 0 until node.childCount) {
-            traverseNode(node.getChild(i), foundFirstEditText)
-        }
-    }
 }
 
+
+    
