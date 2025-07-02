@@ -50,6 +50,12 @@ const BlockScreen: React.FC = () => {
     };
 
     const checkUrl = useCallback(async (url: string) => {
+        if (!url || !url.includes('.')) {
+            setWebsiteUrl('');
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         setWebsiteUrl('');
         const normalizedUrl = normalizeUrl(url);
