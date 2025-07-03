@@ -11,6 +11,9 @@ import android.widget.Button
 import android.widget.TextView
 import android.graphics.drawable.GradientDrawable
 
+import android.net.Uri
+import android.provider.Browser   // for EXTRA_APPLICATION_ID
+
 
 class BlockedPageActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,11 +63,15 @@ class BlockedPageActivity : Activity() {
             layoutParams = params
 
             setOnClickListener {
-                val pm = packageManager
-                val intent = pm.getLaunchIntentForPackage(packageName)
-                if (intent != null) {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"))
+                    intent.setPackage(packageName)
+                    intent.addFlags(
+                        Intent.FLAG_ACTIVITY_CLEAR_TASK or 
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    )
+                    intent.putExtra(Browser.EXTRA_APPLICATION_ID, packageName)
                     startActivity(intent)
-                }
+
                 finish()
             }
         }

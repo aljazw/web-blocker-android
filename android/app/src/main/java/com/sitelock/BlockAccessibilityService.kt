@@ -14,8 +14,6 @@ import java.time.format.DateTimeFormatter
 import android.content.SharedPreferences
 
 
-
-
 class BlockAccessibilityService : AccessibilityService() {
 
     data class BlockedWebsite(
@@ -62,8 +60,6 @@ class BlockAccessibilityService : AccessibilityService() {
             }
         }
     }
-
-    
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
 
@@ -123,7 +119,7 @@ class BlockAccessibilityService : AccessibilityService() {
                     node.className == "android.widget.EditText" && !node.isFocused 
                 }
 
-                if (validNode) {
+                if (validNode) {                   
                     startBlockedActivity(item.websiteUrl, packageName ?: "")
                     break
                 }
@@ -149,9 +145,6 @@ class BlockAccessibilityService : AccessibilityService() {
     }
 
     private fun startBlockedActivity(url: String, packageName: String) {
-        Thread.sleep(500)
-        performGlobalAction(GLOBAL_ACTION_BACK)
-        Thread.sleep(200)
         val intent = Intent()
         intent.setClassName("com.sitelock", "com.sitelock.BlockedPageActivity")
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
