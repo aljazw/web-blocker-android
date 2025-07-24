@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, ScrollView } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
 import React, { useCallback, useEffect, useState } from 'react';
 import { BlockedWebsitesData } from '../types/types';
@@ -47,7 +47,7 @@ const HomeScreen: React.FC = () => {
                 {websites.length === 0 ? (
                     <ThemedText style={styles.noBlockedWebsiteText}>No Blocked Webistes</ThemedText>
                 ) : (
-                    <View>
+                    <ScrollView contentContainerStyle={styles.scrollContainer}>
                         {websites.map(
                             (website, index) =>
                                 website.visible && (
@@ -69,7 +69,7 @@ const HomeScreen: React.FC = () => {
                                     </ItemContainer>
                                 ),
                         )}
-                    </View>
+                    </ScrollView>
                 )}
             </View>
             {removeSelectedWebsite && (
@@ -252,6 +252,9 @@ const styles = StyleSheet.create({
     },
     favicon: {
         marginRight: spacing.sm,
+    },
+    scrollContainer: {
+        paddingBottom: spacing.md,
     },
 });
 
