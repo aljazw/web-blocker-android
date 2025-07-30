@@ -129,11 +129,11 @@ const PopupRemove: React.FC<PopupRemoveProps> = ({
     getWebsitesData,
     showError,
 }) => {
-    const { isEnabled } = usePassphrase();
+    const { isPassphraseEnabled } = usePassphrase();
     const [showPassphrasePopup, setShowPassphrasePopup] = useState(false);
 
     const handleInitialConfirm = () => {
-        if (isEnabled) {
+        if (isPassphraseEnabled) {
             setShowPassphrasePopup(true);
         } else {
             onConfirm();

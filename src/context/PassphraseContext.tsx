@@ -1,17 +1,21 @@
 import { createContext, ReactNode, useContext, useState } from 'react';
 
 type PassphraseContextType = {
-    isEnabled: boolean;
-    setEnabled: (value: boolean) => void;
+    isPassphraseEnabled: boolean;
+    setPassphraseEnabled: (value: boolean) => void;
 };
 
 const PassphraseContext = createContext<PassphraseContextType | undefined>(undefined);
 
 export const PassphraseProvider = ({ children }: { children: ReactNode }) => {
-    const [isEnabled, setIsEnabled] = useState(false);
+    const [isPassphraseEnabled, setPassphraseEnabled] = useState(false);
 
     return (
-        <PassphraseContext.Provider value={{ isEnabled, setEnabled: setIsEnabled }}>
+        <PassphraseContext.Provider
+            value={{
+                isPassphraseEnabled,
+                setPassphraseEnabled,
+            }}>
             {children}
         </PassphraseContext.Provider>
     );

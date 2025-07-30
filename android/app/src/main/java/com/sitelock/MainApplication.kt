@@ -15,6 +15,7 @@ import com.facebook.soloader.SoLoader
 import com.sitelock.modules.SharedStoragePackage
 import com.sitelock.modules.AccessibilityStatusPackage
 import com.sitelock.modules.IntentLauncherPackage
+import com.sitelock.modules.DeviceAdminPackage
 
 
 
@@ -29,6 +30,7 @@ class MainApplication : Application(), ReactApplication {
               add(SharedStoragePackage())
               add(AccessibilityStatusPackage())
               add(IntentLauncherPackage())
+              add(DeviceAdminPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

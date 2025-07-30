@@ -56,8 +56,8 @@ If everything is set up correctly, you should see your new app running in the An
 This is one way to run your app — you can also build it directly from Android Studio.
 
 ### Troubleshooting
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
 
+If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
 
 ## 🔐 Signing Your Own APK (Release Build)
 
@@ -68,7 +68,9 @@ To build the release APK with your own signing key, follow these steps:
 ```bash
 keytool -genkey -v -keystore sitelock-release-key.jks -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000
 ```
+
 2. Create a file named **keystore.properties** in android/ folder with the following content (replace with your own passwords and alias):
+
 ```
 storeFile=sitelock-release-key.jks
 storePassword=yourStorePassword
@@ -79,6 +81,7 @@ keyPassword=yourKeyPassword
 3. Place the **sitelock-release-key**.jks file inside the android/ folder.
 
 4. Build your release APK:
+
 ```bash
 cd android
 ./gradlew assembleRelease
