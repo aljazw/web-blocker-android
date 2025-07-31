@@ -15,6 +15,7 @@ import { spacing } from '../theme/tokens';
 import { ThemedText } from '../components/ThemedText';
 import ErrorPopup from '../components/ErrorPopup';
 import { isWebsiteBlocked } from '../utils/storage';
+import { ERRORS } from '../constants/strings';
 
 const BlockScreen: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -45,7 +46,7 @@ const BlockScreen: React.FC = () => {
                 navigation.navigate('Schedule', { websiteUrl: websiteUrl });
             }
         } catch {
-            showError('Data Load Error', 'We couldn’t access your blocked websites. Please try again later.');
+            showError(ERRORS.dataLoadError.title, ERRORS.dataLoadError.text);
         }
     };
 
@@ -65,7 +66,7 @@ const BlockScreen: React.FC = () => {
             if (response.ok) {
                 setWebsiteUrl(denormalizeUrl(normalizedUrl));
             } else {
-                showError('Invalid URL', 'The subdirectory does not exist.');
+                showError(ERRORS.invalidUrl.title, ERRORS.invalidUrl.text);
             }
         } finally {
             setLoading(false);

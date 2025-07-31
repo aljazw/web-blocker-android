@@ -33,15 +33,18 @@ const BaseScreen: React.FC<BaseScreenProps> = ({
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }, style]}>
             {showHeader && (
-                <View style={styles.header}>
-                    {title && (
-                        <ThemedText size="xlarge" weight="strong">
-                            {title}
-                        </ThemedText>
-                    )}
-                </View>
+                <>
+                    <View style={styles.header}>
+                        {title && (
+                            <ThemedText size="xlarge" weight="strong">
+                                {title}
+                            </ThemedText>
+                        )}
+                    </View>
+                    <ThemedView withBorder style={styles.lineDivider} />
+                </>
             )}
-            <ThemedView withBorder style={styles.lineDivider} />
+
             <View style={[styles.content, style]}>
                 {isLoading ? <ActivityIndicator size="large" color="#0000ff" /> : children}
             </View>

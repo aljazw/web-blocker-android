@@ -5,10 +5,10 @@ import notifee, {
     AndroidStyle,
     AndroidLaunchActivityFlag,
 } from '@notifee/react-native';
-import { notificationText } from '../assets/data/textContent';
+import { ACCESSIBILITY_NOTIFICATION_TEXT } from '../constants/strings';
 
 export async function scheduleDailyNotification() {
-    const text = notificationText;
+    const text = ACCESSIBILITY_NOTIFICATION_TEXT;
 
     const bigTextStyle: AndroidBigTextStyle = {
         type: AndroidStyle.BIGTEXT,

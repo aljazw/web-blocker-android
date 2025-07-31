@@ -6,7 +6,7 @@ import ActionButton from './ActionButton';
 import { shapes, spacing, useTheme } from '../theme';
 import { TextInput } from 'react-native-gesture-handler';
 import { ThemedView } from './ThemedView';
-import { unblockMessages } from '../assets/data/textContent';
+import { UNBLOCK_MESSAGES } from '../constants/strings';
 
 interface PassphrasePopupProps {
     visible: boolean;
@@ -16,8 +16,8 @@ interface PassphrasePopupProps {
 
 const PassphrasePopup: React.FC<PassphrasePopupProps> = ({ visible, onClose, onConfirm }) => {
     const getRandomText = () => {
-        const index = Math.floor(Math.random() * unblockMessages.length);
-        return unblockMessages[index];
+        const index = Math.floor(Math.random() * UNBLOCK_MESSAGES.length);
+        return UNBLOCK_MESSAGES[index];
     };
 
     const [passphraseText, setPassphraseText] = useState('');

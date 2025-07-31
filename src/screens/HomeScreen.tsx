@@ -13,6 +13,7 @@ import PassphrasePopup from '../components/PassphrasePopup';
 import { usePassphrase } from '../context/PassphraseContext';
 import ErrorPopup from '../components/ErrorPopup';
 import { deleteBlockedWebsite, getBlockedWebsites, hideBlockedWebsite } from '../utils/storage';
+import { ERRORS } from '../constants/strings';
 
 const HomeScreen: React.FC = () => {
     const [websites, setWebsites] = useState<BlockedWebsitesData[]>([]);
@@ -33,7 +34,7 @@ const HomeScreen: React.FC = () => {
             const websitesData = await getBlockedWebsites();
             setWebsites(websitesData);
         } catch {
-            showError('Data Load Error', 'We couldn’t retrieve your blocked websites. Please try again later.');
+            showError(ERRORS.dataLoadError.title, ERRORS.dataLoadError.text);
         }
     }, []);
 
@@ -79,12 +80,7 @@ const HomeScreen: React.FC = () => {
                     url={removeSelectedWebsite}
                     setRemoveSelectedWebsites={setRemoveSelectedWebsite}
                     getWebsitesData={getWebsitesData}
-                    showError={() =>
-                        showError(
-                            'Data Load Error',
-                            'We couldn’t retrieve your blocked websites. Please try again later.',
-                        )
-                    }
+                    showError={() => showError(ERRORS.dataLoadError.title, ERRORS.dataLoadError.text)}
                 />
             )}
             {hideSelectedWebsite && (
@@ -94,12 +90,7 @@ const HomeScreen: React.FC = () => {
                     url={hideSelectedWebsite}
                     setHideSelectedWebsite={() => setHideSelectedWebsite(null)}
                     getWebsitesData={getWebsitesData}
-                    showError={() =>
-                        showError(
-                            'Oops! Something went wrong”',
-                            'We couldn’t retrieve your blocked websites. Please try again later.',
-                        )
-                    }
+                    showError={() => showError(ERRORS.genericRetrieveError.title, ERRORS.genericRetrieveError.text)}
                 />
             )}
             <ErrorPopup

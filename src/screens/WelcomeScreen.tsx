@@ -3,6 +3,7 @@ import { Text, StyleSheet, Image, TouchableOpacity, View } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
 import { ThemedText } from '../components/ThemedText';
 import { shapes, spacing } from '../theme';
+import { ACCESSIBILITY_SETUP_STEPS } from '../constants/strings';
 
 interface WelcomeScreenProps {
     onContinue: () => void;
@@ -28,18 +29,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
     );
 };
 
-const steps = [
-    'Open Accessibility settings (click below).',
-    'Scroll to "Installed Services" (or "Downloaded Services").',
-    'Find & tap "SiteLock".',
-    'Toggle it ON.',
-    'Confirm any prompts.',
-];
-
 export function StepList() {
     return (
         <View>
-            {steps.map((step, index) => (
+            {ACCESSIBILITY_SETUP_STEPS.map((step, index) => (
                 <ThemedText key={index} style={styles.item}>
                     {`${index + 1}️⃣ ${step}`}
                 </ThemedText>

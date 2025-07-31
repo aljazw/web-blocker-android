@@ -27,4 +27,44 @@ export const ERRORS = {
         title: 'Uninstall Prevention Error',
         text: 'Failed to change uninstall prevention settings. Please try again later.',
     },
+    dataLoadError: {
+        title: 'Data Load Error',
+        text: 'We couldn’t access your blocked websites. Please try again later.',
+    },
+    invalidUrl: {
+        title: 'Invalid URL',
+        text: 'The subdirectory does not exist.',
+    },
+    genericRetrieveError: {
+        title: 'Oops! Something went wrong',
+        text: 'We couldn’t retrieve your blocked websites. Please try again later.',
+    },
 };
+
+export const UNBLOCK_MESSAGES = [
+    'I told myself I should stop procrastinating but then I thought why put off until tomorrow what you can do the day after tomorrow',
+    "Congrats! You are about to unblock a site. Just don't let it turn into a quick break that lasts all day. Stay strong, champion of focus!",
+    'Removing a block means saying yes to your goals. Keep your focus sharp and your distractions away.',
+    'Unlocked! Now resist the urge to turn that quick peek into a deep dive. Your future self will thank you for staying focused today.',
+    'Freedom tastes sweet, but so does crushing your goals. Unblock wisely and keep slaying that productivity game.',
+];
+
+export const SAMPLE_TEXTS = ['Hello world', 'React Native is cool', 'Keep coding!', 'This is a sample text'];
+
+export const ACCESSIBILITY_NOTIFICATION_TEXT = `🔧 Please enable Accessibility Service for SiteLock:
+
+1️⃣ Open Accessibility settings (click here).
+2️⃣ Scroll to 'Installed Services' (or 'Downloaded Services').
+3️⃣ Find & tap 'SiteLock'.
+4️⃣ Toggle it ON 
+5️⃣ Confirm any prompts.
+
+This lets the app block distracting sites and keep you focused! 🔒`;
+
+export const ACCESSIBILITY_SETUP_STEPS = [
+    'Open Accessibility settings (click below).',
+    'Scroll to "Installed Services" (or "Downloaded Services").',
+    'Find & tap "SiteLock".',
+    'Toggle it ON.',
+    'Confirm any prompts.',
+];
