@@ -8,10 +8,11 @@ import TimeInput from '../components/TimeInput';
 import NextButton from '../components/NextButton';
 import ActionButton from '../components/ActionButton';
 import BlurModal from '../components/BlurModal';
-import { shapes, spacing, useTheme } from '../theme';
+import { shapes, spacing } from '../theme';
 import { ThemedText } from '../components/ThemedText';
 import { addBlockedWebsite } from '../utils/storage';
 import ErrorPopup from '../components/ErrorPopup';
+import { useTheme } from '../context/ThemeContext';
 
 const ScheduleScreen: React.FC = () => {
     const navigation = useNavigation<RootStackNavigation>();

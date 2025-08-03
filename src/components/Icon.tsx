@@ -1,5 +1,5 @@
 import { Image, ImageStyle, StyleProp } from 'react-native';
-import { useTheme } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 const iconMap: Record<string, any> = {
     Home: require('../assets/icons/home.png'),

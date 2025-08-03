@@ -5,66 +5,32 @@
  * @format
  */
 
-import React, { useEffect, useState } from 'react';
-
 import Navigation from './src/navigation/Navigation';
-import { ThemeProvider } from './src/theme';
 import { PassphraseProvider } from './src/context/PassphraseContext';
-import { NativeModules, View } from 'react-native';
+import { View } from 'react-native';
 import WelcomeScreen from './src/screens/WelcomeScreen';
-import { checkAccessibilityEnabled, openAccessibilitySettings } from './src/utils/accessibility';
-import notifee from '@notifee/react-native';
-import { scheduleDailyNotification } from './src/utils/notificationService';
-
-const { SharedStorage } = NativeModules;
+import { useAppInitializer } from './src/hooks/useAppInitializer';
+import { setUserHasSeenWelcome } from './src/utils/storage';
+import { openAccessibilitySettings } from './src/utils/accessibility';
+import { ThemeProvider } from './src/context/ThemeContext';
 
 function App(): React.JSX.Element {
-    const [showWelcome, setShowWelcome] = useState<boolean | null>(null); // null = still loading
-
-    useEffect(() => {
-        const initializeApp = async () => {
-            const hasSeenWelcome = await SharedStorage.getItem('@has_seen_welcome');
-            setShowWelcome(hasSeenWelcome !== 'true');
-
-            await notifee.createChannel({
-                id: 'default',
-                name: 'Default Channel',
-            });
-
-            // Check if notification should be scheduled
-            const alreadyScheduled = await SharedStorage.getItem('@notification_scheduled');
-            const accessibilityEnabled = await checkAccessibilityEnabled();
-
-            if (!accessibilityEnabled) {
-                if (alreadyScheduled !== 'true') {
-                    await scheduleDailyNotification();
-                    await SharedStorage.setItem('@notification_scheduled', 'true');
-                } else {
-                    await SharedStorage.setItem('@notification_scheduled', 'false');
-                }
-            } else if (alreadyScheduled === 'true') {
-                await notifee.cancelTriggerNotification('accessibility-reminder');
-                await SharedStorage.setItem('@notification_scheduled', 'false');
-            }
-        };
-
-        initializeApp();
-    }, []);
+    const { status, setStatus } = useAppInitializer();
 
     const handleWelcomeComplete = async () => {
-        await SharedStorage.setItem('@has_seen_welcome', 'true');
+        await setUserHasSeenWelcome(true);
         openAccessibilitySettings();
-        setShowWelcome(false);
+        setStatus('main');
     };
 
-    if (showWelcome === null) {
+    if (status === 'loading') {
         return <View />;
     }
 
     return (
         <ThemeProvider>
             <PassphraseProvider>
-                {showWelcome ? <WelcomeScreen onContinue={handleWelcomeComplete} /> : <Navigation />}
+                {status === 'welcome' ? <WelcomeScreen onContinue={handleWelcomeComplete} /> : <Navigation />}
             </PassphraseProvider>
         </ThemeProvider>
     );

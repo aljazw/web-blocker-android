@@ -1,6 +1,6 @@
 import { TextProps, TextStyle } from 'react-native';
-import { useTheme } from '../theme';
 import { Text } from 'react-native-gesture-handler';
+import { useTheme } from '../context/ThemeContext';
 
 type TextSize = 'small' | 'normal' | 'large' | 'xlarge';
 type TextWeight = 'light' | 'regular' | 'medium' | 'strong';

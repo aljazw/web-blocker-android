@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput } from 'react-native';
 import Icon from './Icon';
-import { shapes, spacing, useTheme } from '../theme';
+import { shapes, spacing } from '../theme';
 import { ThemedView } from './ThemedView';
+import { useTheme } from '../context/ThemeContext';
 
 interface SearchBarProps {
     placeholder?: string;

@@ -3,10 +3,11 @@ import BlurModal from './BlurModal';
 import { ThemedText } from './ThemedText';
 import { StyleSheet, Text, View } from 'react-native';
 import ActionButton from './ActionButton';
-import { shapes, spacing, useTheme } from '../theme';
+import { shapes, spacing } from '../theme';
 import { TextInput } from 'react-native-gesture-handler';
 import { ThemedView } from './ThemedView';
 import { UNBLOCK_MESSAGES } from '../constants/strings';
+import { useTheme } from '../context/ThemeContext';
 
 interface PassphrasePopupProps {
     visible: boolean;
@@ -86,22 +87,43 @@ type Props = {
 };
 
 const HighlightMismatchText: React.FC<Props> = ({ originalText, userInput }) => {
-    const elements = [];
+    type Segment = { text: string; isMatch: boolean };
+    const segments: Segment[] = [];
+
+    let currentMatchStatus: boolean | null = null;
+    let currentText = '';
 
     for (let i = 0; i < originalText.length; i++) {
         const originalChar = originalText[i];
         const inputChar = userInput[i];
-
         const isMatch = originalChar === inputChar;
 
-        elements.push(
-            <ThemedText key={i} color={isMatch ? 'text' : 'primaryRed'}>
-                {originalChar}
-            </ThemedText>,
-        );
+        if (isMatch !== currentMatchStatus) {
+            // Push previous segment if any
+            if (currentText) {
+                segments.push({ text: currentText, isMatch: currentMatchStatus! });
+            }
+            currentText = originalChar;
+            currentMatchStatus = isMatch;
+        } else {
+            currentText += originalChar;
+        }
     }
 
-    return <Text>{elements}</Text>;
+    // Push last segment
+    if (currentText) {
+        segments.push({ text: currentText, isMatch: currentMatchStatus! });
+    }
+
+    return (
+        <Text>
+            {segments.map((segment, index) => (
+                <ThemedText key={index} color={segment.isMatch ? 'text' : 'primaryRed'}>
+                    {segment.text}
+                </ThemedText>
+            ))}
+        </Text>
+    );
 };
 
 const styles = StyleSheet.create({

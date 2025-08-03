@@ -1,5 +1,6 @@
 import { StyleProp, View, ViewStyle } from 'react-native';
-import { shapes, useTheme } from '../theme';
+import { shapes } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 interface ThemedViewProps {
     style?: StyleProp<ViewStyle>;

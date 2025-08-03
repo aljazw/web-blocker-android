@@ -1,20 +1,41 @@
-import { createContext, ReactNode, useContext, useState } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { getPassphrasePreference, setPassphrasePreference } from '../utils/storage';
 
 type PassphraseContextType = {
     isPassphraseEnabled: boolean;
-    setPassphraseEnabled: (value: boolean) => void;
+    togglePassphrase: () => void;
 };
 
 const PassphraseContext = createContext<PassphraseContextType | undefined>(undefined);
 
 export const PassphraseProvider = ({ children }: { children: ReactNode }) => {
-    const [isPassphraseEnabled, setPassphraseEnabled] = useState(false);
+    const [isPassphraseEnabled, setIsPassphraseEnabled] = useState(false);
+
+    useEffect(() => {
+        const loadPassphrasePreference = async () => {
+            const saved = await getPassphrasePreference();
+            if (saved === null) {
+                await setPassphrasePreference(false);
+            } else {
+                setIsPassphraseEnabled(saved);
+            }
+        };
+        loadPassphrasePreference();
+    }, []);
+
+    const togglePassphrase = async () => {
+        setIsPassphraseEnabled(prev => {
+            const next = !prev;
+            setPassphrasePreference(next);
+            return next;
+        });
+    };
 
     return (
         <PassphraseContext.Provider
             value={{
                 isPassphraseEnabled,
-                setPassphraseEnabled,
+                togglePassphrase,
             }}>
             {children}
         </PassphraseContext.Provider>

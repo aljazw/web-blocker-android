@@ -3,7 +3,7 @@ import Icon from '../components/Icon';
 import HomeScreen from '../screens/HomeScreen';
 import BlockScreen from '../screens/BlockScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import { useTheme } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 

@@ -2,7 +2,7 @@ import { AppState, AppStateStatus, StyleSheet, View } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
 import { Switch } from 'react-native-gesture-handler';
 import { useEffect, useRef, useState } from 'react';
-import { spacing, useTheme } from '../theme';
+import { spacing } from '../theme';
 import { ThemedText } from '../components/ThemedText';
 import BlurModal from '../components/BlurModal';
 import ActionButton from '../components/ActionButton';
@@ -12,10 +12,11 @@ import { ThemedView } from '../components/ThemedView';
 import { checkAdmin, toggleDeviceAdmin } from '../utils/deviceAdmin';
 import { ERRORS, PASSPHRASE_PROTECTION, UNINSTALL_PREVENTION } from '../constants/strings';
 import ErrorPopup from '../components/ErrorPopup';
+import { useTheme } from '../context/ThemeContext';
 
 const SettingsScreen: React.FC = () => {
     const { isDarkMode, toggleTheme } = useTheme();
-    const { isPassphraseEnabled, setPassphraseEnabled } = usePassphrase();
+    const { isPassphraseEnabled, togglePassphrase } = usePassphrase();
     const [isAdminEnabled, setIsAdminEnabled] = useState(false);
 
     const [showEnablePassphrasePopup, setShowEnablePassphrasePopup] = useState(false);
@@ -39,25 +40,24 @@ const SettingsScreen: React.FC = () => {
         nextValue ? setShowEnableUninstallPreventionPopup(true) : setShowDisableUninstallPreventionPopup(true);
     };
 
-    const confirmEnablePassphrase = () => {
-        setShowEnablePassphrasePopup(false);
+    const confirmPassphrasePopup = (action: 'enable' | 'disable') => {
+        if (action === 'enable') {
+            setShowEnablePassphrasePopup(false);
+        } else {
+            setShowDisablePassphrasePopup(false);
+        }
+
         setPendingToggleValue(null);
-        setPassphraseEnabled(true);
+        togglePassphrase();
     };
 
-    const cancelEnablePassphrase = () => {
-        setShowEnablePassphrasePopup(false);
-        setPendingToggleValue(null);
-    };
+    const cancelPassphrasePopup = (action: 'enable' | 'disable') => {
+        if (action === 'enable') {
+            setShowEnablePassphrasePopup(false);
+        } else {
+            setShowDisablePassphrasePopup(false);
+        }
 
-    const confirmDisablePassphrase = () => {
-        setShowDisablePassphrasePopup(false);
-        setPendingToggleValue(null);
-        setPassphraseEnabled(false);
-    };
-
-    const cancelDisablePassphrase = () => {
-        setShowDisablePassphrasePopup(false);
         setPendingToggleValue(null);
     };
 
@@ -150,13 +150,13 @@ const SettingsScreen: React.FC = () => {
                 visible={showEnablePassphrasePopup}
                 title={PASSPHRASE_PROTECTION.title}
                 text={PASSPHRASE_PROTECTION.text}
-                onClose={cancelEnablePassphrase}
-                onConfirm={confirmEnablePassphrase}
+                onClose={() => cancelPassphrasePopup('enable')}
+                onConfirm={() => confirmPassphrasePopup('enable')}
             />
             <PassphrasePopup
                 visible={showDisablePassphrasePopup}
-                onClose={cancelDisablePassphrase}
-                onConfirm={confirmDisablePassphrase}
+                onClose={() => cancelPassphrasePopup('disable')}
+                onConfirm={() => confirmPassphrasePopup('disable')}
             />
 
             <PopUp

@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
 import { View, TextInput, StyleSheet } from 'react-native';
 import { ThemedText } from './ThemedText';
-import { shapes, spacing, useTheme } from '../theme';
+import { shapes, spacing } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 interface TimeInputProps {
     label: string;

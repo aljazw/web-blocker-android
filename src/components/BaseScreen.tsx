@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
 import { ActivityIndicator, SafeAreaView, StyleSheet, View } from 'react-native';
-import { spacing, useTheme } from '../theme';
+import { spacing } from '../theme';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import changeNavigationBarColor from 'react-native-navigation-bar-color';
+import { useTheme } from '../context/ThemeContext';
 
 interface BaseScreenProps {
     children: React.ReactNode;
