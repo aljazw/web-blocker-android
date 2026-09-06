@@ -1,6 +1,6 @@
 import { AppState, AppStateStatus, StyleSheet, View } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
-import { Switch } from 'react-native-gesture-handler';
+import { Pressable, Switch } from 'react-native-gesture-handler';
 import { useEffect, useRef, useState } from 'react';
 import { spacing } from '../theme';
 import { ThemedText } from '../components/ThemedText';
@@ -13,6 +13,8 @@ import { checkAdmin, toggleDeviceAdmin } from '../utils/deviceAdmin';
 import { ERRORS, PASSPHRASE_PROTECTION, UNINSTALL_PREVENTION } from '../constants/strings';
 import ErrorPopup from '../components/ErrorPopup';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { openAccessibilitySettings } from '../utils/accessibility';
 
 const SettingsScreen: React.FC = () => {
     const { isDarkMode, toggleTheme } = useTheme();
@@ -145,6 +147,13 @@ const SettingsScreen: React.FC = () => {
                 />
             </ThemedView>
             <ThemedView withBorder style={styles.divideContainer} />
+            <ThemedView color="background" style={styles.settingItem}>
+                <ThemedText>Navigate to Accessibility settings</ThemedText>
+                <Pressable onPress={() => openAccessibilitySettings()}>
+                    <Icon name={'Next'} opacity="faded" style={styles.hideIcon} />
+                </Pressable>
+            </ThemedView>
+            <ThemedView withBorder style={styles.divideContainer} />
 
             <PopUp
                 visible={showEnablePassphrasePopup}
@@ -226,6 +235,9 @@ const styles = StyleSheet.create({
     },
     divideContainer: {
         height: 1,
+    },
+    hideIcon: {
+        marginRight: spacing.sm,
     },
 });
 

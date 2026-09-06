@@ -18,15 +18,17 @@ export const useAppInitializer = () => {
             const accessibilityEnabled = await checkAccessibilityEnabled();
 
             if (!accessibilityEnabled) {
-                if (alreadyScheduled === false) {
+                // Only schedule if it hasn't been scheduled yet
+                if (!alreadyScheduled) {
                     await scheduleDailyNotification();
                     await setNotificationScheduled(true);
-                } else {
+                }
+            } else {
+                // If Accessibility IS enabled, cancel any active reminder and clear the flag
+                if (alreadyScheduled) {
+                    await notifee.cancelTriggerNotification('accessibility-reminder');
                     await setNotificationScheduled(false);
                 }
-            } else if (alreadyScheduled === true) {
-                await notifee.cancelTriggerNotification('accessibility-reminder');
-                await setNotificationScheduled(false);
             }
 
             setStatus(showWelcome ? 'welcome' : 'main');

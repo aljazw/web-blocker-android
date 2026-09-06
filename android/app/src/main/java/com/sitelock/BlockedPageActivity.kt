@@ -63,14 +63,25 @@ class BlockedPageActivity : Activity() {
             layoutParams = params
 
             setOnClickListener {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"))
-                    intent.setPackage(packageName)
-                    intent.addFlags(
-                        Intent.FLAG_ACTIVITY_CLEAR_TASK or 
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    )
-                    intent.putExtra(Browser.EXTRA_APPLICATION_ID, packageName)
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com")).apply {
+                        setPackage(packageName)
+                        addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK or 
+                            Intent.FLAG_ACTIVITY_CLEAR_TASK or 
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        )
+                        putExtra(Browser.EXTRA_APPLICATION_ID, packageName)
+                    }
                     startActivity(intent)
+                } catch (e: Exception) {
+                    // Fallback: If opening the specific browser package fails, open default browser or go Home
+                    val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_HOME)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(homeIntent)
+                }
 
                 finish()
             }

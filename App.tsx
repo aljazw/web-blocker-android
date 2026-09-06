@@ -13,6 +13,7 @@ import { useAppInitializer } from './src/hooks/useAppInitializer';
 import { setUserHasSeenWelcome } from './src/utils/storage';
 import { openAccessibilitySettings } from './src/utils/accessibility';
 import { ThemeProvider } from './src/context/ThemeContext';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 function App(): React.JSX.Element {
     const { status, setStatus } = useAppInitializer();
@@ -30,7 +31,9 @@ function App(): React.JSX.Element {
     return (
         <ThemeProvider>
             <PassphraseProvider>
-                {status === 'welcome' ? <WelcomeScreen onContinue={handleWelcomeComplete} /> : <Navigation />}
+                <SafeAreaProvider>
+                    {status === 'welcome' ? <WelcomeScreen onContinue={handleWelcomeComplete} /> : <Navigation />}
+                </SafeAreaProvider>
             </PassphraseProvider>
         </ThemeProvider>
     );

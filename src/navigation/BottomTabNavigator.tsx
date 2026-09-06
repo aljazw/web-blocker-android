@@ -17,7 +17,7 @@ const BottomTabNavigator: React.FC = () => {
                 tabBarActiveTintColor: 'tomato',
                 tabBarInactiveTintColor: 'gray',
                 tabBarStyle: {
-                    height: 60,
+                    height: 80,
                     backgroundColor: theme.colors.background,
                 },
                 headerShown: false,

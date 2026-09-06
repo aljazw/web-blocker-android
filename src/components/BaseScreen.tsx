@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, SafeAreaView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { spacing } from '../theme';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 import changeNavigationBarColor from 'react-native-navigation-bar-color';
 import { useTheme } from '../context/ThemeContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface BaseScreenProps {
     children: React.ReactNode;
@@ -58,7 +59,8 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     header: {
-        padding: spacing.md,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
     },
     lineDivider: {
         height: 1,

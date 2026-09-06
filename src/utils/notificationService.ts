@@ -6,8 +6,20 @@ import notifee, {
     AndroidLaunchActivityFlag,
 } from '@notifee/react-native';
 import { ACCESSIBILITY_NOTIFICATION_TEXT } from '../constants/strings';
+import { checkAccessibilityEnabled } from './accessibility';
+
 
 export async function scheduleDailyNotification() {
+    // 1. Check if accessibility is ALREADY enabled
+    const isEnabled = await checkAccessibilityEnabled();
+
+    // 2. If already enabled, cancel any existing reminder and stop
+    if (isEnabled) {
+        await notifee.cancelNotification('accessibility-reminder');
+        return;
+    }
+
+    // 3. Otherwise, schedule the trigger notification
     const text = ACCESSIBILITY_NOTIFICATION_TEXT;
 
     const bigTextStyle: AndroidBigTextStyle = {
@@ -27,7 +39,7 @@ export async function scheduleDailyNotification() {
     const trigger: TimestampTrigger = {
         type: TriggerType.TIMESTAMP,
         timestamp: date.getTime(),
-        repeatFrequency: 1,
+        repeatFrequency: 1, // RepeatFrequency.DAILY
     };
 
     await notifee.createTriggerNotification(
