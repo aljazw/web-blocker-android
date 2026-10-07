@@ -1,4 +1,4 @@
-import { StyleSheet, View, ActivityIndicator, Pressable } from 'react-native';
+import { StyleSheet, View, Pressable } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
 import React, { useState, useEffect, useCallback } from 'react';
 import SearchBar from '../components/SearchBar';
@@ -10,7 +10,7 @@ import ItemContainer from '../components/itemContainer';
 import Favicon from '../components/Favicon';
 import BlurModal from '../components/BlurModal';
 import ActionButton from '../components/ActionButton';
-import { denormalizeUrl, normalizeUrl } from '../utils/urlHelpers';
+import { denormalizeUrl, normalizeUrl, isValidWebsiteInput } from '../utils/urlHelpers';
 import { spacing } from '../theme/tokens';
 import { ThemedText } from '../components/ThemedText';
 import ErrorPopup from '../components/ErrorPopup';
@@ -20,7 +20,6 @@ import { ERRORS } from '../constants/strings';
 const BlockScreen: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [websiteUrl, setWebsiteUrl] = useState<string>('');
-    const [loading, setLoading] = useState(false);
     const [next, setNext] = useState(false);
     const [alreadyBlockedPopupVisible, setAlreadyBlockedPopupVisible] = useState(false);
     const [errorPopupVisible, setErrorPopupVisible] = useState(false);
@@ -50,35 +49,23 @@ const BlockScreen: React.FC = () => {
         }
     };
 
-    const checkUrl = useCallback(async (url: string) => {
-        if (!url || !url.includes('.')) {
+    // Validate the entry locally — instant, offline, and never blocks you from
+    // adding a site that happens to be unreachable. No network request, so the
+    // screen can't hang on a slow/unresponsive site.
+    const checkUrl = useCallback((url: string) => {
+        const trimmed = url.trim();
+        if (!isValidWebsiteInput(trimmed)) {
             setWebsiteUrl('');
-            setLoading(false);
             return;
         }
-
-        setLoading(true);
-        setWebsiteUrl('');
-        const normalizedUrl = normalizeUrl(url);
-
-        try {
-            const response = await fetch(normalizedUrl);
-            if (response.ok) {
-                setWebsiteUrl(denormalizeUrl(normalizedUrl));
-            } else {
-                showError(ERRORS.invalidUrl.title, ERRORS.invalidUrl.text);
-            }
-        } finally {
-            setLoading(false);
-        }
+        setWebsiteUrl(denormalizeUrl(normalizeUrl(trimmed)));
     }, []);
 
     useEffect(() => {
+        setNext(false);
         const delayDebounce = setTimeout(() => {
-            setLoading(true);
-            setNext(false);
             checkUrl(searchQuery);
-        }, 600);
+        }, 300);
 
         return () => clearTimeout(delayDebounce);
     }, [searchQuery, checkUrl]);
@@ -86,12 +73,10 @@ const BlockScreen: React.FC = () => {
     return (
         <BaseScreen title="Add Site" showHeader={false}>
             <View style={{ marginTop: spacing.lg, marginHorizontal: spacing.sm }}>
-                <SearchBar placeholder="Find website..." onSearch={setSearchQuery} />
+                <SearchBar placeholder="Enter website..." onSearch={setSearchQuery} />
             </View>
             {searchQuery.length === 0 ? (
                 <GuideContainer />
-            ) : loading ? (
-                <ActivityIndicator size="large" color="#0000ff" />
             ) : websiteUrl.length > 0 ? (
                 <View>
                     <Pressable onPress={() => setNext(prev => !prev)}>
@@ -114,7 +99,13 @@ const BlockScreen: React.FC = () => {
                     {next && <NextButton onPress={handlePressNext} />}
                 </View>
             ) : (
-                <ThemedText style={styles.noResultsText}>No results found for "{searchQuery}"</ThemedText>
+                <ThemedText style={styles.noResultsText}>
+                    Enter a valid address like{' '}
+                    <ThemedText weight="strong" color="primaryBlue">
+                        facebook.com
+                    </ThemedText>{' '}
+                    to block it.
+                </ThemedText>
             )}
             <AlreadyBlockedPopup
                 visible={alreadyBlockedPopupVisible}

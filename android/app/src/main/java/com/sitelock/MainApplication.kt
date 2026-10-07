@@ -31,6 +31,9 @@ class MainApplication : Application(), ReactApplication {
               add(AccessibilityStatusPackage())
               add(IntentLauncherPackage())
               add(DeviceAdminPackage())
+              add(VpnControlPackage())
+              add(OverlayPackage())
+              add(WatchdogPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"
@@ -50,6 +53,13 @@ class MainApplication : Application(), ReactApplication {
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
       load()
+    }
+
+    // If protection is currently enabled, make sure the watchdog is alive.
+    // Covers the case where an aggressive OEM task-killer stopped the service
+    // but the user later opens the app.
+    if (AccessibilityUtils.isServiceEnabled(this)) {
+      WatchdogService.ensureRunning(this)
     }
   }
 }

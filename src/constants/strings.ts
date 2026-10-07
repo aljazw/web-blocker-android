@@ -22,6 +22,29 @@ export const UNINSTALL_PREVENTION = {
     },
 };
 
+export const DNS_PROTECTION = {
+    title: 'Enable DNS blocking (network layer)?\n\n',
+    text:
+        'This adds a second layer of protection using a local VPN on your device. It keeps blocking your ' +
+        'always-blocked sites (Full Week + All Day Long) even if you turn the accessibility service off.\n\n' +
+        'Android will ask you to allow a VPN connection, and you’ll see a key icon in the status bar while it’s on. ' +
+        'All filtering happens on-device — no traffic leaves your phone through us.\n\n' +
+        'Note: sites with a schedule (specific days or hours) are NOT added here; those stay handled by the ' +
+        'accessibility service.',
+};
+
+export const ALWAYS_ON_VPN = {
+    title: 'Make DNS blocking permanent?\n\n',
+    text:
+        'This opens Android’s VPN settings. For the strongest protection:\n\n' +
+        '1. Tap the gear next to "SiteLock".\n' +
+        '2. Turn on "Always-on VPN".\n' +
+        '3. Turn on "Block connections without VPN".\n\n' +
+        'After this, the DNS filter restarts on boot and all internet is blocked whenever it’s off — so it ' +
+        'can’t be dropped with a couple of quick taps.\n\n' +
+        '(Enable DNS Blocking first if you haven’t.)',
+};
+
 export const ERRORS = {
     uninstallPrevention: {
         title: 'Uninstall Prevention Error',
@@ -38,6 +61,10 @@ export const ERRORS = {
     genericRetrieveError: {
         title: 'Oops! Something went wrong',
         text: 'We couldn’t retrieve your blocked websites. Please try again later.',
+    },
+    dnsBlocking: {
+        title: 'DNS Blocking Error',
+        text: 'We couldn’t start DNS blocking. Make sure no other VPN is active and try again.',
     },
 };
 
@@ -56,7 +83,7 @@ export const ACCESSIBILITY_NOTIFICATION_TEXT = `🔧 Please enable Accessibility
 1️⃣ Open Accessibility settings (click here).
 2️⃣ Scroll to 'Installed Services' (or 'Downloaded Services').
 3️⃣ Find & tap 'SiteLock'.
-4️⃣ Toggle it ON 
+4️⃣ Toggle it ON
 5️⃣ Confirm any prompts.
 
 This lets the app block distracting sites and keep you focused! 🔒`;

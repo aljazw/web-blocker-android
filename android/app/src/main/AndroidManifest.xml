@@ -4,6 +4,16 @@
     <uses-permission android:name="android.permission.READ_LOGS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.BIND_DEVICE_ADMIN" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Watchdog + anti-disable support -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Lets the watchdog pop the re-enable screen from the background on every OEM -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Fallback full-screen alert when overlay permission isn't granted -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
 
     <application
@@ -32,9 +42,29 @@
 
         <activity android:name=".OpenAccessibilityActivity"
             android:exported="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" 
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
         />
-        
+
+        <!-- Shown over the lock screen the instant protection is disabled -->
+        <activity
+            android:name=".ReenableActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
+        <!-- Shown when the user reaches SiteLock's accessibility toggle page -->
+        <activity
+            android:name=".GuardActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
         <service
             android:name=".BlockAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
@@ -44,9 +74,45 @@
             </intent-filter>
                 <meta-data
                     android:name="android.accessibilityservice"
-                    android:resource="@xml/accessibility_service_config" 
+                    android:resource="@xml/accessibility_service_config"
                 />
         </service>
+
+        <!-- Independent watchdog: detects a disable via Settings.Secure on any OEM -->
+        <service
+            android:name=".WatchdogService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps self-control website blocking active and alerts the user if the accessibility service is turned off." />
+        </service>
+
+        <!-- Second layer: DNS-filtering VPN. Keeps always-blocked sites blocked
+             even if the accessibility service is turned off. -->
+        <service
+            android:name=".DnsVpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="On-device DNS filtering that blocks the user's always-blocked websites at the network level for self-control." />
+        </service>
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name="io.invertase.notifee.service.NotifeeMessagingService"
