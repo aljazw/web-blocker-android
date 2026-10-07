@@ -67,12 +67,20 @@ const TimeInput: React.FC<TimeInputProps> = ({ label, hourValue, minutesValue, s
 
     const { theme } = useTheme();
 
+    const inputStyle = [styles.input, { color: theme.colors.text }];
+
     return (
-        <View>
-            <ThemedText style={styles.label}>{label}</ThemedText>
-            <View style={styles.inputContainer}>
+        <View style={styles.container}>
+            <ThemedText size="small" color="muted" weight="medium">
+                {label}
+            </ThemedText>
+            <View
+                style={[
+                    styles.inputContainer,
+                    { backgroundColor: theme.colors.elevated, borderColor: theme.colors.border },
+                ]}>
                 <TextInput
-                    style={[styles.input, { color: theme.colors.text }]}
+                    style={inputStyle}
                     value={hourValue}
                     onChangeText={text => handleHourChange(text)}
                     onBlur={() => {
@@ -81,16 +89,17 @@ const TimeInput: React.FC<TimeInputProps> = ({ label, hourValue, minutesValue, s
                         }
                     }}
                     placeholder="00"
-                    placeholderTextColor="lightgray"
+                    placeholderTextColor={theme.colors.muted}
+                    selectionColor={theme.colors.accent}
                     keyboardType="numeric"
                     maxLength={2}
                 />
-                <ThemedText size="large" weight="strong">
+                <ThemedText size="xlarge" weight="strong" color="muted">
                     :
                 </ThemedText>
                 <TextInput
                     ref={minutesRef}
-                    style={[styles.input, { color: theme.colors.text }]}
+                    style={inputStyle}
                     value={minutesValue}
                     onChangeText={text => handleMinutesChange(text)}
                     onBlur={() => {
@@ -99,7 +108,8 @@ const TimeInput: React.FC<TimeInputProps> = ({ label, hourValue, minutesValue, s
                         }
                     }}
                     placeholder="00"
-                    placeholderTextColor="lightgray"
+                    placeholderTextColor={theme.colors.muted}
+                    selectionColor={theme.colors.accent}
                     keyboardType="numeric"
                     maxLength={2}
                 />
@@ -110,30 +120,24 @@ const TimeInput: React.FC<TimeInputProps> = ({ label, hourValue, minutesValue, s
 
 const styles = StyleSheet.create({
     container: {
-        padding: spacing.lg,
-    },
-    label: {
-        marginTop: spacing.sm,
+        flex: 1,
     },
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: shapes.borderWidth.thin,
-        borderColor: 'gray',
-        padding: spacing.sm,
-        borderRadius: shapes.borderRadius.small,
+        borderRadius: shapes.borderRadius.medium,
         height: 60,
-        marginTop: spacing.lg,
-        width: 150,
+        marginTop: spacing.xs + 2,
     },
     input: {
-        marginHorizontal: spacing.sm,
-        fontSize: 20,
+        marginHorizontal: spacing.xs,
+        fontSize: 24,
+        fontWeight: '700',
         textAlign: 'center',
-        width: 40,
-        height: 57,
-        color: 'black',
+        width: 44,
+        height: 56,
     },
 });
 

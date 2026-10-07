@@ -2,11 +2,11 @@ import { TextProps, TextStyle } from 'react-native';
 import { Text } from 'react-native-gesture-handler';
 import { useTheme } from '../context/ThemeContext';
 
-type TextSize = 'small' | 'normal' | 'large' | 'xlarge';
+type TextSize = 'tiny' | 'small' | 'normal' | 'large' | 'xlarge' | 'display';
 type TextWeight = 'light' | 'regular' | 'medium' | 'strong';
 type TextOpacity = 'normal' | 'muted' | 'faded';
 type TextAlign = 'left' | 'center' | 'right' | 'auto';
-type ColorToken = 'text' | 'primaryRed' | 'primaryBlue' | 'primaryGreen';
+type ColorToken = 'text' | 'muted' | 'accent' | 'onAccent' | 'primaryRed' | 'primaryBlue' | 'primaryGreen';
 
 interface Props extends TextProps {
     size?: TextSize;
@@ -31,17 +31,19 @@ export const ThemedText: React.FC<Props> = ({
     const { theme } = useTheme();
 
     const sizeMap: Record<TextSize, number> = {
+        tiny: 11,
         small: 13,
         normal: 15,
         large: 17,
-        xlarge: 24,
+        xlarge: 26,
+        display: 34,
     };
 
     const weightMap: Record<TextWeight, TextStyle['fontWeight']> = {
         light: '300',
         regular: '400',
         medium: '600',
-        strong: '800',
+        strong: '700',
     };
 
     const opacityMap: Record<TextOpacity, number> = {
@@ -66,6 +68,7 @@ export const ThemedText: React.FC<Props> = ({
                     opacity: fontOpacity,
                     textAlign: textAlign,
                     color: fontColor,
+                    letterSpacing: size === 'display' || size === 'xlarge' ? -0.5 : 0,
                 },
                 style,
             ]}>

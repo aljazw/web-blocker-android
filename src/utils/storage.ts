@@ -106,3 +106,12 @@ export const getPassphrasePreference = async (): Promise<boolean | null> => {
 export const setPassphrasePreference = async (isPassphrase: boolean): Promise<void> => {
     await SharedStorage.setItem('@is_passphrase', JSON.stringify(isPassphrase));
 };
+
+export const getAccentPreference = async (): Promise<string | null> => {
+    const value = await SharedStorage.getItem('@accent_color');
+    return value ? JSON.parse(value) : null;
+};
+
+export const setAccentPreference = async (accent: string): Promise<void> => {
+    await SharedStorage.setItem('@accent_color', JSON.stringify(accent));
+};

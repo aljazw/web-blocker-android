@@ -1,17 +1,10 @@
 package com.sitelock
 
 import android.app.Activity
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.Gravity
 import android.view.WindowManager
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
 
 /**
  * Shown the instant the accessibility service is disabled. Appears over the
@@ -26,51 +19,20 @@ class ReenableActivity : Activity() {
 
         showWhenLockedAndTurnScreenOn()
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(Color.parseColor("#101418"))
-            setPadding(48, 120, 48, 48)
-        }
-
-        val title = TextView(this).apply {
-            text = "Protection was turned off"
-            textSize = 24f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#FF5252"))
-            setTypeface(null, Typeface.BOLD)
-        }
-
-        val body = TextView(this).apply {
-            text = "\nSiteLock's accessibility service is off, so your blocks are " +
-                "not working right now.\n\n" +
-                "“Don’t trade what you want most for what you want right now.”\n\n" +
-                "Turn it back on to restore your blocks.\n"
-            textSize = 17f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#E0E0E0"))
-        }
-
-        val reenableBtn = Button(this).apply {
-            text = "Turn protection back on"
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            setPadding(48, 28, 48, 28)
-            background = GradientDrawable().apply {
-                cornerRadius = 28f
-                setColor(Color.parseColor("#1976D2"))
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 56 }
-            setOnClickListener { openAccessibilitySettings() }
-        }
-
-        layout.addView(title)
-        layout.addView(body)
-        layout.addView(reenableBtn)
-        setContentView(layout)
+        SiteLockScreen.show(
+            this,
+            SiteLockScreen.Spec(
+                iconRes = R.drawable.ic_shield_alert,
+                tone = SiteLockScreen.Tone.DANGER,
+                eyebrow = "Protection is off",
+                title = "Your blocks aren’t working",
+                body = "SiteLock’s accessibility service was switched off, so blocked sites can load " +
+                    "again. Turn it back on to restore them.",
+                quote = "“Don’t trade what you want most for what you want right now.”",
+                primaryLabel = "Turn protection back on",
+                onPrimary = { openAccessibilitySettings() },
+            ),
+        )
     }
 
     private fun openAccessibilitySettings() {

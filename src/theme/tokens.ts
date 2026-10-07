@@ -9,9 +9,10 @@ export const spacing = {
 
 export const shapes = {
     borderRadius: {
-        small: 5,
-        medium: 9,
-        large: 16,
+        small: 10,
+        medium: 16,
+        large: 24,
+        pill: 999,
     },
     borderWidth: {
         thin: 1,

@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import BlurModal from './BlurModal';
 import { ThemedText } from './ThemedText';
 import { spacing } from '../theme';
-import {
-    enableDnsBlocking,
-    openPrivateDnsSettings,
-    openVpnSettings,
-} from '../utils/dnsBlocking';
+import Button from './Button';
+import { enableDnsBlocking, openPrivateDnsSettings, openVpnSettings } from '../utils/dnsBlocking';
 
 interface DnsSetupWizardProps {
     visible: boolean;
@@ -66,7 +63,11 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
                             {enableError}
                         </ThemedText>
                     )}
-                    <PrimaryButton label={busy ? 'Waiting…' : 'Turn on DNS blocking'} onPress={handleEnable} disabled={busy} />
+                    <PrimaryButton
+                        label={busy ? 'Waiting…' : 'Turn on DNS blocking'}
+                        onPress={handleEnable}
+                        disabled={busy}
+                    />
                 </>
             )}
 
@@ -79,7 +80,7 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
                         Private DNS encrypts your lookups so the filter can’t read them. I’ll open the page — set it to{' '}
                         <ThemedText weight="strong">Off</ThemedText>, then come back here.
                     </ThemedText>
-                    <ThemedText align="center" size="small" color="primaryBlue" style={styles.body}>
+                    <ThemedText align="center" size="small" color="accent" style={styles.body}>
                         Used AdGuard here? You won’t lose it — after setup, set “Allowed-sites resolver” to AdGuard in
                         Settings and you keep ad/tracker blocking too.
                     </ThemedText>
@@ -127,27 +128,15 @@ const PrimaryButton: React.FC<{ label: string; onPress: () => void; disabled?: b
     label,
     onPress,
     disabled,
-}) => (
-    <Pressable
-        onPress={disabled ? undefined : onPress}
-        style={[styles.primaryBtn, disabled && styles.btnDisabled]}>
-        <ThemedText weight="strong" style={styles.primaryBtnText}>
-            {label}
-        </ThemedText>
-    </Pressable>
-);
+}) => <Button label={label} onPress={onPress} disabled={disabled} style={styles.button} />;
 
 const SecondaryButton: React.FC<{ label: string; onPress: () => void }> = ({ label, onPress }) => (
-    <Pressable onPress={onPress} style={styles.secondaryBtn}>
-        <ThemedText weight="strong" color="primaryBlue">
-            {label}
-        </ThemedText>
-    </Pressable>
+    <Button variant="secondary" label={label} onPress={onPress} style={styles.button} />
 );
 
 const BackButton: React.FC<{ onPress: () => void }> = ({ onPress }) => (
     <Pressable onPress={onPress} style={styles.backBtn}>
-        <ThemedText size="small" opacity="faded">
+        <ThemedText size="small" color="muted">
             Back
         </ThemedText>
     </Pressable>
@@ -163,28 +152,9 @@ const styles = StyleSheet.create({
     body: {
         marginBottom: spacing.md,
     },
-    primaryBtn: {
-        backgroundColor: '#1976D2',
-        borderRadius: 24,
-        paddingVertical: 14,
-        paddingHorizontal: 24,
-        alignItems: 'center',
-        marginTop: spacing.xs,
-    },
-    primaryBtnText: {
-        color: '#FFFFFF',
-    },
-    btnDisabled: {
-        opacity: 0.6,
-    },
-    secondaryBtn: {
-        borderWidth: 1,
-        borderColor: '#1976D2',
-        borderRadius: 24,
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        alignItems: 'center',
-        marginTop: spacing.xs,
+    button: {
+        alignSelf: 'stretch',
+        marginTop: spacing.xs + 2,
     },
     backBtn: {
         alignItems: 'center',

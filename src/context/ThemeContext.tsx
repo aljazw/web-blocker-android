@@ -1,19 +1,23 @@
 import { darkTheme } from '../theme/dark';
 import { lightTheme } from '../theme/light';
 import { Theme } from '../theme/types';
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { getThemePreference, setThemePreference } from '../utils/storage';
+import { AccentName, DEFAULT_ACCENT, isAccentName, withAccent } from '../theme/accents';
+import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import { getAccentPreference, getThemePreference, setAccentPreference, setThemePreference } from '../utils/storage';
 
 type ThemeContextType = {
     theme: Theme;
     isDarkMode: boolean;
     toggleTheme: () => void;
+    accent: AccentName;
+    setAccent: (accent: AccentName) => void;
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     const [isDarkMode, setIsDarkMode] = useState(true);
+    const [accent, setAccentState] = useState<AccentName>(DEFAULT_ACCENT);
 
     useEffect(() => {
         const loadThemePreferences = async () => {
@@ -22,6 +26,11 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
                 await setThemePreference(true);
             } else {
                 setIsDarkMode(saved);
+            }
+
+            const savedAccent = await getAccentPreference().catch(() => null);
+            if (isAccentName(savedAccent)) {
+                setAccentState(savedAccent);
             }
         };
         loadThemePreferences();
@@ -35,9 +44,18 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
         });
     };
 
-    const theme = isDarkMode ? darkTheme : lightTheme;
+    const setAccent = (next: AccentName) => {
+        setAccentState(next);
+        setAccentPreference(next);
+    };
 
-    return <ThemeContext.Provider value={{ theme, isDarkMode, toggleTheme }}>{children}</ThemeContext.Provider>;
+    const theme = useMemo(() => withAccent(isDarkMode ? darkTheme : lightTheme, accent), [isDarkMode, accent]);
+
+    return (
+        <ThemeContext.Provider value={{ theme, isDarkMode, toggleTheme, accent, setAccent }}>
+            {children}
+        </ThemeContext.Provider>
+    );
 };
 
 export const useTheme = () => {

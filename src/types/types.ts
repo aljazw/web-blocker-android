@@ -1,7 +1,13 @@
-import { NavigationProp } from '@react-navigation/native';
+import { NavigationProp, NavigatorScreenParams } from '@react-navigation/native';
+
+export type TabParamList = {
+    Home: undefined;
+    Block: undefined;
+    Settings: undefined;
+};
 
 export type RootStackParamList = {
-    BottomTabs: undefined;
+    BottomTabs: NavigatorScreenParams<TabParamList> | undefined;
     AddSite: undefined;
     Schedule: { websiteUrl: string };
 };

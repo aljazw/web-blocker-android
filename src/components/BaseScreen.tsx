@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StatusBar, StyleSheet, View } from 'react-native';
 import { spacing } from '../theme';
 import { ThemedText } from './ThemedText';
-import { ThemedView } from './ThemedView';
 import changeNavigationBarColor from 'react-native-navigation-bar-color';
 import { useTheme } from '../context/ThemeContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +9,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 interface BaseScreenProps {
     children: React.ReactNode;
     title?: string;
+    subtitle?: string;
+    headerRight?: React.ReactNode;
+    headerLeft?: React.ReactNode;
     isLoading?: boolean;
     style?: object;
     showHeader?: boolean;
@@ -18,6 +20,9 @@ interface BaseScreenProps {
 const BaseScreen: React.FC<BaseScreenProps> = ({
     children,
     title,
+    subtitle,
+    headerRight,
+    headerLeft,
     isLoading = false,
     style = {},
     showHeader = true,
@@ -25,30 +30,38 @@ const BaseScreen: React.FC<BaseScreenProps> = ({
     const { theme, isDarkMode } = useTheme();
 
     useEffect(() => {
-        if (isDarkMode) {
-            changeNavigationBarColor('#000000', false);
-        } else {
-            changeNavigationBarColor('#FFFFFF', true);
-        }
-    }, [isDarkMode]);
+        changeNavigationBarColor(theme.colors.card, !isDarkMode);
+    }, [isDarkMode, theme.colors.card]);
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }, style]}>
+        <SafeAreaView
+            edges={['top', 'left', 'right']}
+            style={[styles.container, { backgroundColor: theme.colors.background }, style]}>
+            <StatusBar
+                barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+                backgroundColor={theme.colors.background}
+            />
             {showHeader && (
-                <>
-                    <View style={styles.header}>
+                <View style={styles.header}>
+                    {headerLeft}
+                    <View style={styles.titles}>
                         {title && (
                             <ThemedText size="xlarge" weight="strong">
                                 {title}
                             </ThemedText>
                         )}
+                        {subtitle && (
+                            <ThemedText size="small" color="muted" style={styles.subtitle}>
+                                {subtitle}
+                            </ThemedText>
+                        )}
                     </View>
-                    <ThemedView withBorder style={styles.lineDivider} />
-                </>
+                    {headerRight}
+                </View>
             )}
 
             <View style={[styles.content, style]}>
-                {isLoading ? <ActivityIndicator size="large" color="#0000ff" /> : children}
+                {isLoading ? <ActivityIndicator size="large" color={theme.colors.accent} /> : children}
             </View>
         </SafeAreaView>
     );
@@ -59,11 +72,17 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     header: {
-        paddingHorizontal: spacing.md,
-        paddingBottom: spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md + 4,
+        paddingTop: spacing.md,
+        paddingBottom: spacing.sm,
     },
-    lineDivider: {
-        height: 1,
+    titles: {
+        flex: 1,
+    },
+    subtitle: {
+        marginTop: 2,
     },
     content: {
         flex: 1,

@@ -1,42 +1,31 @@
-import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
-import { shapes, spacing } from '../theme';
+import { StyleSheet, ViewStyle } from 'react-native';
+import Button from './Button';
 
 type ActionVariant = 'cancel' | 'confirm';
 
-const variantConfig: Record<ActionVariant, { title: string; color: string }> = {
-    cancel: { title: 'Cancel', color: '#d7372f' },
-    confirm: { title: 'Confirm', color: '#4CAF50' },
-};
-
-interface CancelButtonProps {
+interface ActionButtonProps {
     variant: ActionVariant;
+    label?: string;
     style?: ViewStyle;
     onPress: () => void;
 }
 
-const ActionButton: React.FC<CancelButtonProps> = ({ variant, style, onPress }) => {
-    const config = variantConfig[variant];
-
-    return (
-        <Pressable style={[styles.cancelButton, { backgroundColor: config.color }, style]} onPress={onPress}>
-            <Text style={styles.buttonText}>{config.title}</Text>
-        </Pressable>
-    );
-};
+/** Cancel / Confirm pair used at the bottom of popups. */
+const ActionButton: React.FC<ActionButtonProps> = ({ variant, label, style, onPress }) => (
+    <Button
+        compact
+        variant={variant === 'confirm' ? 'primary' : 'ghost'}
+        label={label ?? (variant === 'confirm' ? 'Confirm' : 'Cancel')}
+        onPress={onPress}
+        style={[styles.button, style]}
+    />
+);
 
 const styles = StyleSheet.create({
-    cancelButton: {
-        backgroundColor: '#f44336',
-        padding: spacing.sm,
-        borderRadius: shapes.borderRadius.small,
-        marginRight: spacing.sm,
-        width: 80,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    buttonText: {
-        color: 'white',
-        fontWeight: 'bold',
+    button: {
+        minWidth: 116,
+        marginHorizontal: 6,
+        minHeight: 46,
     },
 });
 

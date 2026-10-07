@@ -1,35 +1,57 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
 import React, { useState } from 'react';
 import Icon from '../components/Icon';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { BlockedWebsitesData, RootStackNavigation, RootStackParamList } from '../types/types';
 import TimeInput from '../components/TimeInput';
-import NextButton from '../components/NextButton';
 import ActionButton from '../components/ActionButton';
 import BlurModal from '../components/BlurModal';
+import Button from '../components/Button';
+import Chip from '../components/Chip';
+import Favicon from '../components/Favicon';
+import SectionHeader from '../components/SectionHeader';
 import { shapes, spacing } from '../theme';
 import { ThemedText } from '../components/ThemedText';
+import { ThemedView } from '../components/ThemedView';
 import { addBlockedWebsite } from '../utils/storage';
 import ErrorPopup from '../components/ErrorPopup';
 import { useTheme } from '../context/ThemeContext';
+import { ALL_DAY, FULL_WEEK, WEEK_DAYS } from '../utils/schedule';
+import { FadeIn, animateLayout } from '../components/Motion';
+import { haptics } from '../utils/haptics';
+
+type Preset = {
+    label: string;
+    days: boolean[];
+    time: [string, string, string, string] | null; // startH, startM, endH, endM — null = all day
+};
+
+const EVERY_DAY = [true, true, true, true, true, true, true];
+const WEEKDAYS = [true, true, true, true, true, false, false];
+const WEEKEND = [false, false, false, false, false, true, true];
+
+const PRESETS: Preset[] = [
+    { label: 'Always', days: EVERY_DAY, time: null },
+    { label: 'Work hours', days: WEEKDAYS, time: ['09', '00', '17', '00'] },
+    { label: 'Evenings', days: EVERY_DAY, time: ['18', '00', '23', '00'] },
+    { label: 'Bedtime', days: EVERY_DAY, time: ['22', '00', '07', '00'] },
+    { label: 'Weekends', days: WEEKEND, time: null },
+];
 
 const ScheduleScreen: React.FC = () => {
+    const { theme } = useTheme();
     const navigation = useNavigation<RootStackNavigation>();
     type ScheduleScreenRouteProp = RouteProp<RootStackParamList, 'Schedule'>;
 
     const route = useRoute<ScheduleScreenRouteProp>();
     const { websiteUrl } = route.params;
 
-    const [showMoreCalendar, setShowMoreCalendar] = useState(false);
-    const [showMoreTime, setShowMoreTime] = useState(false);
-
-    const days: Array<string> = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const [selectedDays, setSelectedDays] = useState<boolean[]>(Array(days.length).fill(true));
+    const [selectedDays, setSelectedDays] = useState<boolean[]>(EVERY_DAY);
+    const [customTime, setCustomTime] = useState(false);
 
     const [startHour, setStartHour] = useState<string>('');
     const [startMinutes, setStartMinutes] = useState<string>('');
-
     const [endHour, setEndHour] = useState<string>('');
     const [endMinutes, setEndMinutes] = useState<string>('');
 
@@ -44,186 +66,218 @@ const ScheduleScreen: React.FC = () => {
         setErrorPopupVisible(true);
     };
 
-    const handleToggleCalendarArrow = () => {
-        setShowMoreCalendar(prev => !prev);
-        if (showMoreTime) {
-            setShowMoreTime(prev => !prev);
+    const toggleDay = (index: number) => {
+        haptics.tap();
+        setSelectedDays(prev => prev.map((v, i) => (i === index ? !v : v)));
+    };
+
+    const applyPreset = (preset: Preset) => {
+        animateLayout();
+        setSelectedDays(preset.days);
+        if (preset.time) {
+            const [sh, sm, eh, em] = preset.time;
+            setStartHour(sh);
+            setStartMinutes(sm);
+            setEndHour(eh);
+            setEndMinutes(em);
+            setCustomTime(true);
+        } else {
+            clearTime();
         }
     };
 
-    const toggleDay = (index: number) => {
-        setSelectedDays(prev => {
-            const newSelected = [...prev];
-            newSelected[index] = !newSelected[index];
-            return newSelected;
-        });
+    const isPresetActive = (preset: Preset) => {
+        const sameDays = preset.days.every((v, i) => v === selectedDays[i]);
+        if (!sameDays) return false;
+        if (!preset.time) return !customTime;
+        return customTime && [startHour, startMinutes, endHour, endMinutes].join() === preset.time.join();
     };
 
     const getSelectedDaysText = () => {
         if (selectedDays.every(selectedDay => selectedDay)) {
-            return 'Full Week';
+            return FULL_WEEK;
         }
-        const selectedNames = days.filter((_, index) => selectedDays[index]);
-        return selectedNames.join(', ');
-    };
-
-    const handleToggleTimeArrow = () => {
-        setShowMoreTime(prev => !prev);
-        if (showMoreCalendar) {
-            setShowMoreCalendar(prev => !prev);
-        }
+        return WEEK_DAYS.filter((_, index) => selectedDays[index]).join(', ');
     };
 
     const getSelectedTimeText = () => {
-        if (!startHour || !startMinutes || !endHour || !endMinutes) {
-            return 'All Day Long';
+        if (!customTime || !startHour || !startMinutes || !endHour || !endMinutes) {
+            return ALL_DAY;
         }
 
         // Ensure the start and end times are valid (hours between 00-23, minutes between 00-59)
         if (
-            parseInt(startHour, 10) < 0 ||
             parseInt(startHour, 10) > 23 ||
-            parseInt(startMinutes, 10) < 0 ||
             parseInt(startMinutes, 10) > 59 ||
-            parseInt(endHour, 10) < 0 ||
             parseInt(endHour, 10) > 23 ||
-            parseInt(endMinutes, 10) < 0 ||
             parseInt(endMinutes, 10) > 59
         ) {
             return 'Invalid Time';
         }
 
-        return `${startHour.padStart(2, '0')}:${startMinutes.padStart(2, '0')} - ${endHour.padStart(
-            2,
-            '0',
-        )}:${endMinutes.padStart(2, '0')}`;
+        const pad = (v: string) => v.padStart(2, '0');
+        return `${pad(startHour)}:${pad(startMinutes)} - ${pad(endHour)}:${pad(endMinutes)}`;
     };
 
     const clearTime = () => {
+        animateLayout();
         setStartHour('');
         setStartMinutes('');
         setEndHour('');
         setEndMinutes('');
+        setCustomTime(false);
     };
 
-    const { theme } = useTheme();
+    const daysText = getSelectedDaysText();
+    const timeText = getSelectedTimeText();
+    const noDays = !selectedDays.some(Boolean);
+    const incompleteTime = customTime && [startHour, startMinutes, endHour, endMinutes].some(v => v.length === 0);
+    const toMinutes = (h: string, m: string) => parseInt(h || '0', 10) * 60 + parseInt(m || '0', 10);
+    const startTotal = toMinutes(startHour, startMinutes);
+    const endTotal = toMinutes(endHour, endMinutes);
+    const sameStartEnd = customTime && !incompleteTime && startTotal === endTotal;
+    const overnight = customTime && !incompleteTime && timeText !== 'Invalid Time' && endTotal < startTotal;
+    const problem = noDays
+        ? 'Pick at least one day.'
+        : timeText === 'Invalid Time'
+        ? 'That time isn’t valid.'
+        : incompleteTime
+        ? 'Fill in both start and end times, or choose “All day”.'
+        : sameStartEnd
+        ? 'Start and end time can’t be the same.'
+        : null;
+
+    const backButton = (
+        <Pressable
+            onPress={() => navigation.goBack()}
+            hitSlop={10}
+            style={[styles.back, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <Icon name="Back" size={20} />
+        </Pressable>
+    );
 
     return (
-        <BaseScreen title="Schedule">
-            <View style={styles.itemContainer}>
-                <View style={styles.itemLessContainer}>
-                    <View style={styles.itemInnerLeftContainer}>
-                        <Icon name="Calendar" tint={false} style={styles.leftIcon} size={30} />
-                        <View>
-                            <ThemedText>Days</ThemedText>
-                            <ThemedText opacity="faded">{getSelectedDaysText()}</ThemedText>
+        <BaseScreen title="Schedule" subtitle="When should this site be blocked?" headerLeft={backButton}>
+            <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+                <FadeIn>
+                    <ThemedView withBorder style={styles.siteCard}>
+                        <View style={[styles.faviconWrap, { backgroundColor: theme.colors.elevated }]}>
+                            <Favicon url={websiteUrl} size={26} />
                         </View>
-                    </View>
-                    <Pressable onPress={handleToggleCalendarArrow}>
-                        <View style={styles.arrowIconContainer}>
-                            <Icon
-                                name="Arrow"
-                                size={18}
-                                opacity="faded"
-                                style={[
-                                    {
-                                        transform: [
-                                            {
-                                                rotate: showMoreCalendar ? '180deg' : '0deg',
-                                            },
-                                        ],
-                                    },
-                                ]}
+                        <View style={styles.flex}>
+                            <ThemedText size="large" weight="strong" numberOfLines={1}>
+                                {websiteUrl}
+                            </ThemedText>
+                            <ThemedText size="small" color="muted">
+                                New block
+                            </ThemedText>
+                        </View>
+                    </ThemedView>
+                </FadeIn>
+
+                <FadeIn delay={70}>
+                    <SectionHeader title="Quick presets" />
+                    <View style={styles.chips}>
+                        {PRESETS.map(preset => (
+                            <Chip
+                                key={preset.label}
+                                label={preset.label}
+                                selected={isPresetActive(preset)}
+                                onPress={() => applyPreset(preset)}
                             />
-                        </View>
-                    </Pressable>
-                </View>
-                {showMoreCalendar && (
-                    <View style={styles.itemMoreContainer}>
-                        {days.map((day, index) => (
-                            <Pressable
-                                key={index}
-                                style={[
-                                    styles.dayContainer,
-                                    !selectedDays[index] && {
-                                        backgroundColor: theme.colors.card,
-                                        borderWidth: shapes.borderWidth.thin,
-                                        borderColor: theme.colors.border,
-                                    },
-                                ]}
-                                onPress={() => toggleDay(index)}>
-                                <ThemedText
-                                    size="small"
-                                    weight="strong"
-                                    style={[
-                                        selectedDays[index] ? styles.dayTextSelected : {},
-                                        !selectedDays[index] ? styles.dayTextUnselected : {},
-                                    ]}>
-                                    {day.charAt(0)}
-                                </ThemedText>
-                            </Pressable>
                         ))}
                     </View>
-                )}
-            </View>
-            <View style={styles.itemContainer}>
-                <View style={styles.itemLessContainer}>
-                    <View style={styles.itemInnerLeftContainer}>
-                        <Icon name="Time" style={styles.leftIcon} size={28} />
-                        <View>
-                            <ThemedText>Time</ThemedText>
-                            <ThemedText opacity="faded">{getSelectedTimeText()}</ThemedText>
+                </FadeIn>
+                <FadeIn delay={140}>
+                    <SectionHeader title="Days" />
+                    <ThemedView withBorder style={styles.card}>
+                        <View style={styles.daysRow}>
+                            {WEEK_DAYS.map((day, index) => {
+                                const on = selectedDays[index];
+                                return (
+                                    <Pressable
+                                        key={day}
+                                        onPress={() => toggleDay(index)}
+                                        style={[
+                                            styles.dayPill,
+                                            on
+                                                ? { backgroundColor: theme.colors.accent }
+                                                : { backgroundColor: theme.colors.elevated },
+                                        ]}>
+                                        <ThemedText
+                                            size="small"
+                                            weight="strong"
+                                            style={{ color: on ? theme.colors.onAccent : theme.colors.muted }}>
+                                            {day.charAt(0)}
+                                        </ThemedText>
+                                    </Pressable>
+                                );
+                            })}
                         </View>
-                    </View>
-                    <Pressable onPress={handleToggleTimeArrow}>
-                        <View style={styles.arrowIconContainer}>
-                            <Icon
-                                name="Arrow"
-                                size={18}
-                                opacity="faded"
-                                style={[
-                                    {
-                                        transform: [
-                                            {
-                                                rotate: showMoreTime ? '180deg' : '0deg',
-                                            },
-                                        ],
-                                    },
-                                ]}
+                        <ThemedText size="small" color="muted" align="center" style={styles.cardFoot}>
+                            {noDays ? 'No days selected' : daysText === FULL_WEEK ? 'Every day' : daysText}
+                        </ThemedText>
+                    </ThemedView>
+                </FadeIn>
+                <FadeIn delay={210}>
+                    <SectionHeader title="Time" />
+                    <ThemedView withBorder style={styles.card}>
+                        <View style={[styles.segment, { backgroundColor: theme.colors.elevated }]}>
+                            <Segment label="All day" active={!customTime} onPress={clearTime} />
+                            <Segment
+                                label="Custom hours"
+                                active={customTime}
+                                onPress={() => {
+                                    animateLayout();
+                                    setCustomTime(true);
+                                }}
                             />
                         </View>
-                    </Pressable>
-                </View>
-                {showMoreTime && (
-                    <View>
-                        <TimeInput
-                            label="Start Time (HH:mm)"
-                            hourValue={startHour}
-                            minutesValue={startMinutes}
-                            setHour={setStartHour}
-                            setMinutes={setStartMinutes}
-                        />
-                        <TimeInput
-                            label="End Time (HH:mm)"
-                            hourValue={endHour}
-                            minutesValue={endMinutes}
-                            setHour={setEndHour}
-                            setMinutes={setEndMinutes}
-                        />
-                        <Pressable onPress={clearTime}>
-                            <ThemedText color="primaryRed" style={styles.clearText}>
-                                Clear
+                        {customTime && (
+                            <View style={styles.timeRow}>
+                                <TimeInput
+                                    label="From"
+                                    hourValue={startHour}
+                                    minutesValue={startMinutes}
+                                    setHour={setStartHour}
+                                    setMinutes={setStartMinutes}
+                                />
+                                <View style={styles.timeGap} />
+                                <TimeInput
+                                    label="Until"
+                                    hourValue={endHour}
+                                    minutesValue={endMinutes}
+                                    setHour={setEndHour}
+                                    setMinutes={setEndMinutes}
+                                />
+                            </View>
+                        )}
+                        {overnight && (
+                            <ThemedText size="small" color="muted" align="center" style={styles.cardFoot}>
+                                Runs overnight, past midnight.
                             </ThemedText>
-                        </Pressable>
-                    </View>
+                        )}
+                    </ThemedView>
+                </FadeIn>
+                {problem && (
+                    <ThemedText size="small" color="primaryRed" align="center" style={styles.problem}>
+                        {problem}
+                    </ThemedText>
                 )}
-            </View>
-            <NextButton onPress={() => setPopupVisible(true)} />
+                <Button
+                    label="Review & block"
+                    icon="ArrowRight"
+                    disabled={!!problem}
+                    onPress={() => setPopupVisible(true)}
+                    style={styles.save}
+                />
+            </ScrollView>
+
             <Popup
                 navigation={navigation}
                 visible={popupVisible}
-                days={getSelectedDaysText()}
-                time={getSelectedTimeText()}
+                days={daysText}
+                time={timeText}
                 websiteUrl={websiteUrl}
                 onClose={() => setPopupVisible(false)}
                 showError={() => showError('Data Load Error', 'Failed to save blocked website data')}
@@ -232,9 +286,20 @@ const ScheduleScreen: React.FC = () => {
                 title={errorTitle}
                 text={errorText}
                 visible={errorPopupVisible}
-                onClose={() => setErrorPopupVisible}
+                onClose={() => setErrorPopupVisible(false)}
             />
         </BaseScreen>
+    );
+};
+
+const Segment: React.FC<{ label: string; active: boolean; onPress: () => void }> = ({ label, active, onPress }) => {
+    const { theme } = useTheme();
+    return (
+        <Pressable onPress={onPress} style={[styles.segmentItem, active && { backgroundColor: theme.colors.card }]}>
+            <ThemedText size="small" weight="strong" style={{ color: active ? theme.colors.text : theme.colors.muted }}>
+                {label}
+            </ThemedText>
+        </Pressable>
     );
 };
 
@@ -259,7 +324,9 @@ const Popup: React.FC<PopupProps> = ({ navigation, visible, days, time, websiteU
 
         const success = await addBlockedWebsite(newBlockedData);
         if (success) {
-            navigation.navigate('BottomTabs');
+            haptics.success();
+            onClose();
+            navigation.navigate('BottomTabs', { screen: 'Home' });
         } else {
             showError();
         }
@@ -267,84 +334,132 @@ const Popup: React.FC<PopupProps> = ({ navigation, visible, days, time, websiteU
 
     return (
         <BlurModal visible={visible} onClose={onClose}>
-            <ThemedText align="center" style={styles.popUpText}>
-                Are you sure you want to put{' '}
-                <ThemedText color="primaryBlue" size="large" weight="strong">
+            <ThemedText size="large" weight="strong" align="center" style={styles.popUpText}>
+                Block{' '}
+                <ThemedText size="large" weight="strong" color="accent">
                     {websiteUrl}
-                </ThemedText>{' '}
-                on a block list?
+                </ThemedText>
+                ?
             </ThemedText>
-            <ThemedText align="center" style={styles.popUpText}>
-                For the following days: <ThemedText weight="medium">{days}</ThemedText>
-            </ThemedText>
-            <ThemedText align="center" style={styles.popUpText}>
-                Blocking hour: <ThemedText weight="medium">{time}</ThemedText>
-            </ThemedText>
+            <View style={styles.summary}>
+                <SummaryRow label="Days" value={days === FULL_WEEK ? 'Every day' : days} />
+                <SummaryRow label="Hours" value={time === ALL_DAY ? 'All day' : time} />
+            </View>
             <View style={styles.buttonsContainer}>
                 <ActionButton variant="cancel" onPress={onClose} />
-                <ActionButton variant="confirm" onPress={onConfirm} />
+                <ActionButton variant="confirm" label="Block it" onPress={onConfirm} />
             </View>
         </BlurModal>
     );
 };
 
+const SummaryRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+    <View style={styles.summaryRow}>
+        <ThemedText size="small" color="muted">
+            {label}
+        </ThemedText>
+        <ThemedText size="small" weight="strong">
+            {value}
+        </ThemedText>
+    </View>
+);
+
 const styles = StyleSheet.create({
-    itemContainer: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginHorizontal: spacing.sm,
-        marginTop: spacing.lg,
-        paddingVertical: 13,
-        paddingHorizontal: spacing.md,
-        borderRadius: shapes.borderRadius.medium,
+    scroll: {
+        paddingBottom: spacing.xl,
+    },
+    back: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         borderWidth: 1,
-        borderColor: '#e0e0e0',
-    },
-    itemLessContainer: {
-        width: '100%',
-        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    itemMoreContainer: {
-        flexDirection: 'row',
-    },
-    itemInnerLeftContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    leftIcon: {
+        justifyContent: 'center',
         marginRight: spacing.md,
     },
-    dayContainer: {
+    flex: {
+        flex: 1,
+    },
+    siteCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: spacing.md,
+        marginTop: spacing.xs,
+        padding: spacing.md,
+        borderRadius: shapes.borderRadius.large,
+    },
+    faviconWrap: {
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: spacing.md,
+    },
+    chips: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: spacing.md,
+        marginTop: spacing.xs,
+    },
+    card: {
+        marginHorizontal: spacing.md,
+        padding: spacing.md,
+        borderRadius: shapes.borderRadius.large,
+    },
+    cardFoot: {
         marginTop: spacing.sm,
-        marginHorizontal: 5,
-        padding: 7,
+    },
+    daysRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    dayPill: {
         width: 38,
         height: 38,
         borderRadius: 19,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#009a26',
-    },
-    dayTextSelected: {
-        color: 'white',
-    },
-    dayTextUnselected: {
-        opacity: 0.6,
-    },
-    arrowIconContainer: {
-        width: 30,
-        height: 30,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    clearText: {
-        marginTop: spacing.xs,
+    segment: {
+        flexDirection: 'row',
+        borderRadius: shapes.borderRadius.pill,
+        padding: 4,
+    },
+    segmentItem: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 9,
+        borderRadius: shapes.borderRadius.pill,
+    },
+    timeRow: {
+        flexDirection: 'row',
+        marginTop: spacing.md,
+    },
+    timeGap: {
+        width: spacing.md,
+    },
+    problem: {
+        marginTop: spacing.lg,
+        marginHorizontal: spacing.md,
+    },
+    save: {
+        marginHorizontal: spacing.md,
+        marginTop: spacing.md,
+    },
+    summary: {
+        alignSelf: 'stretch',
+        marginVertical: spacing.sm,
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 6,
     },
     buttonsContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
+        marginTop: spacing.md,
     },
     popUpText: {
         marginBottom: spacing.sm,

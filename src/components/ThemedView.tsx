@@ -9,7 +9,7 @@ interface ThemedViewProps {
     children?: React.ReactNode;
 }
 
-type Color = 'background' | 'card';
+type Color = 'background' | 'card' | 'elevated';
 
 export const ThemedView: React.FC<ThemedViewProps> = ({ style, withBorder, color = 'card', children, ...rest }) => {
     const { theme } = useTheme();
