@@ -111,7 +111,7 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
                     </ThemedText>
                     <ThemedText color="muted" style={styles.body}>
                         So it can’t be switched off in a couple of taps. In VPN settings, tap the gear next to{' '}
-                        <ThemedText weight="strong">SiteLock</ThemedText>, then turn on{' '}
+                        <ThemedText weight="strong">Gaman</ThemedText>, then turn on{' '}
                         <ThemedText weight="strong">Always-on VPN</ThemedText> and{' '}
                         <ThemedText weight="strong">Block connections without VPN</ThemedText>.
                     </ThemedText>

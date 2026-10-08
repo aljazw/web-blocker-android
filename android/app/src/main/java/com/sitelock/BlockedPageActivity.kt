@@ -24,7 +24,7 @@ class BlockedPageActivity : Activity() {
             SiteLockScreen.Spec(
                 iconRes = R.drawable.ic_ban,
                 tone = SiteLockScreen.Tone.DANGER,
-                eyebrow = "Blocked by SiteLock",
+                eyebrow = "Blocked by Gaman",
                 title = blockedUrl,
                 body = "This site is on your block list right now.",
                 primaryLabel = "Go back",
@@ -41,7 +41,7 @@ class BlockedPageActivity : Activity() {
             SiteLockScreen.Spec(
                 iconRes = R.drawable.ic_ban,
                 tone = SiteLockScreen.Tone.DANGER,
-                eyebrow = "Blocked by SiteLock",
+                eyebrow = "Blocked by Gaman",
                 title = appName,
                 body = "This app is on your block list right now.",
                 primaryLabel = "Go to home screen",

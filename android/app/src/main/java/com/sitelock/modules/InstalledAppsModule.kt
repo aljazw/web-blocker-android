@@ -25,7 +25,7 @@ class InstalledAppsModule(private val reactContext: ReactApplicationContext) :
 
     override fun getName(): String = "InstalledApps"
 
-    /** Resolves to [{ packageName, label }], sorted by label. Excludes SiteLock itself. */
+    /** Resolves to [{ packageName, label }], sorted by label. Excludes Gaman itself. */
     @ReactMethod
     fun getLaunchableApps(promise: Promise) {
         executor.execute {

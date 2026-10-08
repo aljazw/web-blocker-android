@@ -22,7 +22,15 @@ export type RootStackParamList = {
     ApneaSession: undefined;
     ApneaHistory: undefined;
     ApneaSettings: undefined;
+    Sleep: undefined;
 };
+
+/** Nightly sleep time; times are "HH:mm". Mirrors SleepSchedule.kt. */
+export interface SleepSchedule {
+    enabled: boolean;
+    bedtime: string;
+    wake: string;
+}
 
 export interface BlockedWebsitesData {
     days: string;

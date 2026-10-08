@@ -54,17 +54,17 @@ export const UNBLOCK_MESSAGES = [
     'I set this block when I was thinking clearly and I am overriding that decision now knowing exactly what I am doing',
 ];
 
-export const ACCESSIBILITY_NOTIFICATION_TEXT = `SiteLock needs its Accessibility service to block sites and apps.
+export const ACCESSIBILITY_NOTIFICATION_TEXT = `Gaman needs its Accessibility service to block sites and apps.
 
 1. Tap to open Accessibility settings.
 2. Open "Installed services" (or "Downloaded services").
-3. Select SiteLock and switch it on.
+3. Select Gaman and switch it on.
 4. Confirm the prompts.`;
 
 export const ACCESSIBILITY_SETUP_STEPS = [
     'Open Accessibility settings (click below).',
     'Scroll to "Installed Services" (or "Downloaded Services").',
-    'Find & tap "SiteLock".',
+    'Find & tap "Gaman".',
     'Toggle it ON.',
     'Confirm any prompts.',
 ];

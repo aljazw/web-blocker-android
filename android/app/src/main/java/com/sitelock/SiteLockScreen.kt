@@ -8,13 +8,16 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.DecelerateInterpolator
+import android.view.inputmethod.EditorInfo
 import android.view.animation.OvershootInterpolator
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -39,6 +42,8 @@ object SiteLockScreen {
         val title: String,
         val body: String,
         val quote: String? = null,
+        /** Extra content (e.g. an [input] field) shown below the quote. */
+        val extra: View? = null,
         val primaryLabel: String,
         val onPrimary: () -> Unit,
         val secondaryLabel: String? = null,
@@ -176,6 +181,10 @@ object SiteLockScreen {
             })
         }
 
+        spec.extra?.let { extra ->
+            content.addView(extra, margins(top = dp(16), matchWidth = true))
+        }
+
         val primary = TextView(activity).apply {
             text = spec.primaryLabel
             textSize = 16f
@@ -227,6 +236,51 @@ object SiteLockScreen {
         activity.setContentView(scroll)
         paintSystemBars(activity, p.background, p.dark)
         animateIn(content, badge, dp(24))
+    }
+
+    /** A themed single-line text field with an error line below it. */
+    class Input(val root: LinearLayout, val field: EditText, private val error: TextView) {
+        fun showError(message: String) {
+            error.text = message
+            error.visibility = View.VISIBLE
+        }
+
+        fun clearError() {
+            error.visibility = View.GONE
+        }
+    }
+
+    fun input(activity: Activity, hint: String): Input {
+        val p = palette(activity)
+        val dp = { v: Int -> v.dp(activity) }
+        val field = EditText(activity).apply {
+            this.hint = hint
+            textSize = 16f
+            setTextColor(p.text)
+            setHintTextColor(p.muted)
+            isSingleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
+                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(12).toFloat()
+                setColor(p.background)
+                setStroke(dp(1), p.border)
+            }
+        }
+        val error = TextView(activity).apply {
+            textSize = 13f
+            setTextColor(p.danger)
+            visibility = View.GONE
+            layoutParams = margins(top = dp(8))
+        }
+        val root = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(field, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(error)
+        }
+        return Input(root, field, error)
     }
 
     // ---- helpers -----------------------------------------------------------
@@ -282,7 +336,7 @@ object SiteLockScreen {
     }
 
     @Suppress("DEPRECATION")
-    private fun paintSystemBars(activity: Activity, color: Int, dark: Boolean) {
+    fun paintSystemBars(activity: Activity, color: Int, dark: Boolean) {
         val window = activity.window
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             window.statusBarColor = color

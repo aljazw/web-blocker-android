@@ -126,7 +126,7 @@ class DnsVpnService : VpnService() {
         }
 
         val builder = Builder()
-            .setSession("SiteLock DNS")
+            .setSession("Gaman DNS")
             .addAddress(TUN_ADDRESS, 32)
             .addDnsServer(primary)
         // Route every resolver (the device's own + common public ones) through
@@ -434,7 +434,7 @@ class DnsVpnService : VpnService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "SiteLock DNS", NotificationManager.IMPORTANCE_MIN)
+                NotificationChannel(CHANNEL, "Gaman DNS", NotificationManager.IMPORTANCE_MIN)
                     .apply { description = "Network-level blocking for always-blocked sites." }
             )
         }
@@ -446,7 +446,7 @@ class DnsVpnService : VpnService() {
             else PendingIntent.FLAG_UPDATE_CURRENT
         )
         val notif: Notification = NotificationCompat.Builder(this, CHANNEL)
-            .setContentTitle("SiteLock DNS protection active")
+            .setContentTitle("Gaman DNS protection active")
             .setContentText("Blocking always-blocked sites at the network level.")
             .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .setOngoing(true)

@@ -18,7 +18,7 @@ import android.provider.Settings
 import androidx.core.app.NotificationCompat
 
 /**
- * Independent foreground service that guarantees SiteLock notices the instant
+ * Independent foreground service that guarantees Gaman notices the instant
  * the accessibility service is turned off — on ANY device, in ANY language.
  *
  * How it works:
@@ -139,7 +139,7 @@ class WatchdogService : Service() {
             pendingFlags()
         )
         val notif = NotificationCompat.Builder(this, CHANNEL_PERSISTENT)
-            .setContentTitle("SiteLock protection active")
+            .setContentTitle("Gaman protection active")
             .setContentText("Keeping your blocks in place.")
             .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .setOngoing(true)
@@ -161,7 +161,7 @@ class WatchdogService : Service() {
         val nm = notificationManager()
         nm.createNotificationChannel(
             NotificationChannel(
-                CHANNEL_PERSISTENT, "SiteLock protection",
+                CHANNEL_PERSISTENT, "Gaman protection",
                 NotificationManager.IMPORTANCE_MIN
             ).apply { description = "Shows that blocking is active." }
         )
@@ -169,7 +169,7 @@ class WatchdogService : Service() {
             NotificationChannel(
                 CHANNEL_ALERT, "Protection turned off",
                 NotificationManager.IMPORTANCE_HIGH
-            ).apply { description = "Alerts you when SiteLock is disabled." }
+            ).apply { description = "Alerts you when Gaman is disabled." }
         )
     }
 
@@ -217,7 +217,7 @@ class WatchdogService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 nm.createNotificationChannel(
                     NotificationChannel(CHANNEL_ALERT, "Protection turned off", NotificationManager.IMPORTANCE_HIGH)
-                        .apply { description = "Alerts you when SiteLock is disabled." }
+                        .apply { description = "Alerts you when Gaman is disabled." }
                 )
             }
 
@@ -230,7 +230,7 @@ class WatchdogService : Service() {
             val pi = PendingIntent.getActivity(ctx, 1, reenable, flags)
 
             val notif = NotificationCompat.Builder(ctx, CHANNEL_ALERT)
-                .setContentTitle("SiteLock was turned off")
+                .setContentTitle("Gaman was turned off")
                 .setContentText("Tap to turn protection back on.")
                 .setSmallIcon(android.R.drawable.stat_sys_warning)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -247,7 +247,7 @@ class WatchdogService : Service() {
         }
 
         /**
-         * Show the "stay on track" guard screen when the user reaches SiteLock's
+         * Show the "stay on track" guard screen when the user reaches Gaman's
          * accessibility toggle page. Uses a full-screen-intent notification (the
          * path that is NOT blocked from the background) plus a best-effort launch.
          * Auto-cancels, unlike the persistent "turned off" alert.
@@ -258,7 +258,7 @@ class WatchdogService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 nm.createNotificationChannel(
                     NotificationChannel(CHANNEL_GUARD, "Settings guard", NotificationManager.IMPORTANCE_HIGH)
-                        .apply { description = "Blocks the SiteLock disable page while active." }
+                        .apply { description = "Blocks the Gaman disable page while active." }
                 )
             }
             val guard = Intent(ctx, GuardActivity::class.java)
@@ -269,7 +269,7 @@ class WatchdogService : Service() {
             val pi = PendingIntent.getActivity(ctx, 2, guard, flags)
 
             val notif = NotificationCompat.Builder(ctx, CHANNEL_GUARD)
-                .setContentTitle("SiteLock is protecting you")
+                .setContentTitle("Gaman is protecting you")
                 .setContentText("You can’t disable it here right now.")
                 .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)

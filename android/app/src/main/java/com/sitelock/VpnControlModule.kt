@@ -93,7 +93,7 @@ class VpnControlModule(private val reactContext: ReactApplicationContext) :
 
     /**
      * Opens Android's VPN settings, where the user can turn on "Always-on VPN"
-     * and "Block connections without VPN" for SiteLock. That makes the DNS filter
+     * and "Block connections without VPN" for Gaman. That makes the DNS filter
      * persistent, reboot-proof, and cuts off all internet when it's off — so it
      * can't be dropped with a couple of quick taps.
      */

@@ -265,7 +265,7 @@ const HomeScreen: React.FC = () => {
                     <View>
                         <ThemedText color="muted">It stays blocked but no longer appears in this list.</ThemedText>
                         <ThemedText size="small" weight="medium" color="primaryRed" style={styles.warning}>
-                            A hidden block can only be removed by clearing SiteLock's data in your phone's settings.
+                            A hidden block can only be removed by clearing Gaman's data in your phone's settings.
                         </ThemedText>
                     </View>
                 }

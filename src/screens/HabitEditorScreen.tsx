@@ -321,7 +321,7 @@ const HabitEditorScreen: React.FC = () => {
                 onClose={() => navigation.goBack()}
                 icon="Bell"
                 title="Habit saved"
-                message="Notifications are off for SiteLock, so reminders can't appear. You can allow them in your phone's settings."
+                message="Notifications are off for Gaman, so reminders can't appear. You can allow them in your phone's settings."
                 actions={[{ label: 'OK', onPress: () => navigation.goBack() }]}
             />
             <ErrorPopup {...ERRORS.saveFailed} visible={dialog?.kind === 'error'} onClose={() => setDialog(null)} />

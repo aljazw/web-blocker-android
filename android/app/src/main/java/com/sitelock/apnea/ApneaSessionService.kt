@@ -183,7 +183,7 @@ class ApneaSessionService : Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_DONE)
             .setSmallIcon(R.drawable.ic_stat_sitelock)
             .setContentTitle("${tl.title} complete")
-            .setContentText("Open SiteLock to see your results.")
+            .setContentText("Open Gaman to see your results.")
             .setAutoCancel(true)
             .setContentIntent(openAppIntent())
             .build()

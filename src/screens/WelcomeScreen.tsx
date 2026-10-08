@@ -43,7 +43,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
                         />
                     </View>
                     <ThemedText weight="bold" size="display" style={styles.title}>
-                        SiteLock
+                        Gaman
                     </ThemedText>
                     <ThemedText color="muted" size="large" style={styles.subtitle}>
                         Focus and self-improvement. Remove distractions, build routines and train your breath.

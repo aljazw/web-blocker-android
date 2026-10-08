@@ -26,7 +26,7 @@ class ReenableActivity : Activity() {
                 tone = SiteLockScreen.Tone.DANGER,
                 eyebrow = "Protection is off",
                 title = "Your blocks aren’t working",
-                body = "SiteLock’s accessibility service was switched off, so blocked sites can load " +
+                body = "Gaman’s accessibility service was switched off, so blocked sites can load " +
                     "again. Turn it back on to restore them.",
                 primaryLabel = "Turn protection back on",
                 onPrimary = { openAccessibilitySettings() },

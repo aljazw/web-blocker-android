@@ -6,7 +6,7 @@ import android.os.Bundle
 import android.view.WindowManager
 
 /**
- * Shown when the user reaches SiteLock's accessibility on/off page while the
+ * Shown when the user reaches Gaman's accessibility on/off page while the
  * service is active. Explains that they can't disable it here and sends them
  * away. Appears over the lock screen and keeps the screen on.
  */
@@ -23,7 +23,7 @@ class GuardActivity : Activity() {
                 tone = SiteLockScreen.Tone.ACCENT,
                 eyebrow = "Protection is locked",
                 title = "Stay on track",
-                body = "You’re trying to turn SiteLock’s protection off while a block is active. " +
+                body = "You’re trying to turn Gaman’s protection off while a block is active. " +
                     "That’s exactly the moment to keep it on, so this page is off-limits right now.",
                 primaryLabel = "OK, keep me focused",
                 onPrimary = { goHome() },

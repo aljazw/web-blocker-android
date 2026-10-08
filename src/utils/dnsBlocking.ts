@@ -53,7 +53,7 @@ export async function disableDnsBlocking(): Promise<boolean> {
 
 /**
  * Opens Android's VPN settings so the user can enable "Always-on VPN" +
- * "Block connections without VPN" for SiteLock — making the DNS layer
+ * "Block connections without VPN" for Gaman — making the DNS layer
  * persistent and much harder to switch off.
  */
 export async function openVpnSettings(): Promise<void> {

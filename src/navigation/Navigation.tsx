@@ -8,6 +8,7 @@ import ApneaTableScreen from '../screens/ApneaTableScreen';
 import ApneaSessionScreen from '../screens/ApneaSessionScreen';
 import ApneaHistoryScreen from '../screens/ApneaHistoryScreen';
 import ApneaSettingsScreen from '../screens/ApneaSettingsScreen';
+import SleepScreen from '../screens/SleepScreen';
 import { RootStackParamList } from '../types/types';
 import { useAppForeground } from '../hooks/useAppForeground';
 import { useTheme } from '../context/ThemeContext';
@@ -53,6 +54,7 @@ const Navigation: React.FC = () => {
                 <Stack.Screen name="ApneaSession" component={ApneaSessionScreen} options={{ gestureEnabled: false }} />
                 <Stack.Screen name="ApneaHistory" component={ApneaHistoryScreen} />
                 <Stack.Screen name="ApneaSettings" component={ApneaSettingsScreen} />
+                <Stack.Screen name="Sleep" component={SleepScreen} />
             </Stack.Navigator>
         </NavigationContainer>
     );

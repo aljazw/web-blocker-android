@@ -9,7 +9,7 @@ import android.net.VpnService
  * Restarts the protection layers after a reboot or an app update.
  *
  *  - Watchdog: restarted only if the accessibility service is still enabled, so
- *    we never nag a user who legitimately turned SiteLock off.
+ *    we never nag a user who legitimately turned Gaman off.
  *  - DNS VPN: restarted only if it was on AND consent is still granted
  *    (VpnService.prepare returns null when already consented).
  *

@@ -17,11 +17,22 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
 
-    <!-- Android 11+: lets SiteLock list launchable apps so the user can choose which to block. -->
+    <!-- Android 11+: lets Gaman list launchable apps so the user can choose which to block. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- Sleep time keeps the launcher, dialer and clock usable, so it must find them. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SHOW_ALARMS" />
         </intent>
     </queries>
 
@@ -64,7 +75,17 @@
             android:turnScreenOn="true"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
 
-        <!-- Shown when the user reaches SiteLock's accessibility toggle page -->
+        <!-- Covers every app during sleep time; turning it off takes the video + a passphrase -->
+        <activity
+            android:name=".sleep.SleepActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
+        <!-- Shown when the user reaches Gaman's accessibility toggle page -->
         <activity
             android:name=".GuardActivity"
             android:exported="false"

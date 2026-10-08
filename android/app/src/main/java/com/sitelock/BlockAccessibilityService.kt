@@ -5,11 +5,16 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
+import android.provider.AlarmClock
+import android.provider.Settings
+import android.telecom.TelecomManager
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.sitelock.sleep.SleepActivity
+import com.sitelock.sleep.SleepSchedule
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -63,6 +68,12 @@ class BlockAccessibilityService : AccessibilityService() {
     private var lastProcessedTime: Long = 0
     private var lastGuardTime: Long = 0
     private var lastAppBlockTime: Long = 0
+    private var lastSleepTime: Long = 0
+    private var sleepSchedule: SleepSchedule? = null
+
+    /** Packages that stay usable during sleep time; rebuilt now and then since defaults can change. */
+    private var sleepAllowed: Set<String> = emptySet()
+    private var sleepAllowedBuiltAt: Long = 0
 
     companion object {
         private const val TAG = "BlockedService"
@@ -71,10 +82,12 @@ class BlockAccessibilityService : AccessibilityService() {
         private const val KEY_BLOCKED_APPS = "@blocked_apps"
         private const val FULL_WEEK = "Full Week"
         private const val ALL_DAY = "All Day Long"
-        private const val APP_NAME = "SiteLock"
+        private const val APP_NAME = "Gaman"
         private const val DEBOUNCE_INTERVAL = 500L
         private const val GUARD_DEBOUNCE = 1500L
         private const val APP_BLOCK_DEBOUNCE = 800L
+        private const val SLEEP_DEBOUNCE = 800L
+        private const val SLEEP_ALLOWED_TTL = 60_000L
         private const val MAX_DETAIL_CLICKABLE = 3
         private const val MAX_TREE_DEPTH = 40
 
@@ -84,6 +97,20 @@ class BlockAccessibilityService : AccessibilityService() {
         private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         private val timePattern = Regex("""^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$""")
         private val ALL_DAYS = setOf("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+        /** Always usable during sleep: system UI, calls and emergency, alarms. */
+        private val SLEEP_ALWAYS_ALLOWED = setOf(
+            "android",
+            "com.android.systemui",
+            "com.android.phone",
+            "com.android.server.telecom",
+            "com.android.incallui",
+            "com.android.emergency",
+            "com.google.android.dialer",
+            "com.google.android.deskclock",
+            "com.android.deskclock",
+            "com.sec.android.app.clockpackage",
+            "com.samsung.android.incallui",
+        )
         private val BROWSER_PACKAGES = setOf(
             "com.android.chrome",
             "org.mozilla.firefox",
@@ -96,6 +123,7 @@ class BlockAccessibilityService : AccessibilityService() {
         when (key) {
             KEY_BLOCKED -> loadBlockedList()
             KEY_BLOCKED_APPS -> loadBlockedApps()
+            SleepSchedule.KEY_SCHEDULE -> sleepSchedule = SleepSchedule.load(sharedPref)
         }
     }
 
@@ -105,6 +133,7 @@ class BlockAccessibilityService : AccessibilityService() {
         sharedPref.registerOnSharedPreferenceChangeListener(prefsListener)
         loadBlockedList()
         loadBlockedApps()
+        sleepSchedule = SleepSchedule.load(sharedPref)
 
         // Start the independent watchdog. From this moment, if the user ever
         // disables this service, the watchdog (a separate foreground service
@@ -223,6 +252,15 @@ class BlockAccessibilityService : AccessibilityService() {
     private fun handleEvent(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString() ?: return
 
+        // Sleep time covers everything (Settings included) except the essentials.
+        if (shouldCoverForSleep(packageName, event)) {
+            if (System.currentTimeMillis() - lastSleepTime > SLEEP_DEBOUNCE) {
+                lastSleepTime = System.currentTimeMillis()
+                startSleepActivity()
+            }
+            return
+        }
+
         if (isSettingsPackage(packageName)) {
             handleSettingsGuard()
             return
@@ -254,19 +292,69 @@ class BlockAccessibilityService : AccessibilityService() {
         }
     }
 
+    // ---- Sleep time ---------------------------------------------------------
+
+    private fun shouldCoverForSleep(packageName: String, event: AccessibilityEvent): Boolean {
+        val schedule = sleepSchedule ?: return false
+        if (!SleepSchedule.isSleepTimeNow(sharedPref, schedule)) return false
+        if (packageName == applicationContext.packageName) {
+            // Our own app is covered too (otherwise sleep time could just be switched
+            // off there), but not our native pages: the sleep page, guard, block page.
+            return event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+                event.className?.toString() == MainActivity::class.java.name
+        }
+        return packageName !in sleepAllowedPackages()
+    }
+
+    private fun sleepAllowedPackages(): Set<String> {
+        val now = System.currentTimeMillis()
+        if (now - sleepAllowedBuiltAt < SLEEP_ALLOWED_TTL) return sleepAllowed
+        sleepAllowedBuiltAt = now
+
+        val allowed = SLEEP_ALWAYS_ALLOWED.toMutableSet()
+        val pm = applicationContext.packageManager
+        fun add(intent: Intent) {
+            try {
+                pm.resolveActivity(intent, 0)?.activityInfo?.packageName?.let { allowed += it }
+            } catch (_: Exception) { }
+        }
+        add(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)) // launcher
+        add(Intent(AlarmClock.ACTION_SHOW_ALARMS)) // clock
+        add(Intent(Intent.ACTION_DIAL)) // dialer
+        try {
+            (getSystemService(Context.TELECOM_SERVICE) as? TelecomManager)?.defaultDialerPackage?.let { allowed += it }
+        } catch (_: Exception) { }
+        // Keyboards, so the sleep page's passphrase can be typed.
+        try {
+            Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_INPUT_METHODS)
+                ?.split(':')
+                ?.mapNotNull { it.substringBefore('/').takeIf(String::isNotBlank) }
+                ?.let { allowed += it }
+        } catch (_: Exception) { }
+
+        sleepAllowed = allowed
+        return allowed
+    }
+
+    private fun startSleepActivity() {
+        val intent = Intent(applicationContext, SleepActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        applicationContext.startActivity(intent)
+    }
+
     // ---- Anti-disable guard ------------------------------------------------
     // This only runs while our service is ENABLED (the service isn't alive
     // otherwise), so it prevents reaching the OFF toggle without ever
     // blocking the user from turning the service ON.
     //
     // Universal detection: the Settings app is in front AND the screen shows
-    // our app's name "SiteLock". The app name is a brand string — identical
+    // our app's name "Gaman". The app name is a brand string — identical
     // on every OEM and in every language — so this works everywhere, unlike
     // matching localized phrases or OEM-specific view IDs.
     //
-    // Fire only on SiteLock's OWN on/off page, not the full accessibility
+    // Fire only on Gaman's OWN on/off page, not the full accessibility
     // list. Signals (all structural, OEM/language-neutral):
-    //   • "SiteLock" is shown, AND
+    //   • "Gaman" is shown, AND
     //   • there's a toggle, AND
     //   • there are FEW clickable rows. The list is many tappable rows
     //     (one per app + categories) so it's excluded by its length; a

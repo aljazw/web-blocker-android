@@ -6,11 +6,13 @@ import {
     BlockedWebsitesData,
     CustomTable,
     Habit,
+    SleepSchedule,
     TableParams,
     TableRound,
 } from '../types/types';
 import { habitIconFrom } from '../constants/habitIcons';
 import { DEFAULT_TABLE_PARAMS, isApneaKind, normalizeParams } from './apnea';
+import { DEFAULT_SLEEP_SCHEDULE, isValidTime } from './sleep';
 
 const { SharedStorage } = NativeModules;
 
@@ -30,6 +32,8 @@ const KEYS = {
     darkMode: '@is_dark_mode',
     passphrase: '@is_passphrase',
     accent: '@accent_color',
+    sleepSchedule: '@sleep_schedule',
+    sleepDismissedUntil: '@sleep_dismissed_until',
 } as const;
 
 // ---- Low-level helpers ------------------------------------------------------
@@ -327,6 +331,38 @@ export const updateApneaSettings = (change: Partial<ApneaSettings>): Promise<Apn
             return null;
         }
     });
+
+// ---- Sleep time -------------------------------------------------------------
+
+export const getSleepSchedule = async (): Promise<SleepSchedule> => {
+    const v: any = parseJson(await SharedStorage.getItem(KEYS.sleepSchedule)) ?? {};
+    const d = DEFAULT_SLEEP_SCHEDULE;
+    return {
+        enabled: v.enabled === true,
+        bedtime: typeof v.bedtime === 'string' && isValidTime(v.bedtime) ? v.bedtime : d.bedtime,
+        wake: typeof v.wake === 'string' && isValidTime(v.wake) ? v.wake : d.wake,
+    };
+};
+
+/**
+ * Saves the schedule and clears any "turned off tonight" pause, so a schedule
+ * saved during the night takes effect right away.
+ */
+export const setSleepSchedule = (schedule: SleepSchedule): Promise<boolean> =>
+    serialized(async () => {
+        try {
+            await SharedStorage.setItem(KEYS.sleepDismissedUntil, '0');
+            return await writeJson(KEYS.sleepSchedule, schedule);
+        } catch {
+            return false;
+        }
+    });
+
+/** Epoch millis until which sleep time is turned off (set by the native sleep page), or 0. */
+export const getSleepDismissedUntil = async (): Promise<number> => {
+    const value = Number(await SharedStorage.getItem(KEYS.sleepDismissedUntil));
+    return Number.isFinite(value) ? value : 0;
+};
 
 // ---- Preferences ------------------------------------------------------------
 

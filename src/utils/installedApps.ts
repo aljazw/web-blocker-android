@@ -7,7 +7,7 @@ export interface InstalledApp {
     label: string;
 }
 
-/** Apps the user can launch, sorted by name (SiteLock itself excluded). */
+/** Apps the user can launch, sorted by name (Gaman itself excluded). */
 export const getLaunchableApps = async (): Promise<InstalledApp[]> => {
     try {
         return (await InstalledApps.getLaunchableApps()) ?? [];

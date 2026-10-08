@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import BaseScreen from '../components/BaseScreen';
 import { ACCENTS, AccentName, gutter, shapes, spacing } from '../theme';
 import { ThemedText } from '../components/ThemedText';
@@ -25,6 +26,8 @@ import { requestOverlay } from '../utils/overlay';
 import { testWatchdogWarning } from '../utils/watchdog';
 import { haptics } from '../utils/haptics';
 import { ERRORS, PASSPHRASE_PROTECTION, UNINSTALL_PREVENTION } from '../constants/strings';
+import { getSleepSchedule } from '../utils/storage';
+import { RootStackNavigation, SleepSchedule } from '../types/types';
 
 /**
  * Exactly one popup can be open at a time, so the screen can never end up
@@ -52,6 +55,16 @@ const SettingsScreen: React.FC = () => {
     const { isPassphraseEnabled, togglePassphrase } = usePassphrase();
     const { status, refresh, patch } = useProtectionStatus();
     const [dialog, setDialog] = useState<Dialog | null>(null);
+    const navigation = useNavigation<RootStackNavigation>();
+    const [sleep, setSleep] = useState<SleepSchedule | null>(null);
+
+    useFocusEffect(
+        useCallback(() => {
+            getSleepSchedule()
+                .then(setSleep)
+                .catch(() => setSleep(null));
+        }, []),
+    );
 
     const close = () => setDialog(null);
 
@@ -194,6 +207,19 @@ const SettingsScreen: React.FC = () => {
                     </Card>
                 </FadeIn>
 
+                {/* ---- Sleep ---- */}
+                <SectionHeader title="Sleep" />
+                <ListGroup>
+                    <ListRow
+                        icon="Moon"
+                        title="Sleep time"
+                        description={
+                            sleep?.enabled ? `On · ${sleep.bedtime} – ${sleep.wake}` : 'Off · lock your phone at night'
+                        }
+                        onPress={() => navigation.navigate('Sleep')}
+                    />
+                </ListGroup>
+
                 {/* ---- Appearance ---- */}
                 <SectionHeader title="Appearance" />
                 <ListGroup>
@@ -241,7 +267,7 @@ const SettingsScreen: React.FC = () => {
                     <ListRow
                         icon="Shield"
                         title="Uninstall prevention"
-                        description="Stops SiteLock being removed on impulse">
+                        description="Stops Gaman being removed on impulse">
                         <Toggle value={status.admin} onValueChange={onUninstallSwitch} />
                     </ListRow>
                 </ListGroup>
@@ -282,13 +308,13 @@ const SettingsScreen: React.FC = () => {
                     <ListRow
                         icon="Accessibility"
                         title="Accessibility settings"
-                        description="Where the SiteLock blocking service is switched on"
+                        description="Where the Gaman blocking service is switched on"
                         onPress={() => openAccessibilitySettings()}
                     />
                 </ListGroup>
 
                 <ThemedText size="tiny" color="muted" align="center" style={styles.footer}>
-                    SiteLock · everything runs on your device
+                    Gaman · everything runs on your device
                 </ThemedText>
             </ScrollView>
 
