@@ -16,6 +16,7 @@ import com.sitelock.modules.SharedStoragePackage
 import com.sitelock.modules.AccessibilityStatusPackage
 import com.sitelock.modules.IntentLauncherPackage
 import com.sitelock.modules.DeviceAdminPackage
+import com.sitelock.modules.InstalledAppsPackage
 
 
 
@@ -34,6 +35,7 @@ class MainApplication : Application(), ReactApplication {
               add(VpnControlPackage())
               add(OverlayPackage())
               add(WatchdogPackage())
+              add(InstalledAppsPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

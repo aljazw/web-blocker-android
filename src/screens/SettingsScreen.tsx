@@ -1,209 +1,126 @@
-import { AppState, AppStateStatus, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import React, { useState } from 'react';
 import BaseScreen from '../components/BaseScreen';
-import { Pressable, Switch } from 'react-native-gesture-handler';
-import { useEffect, useRef, useState } from 'react';
 import { ACCENTS, AccentName, shapes, spacing } from '../theme';
 import { ThemedText } from '../components/ThemedText';
+import { ThemedView } from '../components/ThemedView';
 import BlurModal from '../components/BlurModal';
 import ActionButton from '../components/ActionButton';
-import { usePassphrase } from '../context/PassphraseContext';
 import PassphrasePopup from '../components/PassphrasePopup';
-import { ThemedView } from '../components/ThemedView';
-import { checkAdmin, toggleDeviceAdmin } from '../utils/deviceAdmin';
-import { ERRORS, PASSPHRASE_PROTECTION, UNINSTALL_PREVENTION } from '../constants/strings';
 import ErrorPopup from '../components/ErrorPopup';
-import { useTheme } from '../context/ThemeContext';
 import Icon from '../components/Icon';
-import { checkAccessibilityEnabled, openAccessibilitySettings } from '../utils/accessibility';
-import {
-    ADGUARD_DNS,
-    disableDnsBlocking,
-    getDnsStats,
-    getUpstreamDns,
-    isDnsBlockingRunning,
-    setUpstreamDns,
-    DnsStats,
-} from '../utils/dnsBlocking';
-import { canDrawOverlays, requestOverlay } from '../utils/overlay';
-import { getBlockedWebsites } from '../utils/storage';
-import { isWatchdogRunning, testWatchdogWarning } from '../utils/watchdog';
 import DnsSetupWizard from '../components/DnsSetupWizard';
 import SectionHeader from '../components/SectionHeader';
 import { AnimatedBar, FadeIn } from '../components/Motion';
+import { usePassphrase } from '../context/PassphraseContext';
+import { useTheme } from '../context/ThemeContext';
+import { useProtectionStatus } from '../hooks/useProtectionStatus';
+import { toggleDeviceAdmin } from '../utils/deviceAdmin';
+import { openAccessibilitySettings } from '../utils/accessibility';
+import { ADGUARD_DNS, disableDnsBlocking, setUpstreamDns } from '../utils/dnsBlocking';
+import { requestOverlay } from '../utils/overlay';
+import { testWatchdogWarning } from '../utils/watchdog';
 import { haptics } from '../utils/haptics';
+import { ERRORS, PASSPHRASE_PROTECTION, UNINSTALL_PREVENTION } from '../constants/strings';
+
+/**
+ * Exactly one popup can be open at a time, so the screen can never end up
+ * with two dialogs stacked or a dialog stuck open.
+ */
+type Dialog =
+    | { kind: 'confirm'; title: string; text: string; onConfirm: () => void | Promise<void> }
+    | { kind: 'passphrase'; onConfirm: () => void | Promise<void> }
+    | { kind: 'upstream' }
+    | { kind: 'dnsWizard' }
+    | { kind: 'error'; title: string; text: string };
+
+const upstreamLabel = (value: string) => {
+    if (!value) return 'System default';
+    if (value === ADGUARD_DNS) return 'AdGuard (ads & trackers)';
+    return value;
+};
 
 const SettingsScreen: React.FC = () => {
     const { theme, isDarkMode, toggleTheme, accent, setAccent } = useTheme();
     const { isPassphraseEnabled, togglePassphrase } = usePassphrase();
-    const [isAdminEnabled, setIsAdminEnabled] = useState(false);
-    const [isDnsEnabled, setIsDnsEnabled] = useState(false);
-    const [canOverlay, setCanOverlay] = useState(true);
+    const { status, refresh, patch } = useProtectionStatus();
+    const [dialog, setDialog] = useState<Dialog | null>(null);
 
-    // Live status
-    const [accessibilityOn, setAccessibilityOn] = useState(false);
-    const [watchdogOn, setWatchdogOn] = useState(false);
-    const [dnsRuleCount, setDnsRuleCount] = useState(0);
-    const [dnsStats, setDnsStats] = useState<DnsStats | null>(null);
+    const close = () => setDialog(null);
 
-    const [showEnablePassphrasePopup, setShowEnablePassphrasePopup] = useState(false);
-    const [showDisablePassphrasePopup, setShowDisablePassphrasePopup] = useState(false);
-    const [pendingToggleValue, setPendingToggleValue] = useState<boolean | null>(null);
-
-    const [showEnableUninstallPreventionPopup, setShowEnableUninstallPreventionPopup] = useState(false);
-    const [showDisableUninstallPreventionPopup, setShowDisableUninstallPreventionPopup] = useState(false);
-    const [showPassphraseUninstallPreventionPopup, setShowPassphraseUninstallPreventionPopup] = useState(false);
-
-    const [wizardVisible, setWizardVisible] = useState(false);
-    const [showDisableDnsPassphrasePopup, setShowDisableDnsPassphrasePopup] = useState(false);
-    const [upstream, setUpstream] = useState('');
-    const [showUpstreamPopup, setShowUpstreamPopup] = useState(false);
-
-    const [errorPopupVisible, setErrorPopupVisible] = useState(false);
-    const [errorTitle, setErrorTitle] = useState(ERRORS.uninstallPrevention.title);
-    const [errorText, setErrorText] = useState(ERRORS.uninstallPrevention.text);
-
-    const appState = useRef(AppState.currentState);
-
-    const showError = (title: string, text: string) => {
-        setErrorTitle(title);
-        setErrorText(text);
-        setErrorPopupVisible(true);
-    };
-
-    const handleTogglePassphrase = (nextValue: boolean) => {
-        setPendingToggleValue(nextValue);
-        nextValue ? setShowEnablePassphrasePopup(true) : setShowDisablePassphrasePopup(true);
-    };
-
-    const handleToggleUninstallPrevention = (nextValue: boolean) => {
-        nextValue ? setShowEnableUninstallPreventionPopup(true) : setShowDisableUninstallPreventionPopup(true);
-    };
-
-    const handleToggleDns = async (nextValue: boolean) => {
-        if (nextValue) {
-            setWizardVisible(true); // guided setup turns it on
-        } else if (isPassphraseEnabled) {
-            // Weakening protection — require the passphrase first.
-            setShowDisableDnsPassphrasePopup(true);
-        } else {
-            setIsDnsEnabled(false);
-            await disableDnsBlocking();
-        }
-    };
-
-    const confirmDisableDns = async () => {
-        setShowDisableDnsPassphrasePopup(false);
-        setIsDnsEnabled(false);
-        await disableDnsBlocking();
-    };
-
-    const confirmPassphrasePopup = (action: 'enable' | 'disable') => {
-        if (action === 'enable') {
-            setShowEnablePassphrasePopup(false);
-        } else {
-            setShowDisablePassphrasePopup(false);
-        }
-        setPendingToggleValue(null);
-        togglePassphrase();
-    };
-
-    const cancelPassphrasePopup = (action: 'enable' | 'disable') => {
-        if (action === 'enable') {
-            setShowEnablePassphrasePopup(false);
-        } else {
-            setShowDisablePassphrasePopup(false);
-        }
-        setPendingToggleValue(null);
-    };
-
-    const confirmUninstallPreventionChange = async () => {
-        try {
-            const result = await toggleDeviceAdmin();
-            if (result === false) {
-                setIsAdminEnabled(false);
-            }
-        } catch (err) {
-            showError(ERRORS.uninstallPrevention.title, ERRORS.uninstallPrevention.text);
-        }
-    };
-
-    const confirmEnableUninstallPrevention = async () => {
-        setShowEnableUninstallPreventionPopup(false);
-        await confirmUninstallPreventionChange();
-    };
-
-    const confirmDisableUninstallPrevention = async () => {
+    /** Runs `action` right away, or after the passphrase when passphrase protection is on. */
+    const guarded = (action: () => void | Promise<void>) => {
         if (isPassphraseEnabled) {
-            setShowPassphraseUninstallPreventionPopup(true);
-            setShowDisableUninstallPreventionPopup(false);
+            setDialog({ kind: 'passphrase', onConfirm: action });
         } else {
-            setShowDisableUninstallPreventionPopup(false);
-            await confirmUninstallPreventionChange();
+            close();
+            return action();
         }
     };
 
-    const confirmPassphraseUninstallPrevention = async () => {
-        await confirmUninstallPreventionChange();
-        setShowPassphraseUninstallPreventionPopup(false);
+    // ---- Actions ---------------------------------------------------------
+
+    const changeUninstallPrevention = async () => {
+        try {
+            await toggleDeviceAdmin();
+        } catch {
+            setDialog({ kind: 'error', ...ERRORS.uninstallPrevention });
+        }
+        // The system dialog returns to the app; useProtectionStatus refreshes then.
     };
 
-    const refreshStatus = async () => {
-        const [admin, dns, overlay, access, stats, sites, up, wd] = await Promise.all([
-            checkAdmin(),
-            isDnsBlockingRunning(),
-            canDrawOverlays(),
-            checkAccessibilityEnabled(),
-            getDnsStats(),
-            getBlockedWebsites().catch(() => []),
-            getUpstreamDns(),
-            isWatchdogRunning(),
-        ]);
-        setIsAdminEnabled(admin);
-        setIsDnsEnabled(dns);
-        setCanOverlay(overlay);
-        setAccessibilityOn(access);
-        setDnsStats(stats);
-        setDnsRuleCount(sites.filter(s => s.days === 'Full Week' && s.time === 'All Day Long').length);
-        setUpstream(up);
-        setWatchdogOn(wd);
-    };
-
-    const upstreamLabel = (value: string) => {
-        if (!value) return 'System default';
-        if (value === ADGUARD_DNS) return 'AdGuard (ads & trackers)';
-        return value;
+    const turnOffDns = async () => {
+        patch({ dns: false });
+        await disableDnsBlocking();
+        refresh();
     };
 
     const pickUpstream = async (ip: string) => {
-        setShowUpstreamPopup(false);
-        setUpstream(ip);
+        close();
+        patch({ upstream: ip });
         await setUpstreamDns(ip);
-        setTimeout(refreshStatus, 1200); // filter restarts (~0.7s) to apply
+        setTimeout(refresh, 1200); // the filter restarts (~0.7s) to apply it
     };
 
-    const layers = [
-        { label: 'Accessibility blocking', value: accessibilityOn ? 'On' : 'Off', ok: accessibilityOn },
-        { label: 'Re-enable watchdog', value: watchdogOn ? 'Running' : 'Off', ok: watchdogOn },
-        { label: 'Display over other apps', value: canOverlay ? 'Granted' : 'Needed', ok: canOverlay },
-        { label: 'DNS filter (VPN)', value: isDnsEnabled ? 'Running' : 'Off', ok: isDnsEnabled },
-        { label: 'Uninstall prevention', value: isAdminEnabled ? 'On' : 'Off', ok: isAdminEnabled },
-    ];
-    const layersOn = layers.filter(l => l.ok).length;
+    // ---- Switch handlers -------------------------------------------------
 
-    useEffect(() => {
-        refreshStatus();
+    const onPassphraseSwitch = (enable: boolean) =>
+        enable
+            ? setDialog({
+                  kind: 'confirm',
+                  ...PASSPHRASE_PROTECTION,
+                  onConfirm: () => {
+                      close();
+                      togglePassphrase();
+                  },
+              })
+            : guarded(togglePassphrase);
 
-        const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-            if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-                refreshStatus();
-            }
-            appState.current = nextAppState;
+    const onUninstallSwitch = (enable: boolean) =>
+        setDialog({
+            kind: 'confirm',
+            ...(enable ? UNINSTALL_PREVENTION.enable : UNINSTALL_PREVENTION.disable),
+            // Turning protection on needs no passphrase; turning it off does.
+            onConfirm: enable
+                ? () => {
+                      close();
+                      return changeUninstallPrevention();
+                  }
+                : () => guarded(changeUninstallPrevention),
         });
 
-        return () => {
-            subscription.remove();
-        };
-    }, []);
+    const onDnsSwitch = (enable: boolean) => (enable ? setDialog({ kind: 'dnsWizard' }) : guarded(turnOffDns));
+
+    // ---- Derived ---------------------------------------------------------
+
+    const layers = [
+        { label: 'Accessibility blocking', value: status.accessibility ? 'On' : 'Off', ok: status.accessibility },
+        { label: 'Re-enable watchdog', value: status.watchdog ? 'Running' : 'Off', ok: status.watchdog },
+        { label: 'Display over other apps', value: status.overlay ? 'Granted' : 'Needed', ok: status.overlay },
+        { label: 'DNS filter (VPN)', value: status.dns ? 'Running' : 'Off', ok: status.dns },
+        { label: 'Uninstall prevention', value: status.admin ? 'On' : 'Off', ok: status.admin },
+    ];
+    const layersOn = layers.filter(l => l.ok).length;
 
     return (
         <BaseScreen title="Settings" subtitle="Protection, security and appearance">
@@ -224,7 +141,7 @@ const SettingsScreen: React.FC = () => {
                                 style={[
                                     styles.healthBadge,
                                     {
-                                        backgroundColor: accessibilityOn
+                                        backgroundColor: status.accessibility
                                             ? theme.colors.accentSoft
                                             : 'rgba(255,107,107,0.16)',
                                     },
@@ -232,30 +149,40 @@ const SettingsScreen: React.FC = () => {
                                 <ThemedText
                                     size="small"
                                     weight="strong"
-                                    style={{ color: accessibilityOn ? theme.colors.accent : theme.colors.primaryRed }}>
-                                    {accessibilityOn ? (layersOn === layers.length ? 'Strong' : 'Good') : 'At risk'}
+                                    style={{
+                                        color: status.accessibility ? theme.colors.accent : theme.colors.primaryRed,
+                                    }}>
+                                    {status.accessibility
+                                        ? layersOn === layers.length
+                                            ? 'Strong'
+                                            : 'Good'
+                                        : 'At risk'}
                                 </ThemedText>
                             </View>
                         </View>
                         <View style={[styles.progressTrack, { backgroundColor: theme.colors.elevated }]}>
                             <AnimatedBar
                                 fraction={layersOn / layers.length}
-                                color={accessibilityOn ? theme.colors.accent : theme.colors.primaryRed}
+                                color={status.accessibility ? theme.colors.accent : theme.colors.primaryRed}
                                 style={styles.progressFill}
                             />
                         </View>
                         {layers.map(layer => (
                             <StatusRow key={layer.label} label={layer.label} value={layer.value} ok={layer.ok} />
                         ))}
-                        <StatusRow label="Sites covered by DNS" value={`${dnsRuleCount}`} ok={dnsRuleCount > 0} />
-                        {dnsStats && isDnsEnabled && (
+                        <StatusRow
+                            label="Sites covered by DNS"
+                            value={`${status.dnsRuleCount}`}
+                            ok={status.dnsRuleCount > 0}
+                        />
+                        {status.dnsStats && status.dns && (
                             <>
                                 <StatusRow
                                     label="DNS seen / blocked / errors"
-                                    value={`${dnsStats.forwarded} / ${dnsStats.blocked} / ${dnsStats.errors}`}
-                                    ok={dnsStats.errors === 0}
+                                    value={`${status.dnsStats.forwarded} / ${status.dnsStats.blocked} / ${status.dnsStats.errors}`}
+                                    ok={status.dnsStats.errors === 0}
                                 />
-                                {dnsStats.forwarded === 0 && dnsStats.blocked === 0 && (
+                                {status.dnsStats.forwarded === 0 && status.dnsStats.blocked === 0 && (
                                     <ThemedText size="small" color="primaryRed" style={styles.statusHint}>
                                         DNS is on but sees no queries — Private DNS (encrypted) is likely on. Turn it
                                         off via the DNS Blocking setup.
@@ -321,17 +248,14 @@ const SettingsScreen: React.FC = () => {
                             icon="Key"
                             title="Passphrase protection"
                             description="Require a long passphrase to weaken protection">
-                            <ThemedSwitch
-                                value={pendingToggleValue ?? isPassphraseEnabled}
-                                onValueChange={handleTogglePassphrase}
-                            />
+                            <ThemedSwitch value={isPassphraseEnabled} onValueChange={onPassphraseSwitch} />
                         </SettingRow>
                         <Divider />
                         <SettingRow
                             icon="Shield"
                             title="Uninstall prevention"
                             description="Stops SiteLock being removed on impulse">
-                            <ThemedSwitch value={isAdminEnabled} onValueChange={handleToggleUninstallPrevention} />
+                            <ThemedSwitch value={status.admin} onValueChange={onUninstallSwitch} />
                         </SettingRow>
                     </ThemedView>
                 </FadeIn>
@@ -343,16 +267,16 @@ const SettingsScreen: React.FC = () => {
                         <SettingRow
                             icon="Globe"
                             title="DNS blocking"
-                            description={isDnsEnabled ? 'Re-run guided setup' : 'Guided setup — tap the switch'}
-                            onDescriptionPress={() => setWizardVisible(true)}>
-                            <ThemedSwitch value={isDnsEnabled} onValueChange={handleToggleDns} />
+                            description={status.dns ? 'Re-run guided setup' : 'Guided setup — tap the switch'}
+                            onDescriptionPress={() => setDialog({ kind: 'dnsWizard' })}>
+                            <ThemedSwitch value={status.dns} onValueChange={onDnsSwitch} />
                         </SettingRow>
                         <Divider />
                         <SettingRow
                             icon="Server"
                             title="Allowed-sites resolver"
-                            description={upstreamLabel(upstream)}
-                            onPress={() => setShowUpstreamPopup(true)}>
+                            description={upstreamLabel(status.upstream)}
+                            onPress={() => setDialog({ kind: 'upstream' })}>
                             <Chevron />
                         </SettingRow>
                     </ThemedView>
@@ -366,13 +290,13 @@ const SettingsScreen: React.FC = () => {
                             icon="Layers"
                             title="Display over other apps"
                             description={
-                                canOverlay
+                                status.overlay
                                     ? 'Granted — the disable warning can appear'
                                     : 'Required so the warning shows when a layer is turned off'
                             }
-                            danger={!canOverlay}
-                            onPress={canOverlay ? undefined : () => requestOverlay()}>
-                            {canOverlay ? <Icon name={'Selected'} tint={false} size={24} /> : <Chevron />}
+                            danger={!status.overlay}
+                            onPress={status.overlay ? undefined : () => requestOverlay()}>
+                            {status.overlay ? <Icon name={'Selected'} tint={false} size={24} /> : <Chevron />}
                         </SettingRow>
                         <Divider />
                         <SettingRow
@@ -390,100 +314,87 @@ const SettingsScreen: React.FC = () => {
                 </ThemedText>
             </ScrollView>
 
-            <PopUp
-                visible={showEnablePassphrasePopup}
-                title={PASSPHRASE_PROTECTION.title}
-                text={PASSPHRASE_PROTECTION.text}
-                onClose={() => cancelPassphrasePopup('enable')}
-                onConfirm={() => confirmPassphrasePopup('enable')}
-            />
-            <PassphrasePopup
-                visible={showDisablePassphrasePopup}
-                onClose={() => cancelPassphrasePopup('disable')}
-                onConfirm={() => confirmPassphrasePopup('disable')}
+            <ConfirmPopup
+                visible={dialog?.kind === 'confirm'}
+                title={dialog?.kind === 'confirm' ? dialog.title : ''}
+                text={dialog?.kind === 'confirm' ? dialog.text : ''}
+                onClose={close}
+                onConfirm={() => (dialog?.kind === 'confirm' ? dialog.onConfirm() : undefined)}
             />
 
-            <PopUp
-                visible={showEnableUninstallPreventionPopup}
-                title={UNINSTALL_PREVENTION.enable.title}
-                text={UNINSTALL_PREVENTION.enable.text}
-                onClose={() => setShowEnableUninstallPreventionPopup(false)}
-                onConfirm={confirmEnableUninstallPrevention}
-            />
-            <PopUp
-                visible={showDisableUninstallPreventionPopup}
-                title={UNINSTALL_PREVENTION.disable.title}
-                text={UNINSTALL_PREVENTION.disable.text}
-                onClose={() => setShowDisableUninstallPreventionPopup(false)}
-                onConfirm={confirmDisableUninstallPrevention}
-            />
             <PassphrasePopup
-                visible={showPassphraseUninstallPreventionPopup}
-                onClose={() => setShowPassphraseUninstallPreventionPopup(false)}
-                onConfirm={confirmPassphraseUninstallPrevention}
+                visible={dialog?.kind === 'passphrase'}
+                onClose={close}
+                onConfirm={() => {
+                    if (dialog?.kind !== 'passphrase') return;
+                    const action = dialog.onConfirm;
+                    close();
+                    action();
+                }}
             />
 
-            <BlurModal visible={showUpstreamPopup} onClose={() => setShowUpstreamPopup(false)}>
+            <BlurModal visible={dialog?.kind === 'upstream'} onClose={close}>
                 <ThemedText weight="strong" size="large" align="center">
                     Resolver for allowed sites
                 </ThemedText>
                 <ThemedText size="small" align="center" style={styles.upstreamIntro}>
                     Your blocked sites are always blocked. Everything else is resolved by:
                 </ThemedText>
-                <Pressable
-                    style={[
-                        styles.optionBtn,
-                        { borderColor: upstream === '' ? theme.colors.accent : theme.colors.border },
-                    ]}
-                    onPress={() => pickUpstream('')}>
-                    <ThemedText
-                        weight={upstream === '' ? 'strong' : 'medium'}
-                        color={upstream === '' ? 'accent' : undefined}>
-                        System default
-                    </ThemedText>
-                </Pressable>
-                <Pressable
-                    style={[
-                        styles.optionBtn,
-                        { borderColor: upstream === ADGUARD_DNS ? theme.colors.accent : theme.colors.border },
-                    ]}
-                    onPress={() => pickUpstream(ADGUARD_DNS)}>
-                    <ThemedText
-                        weight={upstream === ADGUARD_DNS ? 'strong' : 'medium'}
-                        color={upstream === ADGUARD_DNS ? 'accent' : undefined}>
-                        AdGuard — keep ad & tracker blocking
-                    </ThemedText>
-                    <ThemedText size="small" opacity="faded">
-                        94.140.14.14 · keep Private DNS OFF
-                    </ThemedText>
-                </Pressable>
+                <UpstreamOption
+                    title="System default"
+                    selected={status.upstream === ''}
+                    onPress={() => pickUpstream('')}
+                />
+                <UpstreamOption
+                    title="AdGuard — keep ad & tracker blocking"
+                    subtitle={`${ADGUARD_DNS} · keep Private DNS OFF`}
+                    selected={status.upstream === ADGUARD_DNS}
+                    onPress={() => pickUpstream(ADGUARD_DNS)}
+                />
                 <View style={styles.popupButtonsContainer}>
-                    <ActionButton variant="cancel" onPress={() => setShowUpstreamPopup(false)} />
+                    <ActionButton variant="cancel" onPress={close} />
                 </View>
             </BlurModal>
 
-            <PassphrasePopup
-                visible={showDisableDnsPassphrasePopup}
-                onClose={() => setShowDisableDnsPassphrasePopup(false)}
-                onConfirm={confirmDisableDns}
-            />
-
             <DnsSetupWizard
-                visible={wizardVisible}
+                visible={dialog?.kind === 'dnsWizard'}
                 onClose={() => {
-                    setWizardVisible(false);
-                    refreshStatus();
+                    close();
+                    refresh();
                 }}
-                onDnsEnabledChange={setIsDnsEnabled}
+                onDnsEnabledChange={dns => patch({ dns })}
             />
 
             <ErrorPopup
-                title={errorTitle}
-                text={errorText}
-                visible={errorPopupVisible}
-                onClose={() => setErrorPopupVisible(false)}
+                title={dialog?.kind === 'error' ? dialog.title : ''}
+                text={dialog?.kind === 'error' ? dialog.text : ''}
+                visible={dialog?.kind === 'error'}
+                onClose={close}
             />
         </BaseScreen>
+    );
+};
+
+const UpstreamOption: React.FC<{ title: string; subtitle?: string; selected: boolean; onPress: () => void }> = ({
+    title,
+    subtitle,
+    selected,
+    onPress,
+}) => {
+    const { theme } = useTheme();
+    return (
+        <Pressable
+            style={[styles.optionBtn, { borderColor: selected ? theme.colors.accent : theme.colors.border }]}
+            onPress={onPress}>
+            <ThemedText weight={selected ? 'strong' : 'medium'} color={selected ? 'accent' : undefined}>
+                {title}
+            </ThemedText>
+            {subtitle && (
+                <ThemedText size="small" color="muted">
+                    {subtitle}
+                </ThemedText>
+            )}
+        </Pressable>
     );
 };
 
@@ -574,7 +485,7 @@ const ThemedSwitch: React.FC<{ value: boolean; onValueChange: (v: boolean) => vo
                 haptics.toggle();
                 onValueChange(v);
             }}
-            trackColor={{ false: theme.colors.border, true: theme.colors.accent }}
+            trackColor={{ false: theme.colors.muted, true: theme.colors.accent }}
             thumbColor="#FFFFFF"
         />
     );
@@ -590,15 +501,15 @@ const Divider: React.FC = () => {
     return <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />;
 };
 
-interface PopUpProps {
+interface ConfirmPopupProps {
     visible: boolean;
     title: string;
     text: string;
     onClose: () => void;
-    onConfirm: () => void;
+    onConfirm: () => void | Promise<void>;
 }
 
-const PopUp: React.FC<PopUpProps> = ({ visible, onClose, onConfirm, title, text }) => {
+const ConfirmPopup: React.FC<ConfirmPopupProps> = ({ visible, onClose, onConfirm, title, text }) => {
     return (
         <BlurModal visible={visible} onClose={onClose}>
             <ThemedText weight="medium" align="center">
@@ -703,9 +614,8 @@ const styles = StyleSheet.create({
     },
     swatches: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        paddingLeft: spacing.md + 34 + spacing.sm - 2,
-        paddingRight: spacing.md,
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
         paddingBottom: spacing.md,
     },
     swatchRing: {
@@ -715,7 +625,6 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         alignItems: 'center',
         justifyContent: 'center',
-        marginHorizontal: 4,
     },
     swatch: {
         width: 28,

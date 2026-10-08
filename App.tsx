@@ -1,42 +1,63 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
+import { StyleSheet, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Navigation from './src/navigation/Navigation';
-import { PassphraseProvider } from './src/context/PassphraseContext';
-import { View } from 'react-native';
 import WelcomeScreen from './src/screens/WelcomeScreen';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { PassphraseProvider } from './src/context/PassphraseContext';
+import { ThemeProvider } from './src/context/ThemeContext';
 import { useAppInitializer } from './src/hooks/useAppInitializer';
+import { darkTheme } from './src/theme/dark';
 import { setUserHasSeenWelcome } from './src/utils/storage';
 import { openAccessibilitySettings } from './src/utils/accessibility';
-import { ThemeProvider } from './src/context/ThemeContext';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { logger } from './src/utils/logger';
 
 function App(): React.JSX.Element {
     const { status, setStatus } = useAppInitializer();
 
     const handleWelcomeComplete = async () => {
-        await setUserHasSeenWelcome(true);
+        try {
+            await setUserHasSeenWelcome(true);
+        } catch (error) {
+            // Worst case the welcome screen shows again next launch; never block the user here.
+            logger.warn('Could not save welcome flag', error);
+        }
         openAccessibilitySettings();
         setStatus('main');
     };
 
     if (status === 'loading') {
-        return <View />;
+        // Same color as the default dark theme, so startup doesn't flash white.
+        return <View style={styles.splash} />;
     }
 
     return (
-        <ThemeProvider>
-            <PassphraseProvider>
-                <SafeAreaProvider>
-                    {status === 'welcome' ? <WelcomeScreen onContinue={handleWelcomeComplete} /> : <Navigation />}
-                </SafeAreaProvider>
-            </PassphraseProvider>
-        </ThemeProvider>
+        <GestureHandlerRootView style={styles.root}>
+            <ThemeProvider>
+                <PassphraseProvider>
+                    <SafeAreaProvider>
+                        <ErrorBoundary>
+                            {status === 'welcome' ? (
+                                <WelcomeScreen onContinue={handleWelcomeComplete} />
+                            ) : (
+                                <Navigation />
+                            )}
+                        </ErrorBoundary>
+                    </SafeAreaProvider>
+                </PassphraseProvider>
+            </ThemeProvider>
+        </GestureHandlerRootView>
     );
 }
+
+const styles = StyleSheet.create({
+    root: {
+        flex: 1,
+    },
+    splash: {
+        flex: 1,
+        backgroundColor: darkTheme.colors.background,
+    },
+});
 
 export default App;

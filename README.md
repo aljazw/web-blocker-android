@@ -1,14 +1,22 @@
 # 🔒 SiteLock
 
-**SiteLock** is an Android app that blocks distracting websites, and is built to stay on when you're tempted to switch it off. It's written in **React Native + TypeScript** with native **Kotlin** modules, and all blocking runs on your device: no accounts, no servers, no tracking.
+**SiteLock** is an Android focus and self-improvement app. It blocks the websites and apps that steal your time, and helps you build the habits you want, with streaks, reminders and a little celebration each time you show up. It's built with **React Native + TypeScript** and native **Kotlin** modules. Everything runs on your device: no accounts, no servers, no tracking.
 
 > ⚠️ **Android only.** SiteLock relies on Android Accessibility Services, `VpnService` and other Android-specific APIs.
 
 ## ✨ Features
 
+### Habits
+
+-   ✅ **Daily habits:** create tasks like "Workout 10 min", pick an emoji, and choose exactly which weekdays they're due.
+-   🔥 **Streaks:** consecutive due days completed. Days off never break a streak, and today stays "pending" until it's over. Your best streak and total check-ins are tracked too.
+-   🔔 **Reminders:** an optional notification at a time you choose, only on that habit's days.
+-   🎉 **Motivation:** check-off animations, celebrations at 3, 7, 14, 30, 100+ day milestones, a "perfect day" moment, a weekly completion rate and a daily quote.
+
 ### Blocking
 
 -   🔗 **Real-time URL blocking:** an Accessibility Service watches the address bar of Chrome, Firefox, Brave and Opera and redirects blocked sites to a block page.
+-   📱 **App blocking:** block any installed app on the same schedules. Opening it shows the block page, and the only way out is the home screen. Settings and the phone dialer can't be blocked, so emergency calls always work.
 -   🌐 **DNS filter (second layer):** an on-device VPN answers DNS lookups for always-blocked sites, so they stay blocked even if Accessibility is turned off. A guided wizard walks you through setup, and you can forward allowed sites to the system resolver or to AdGuard DNS to keep ad and tracker blocking.
 -   ⏰ **Schedules:** block a site on chosen days and hours, including overnight ranges such as 22:00 to 07:00. Presets cover *Always*, *Work hours*, *Evenings*, *Bedtime* and *Weekends*.
 -   ⚡ **Quick add:** one-tap suggestions for common distractions in Social, Video, Forums and Shopping.
@@ -92,7 +100,8 @@ src/
 ├── components/   Design-system pieces: Button, Chip, SectionHeader, BlurModal, …
 ├── theme/        Light/dark palettes, accent colors, spacing & radius tokens
 ├── context/      Theme (dark mode + accent) and passphrase state
-├── utils/        Storage, schedule logic, DNS, watchdog and overlay bridges
+├── hooks/        Screen logic: block list, protection status, app startup
+├── utils/        Storage, schedule logic and native-module bridges
 └── constants/    UI strings and quick-add suggestions
 
 android/app/src/main/java/com/sitelock/

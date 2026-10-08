@@ -1,23 +1,26 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
 import React, { useState } from 'react';
-import Icon from '../components/Icon';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import { BlockedWebsitesData, RootStackNavigation, RootStackParamList } from '../types/types';
+import { RootStackNavigation, RootStackParamList } from '../types/types';
 import TimeInput from '../components/TimeInput';
 import ActionButton from '../components/ActionButton';
 import BlurModal from '../components/BlurModal';
 import Button from '../components/Button';
 import Chip from '../components/Chip';
+import Segmented from '../components/Segmented';
+import DayPicker from '../components/DayPicker';
+import BackButton from '../components/BackButton';
+import AppIcon from '../components/AppIcon';
 import Favicon from '../components/Favicon';
 import SectionHeader from '../components/SectionHeader';
 import { shapes, spacing } from '../theme';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
-import { addBlockedWebsite } from '../utils/storage';
+import { addBlockedApp, addBlockedWebsite } from '../utils/storage';
 import ErrorPopup from '../components/ErrorPopup';
 import { useTheme } from '../context/ThemeContext';
-import { ALL_DAY, FULL_WEEK, WEEK_DAYS } from '../utils/schedule';
+import { ALL_DAY, FULL_WEEK, WEEK_DAYS, describeDays } from '../utils/schedule';
 import { FadeIn, animateLayout } from '../components/Motion';
 import { haptics } from '../utils/haptics';
 
@@ -45,7 +48,8 @@ const ScheduleScreen: React.FC = () => {
     type ScheduleScreenRouteProp = RouteProp<RootStackParamList, 'Schedule'>;
 
     const route = useRoute<ScheduleScreenRouteProp>();
-    const { websiteUrl } = route.params;
+    const { websiteUrl, app } = route.params;
+    const targetLabel = app ? app.appName : websiteUrl ?? '';
 
     const [selectedDays, setSelectedDays] = useState<boolean[]>(EVERY_DAY);
     const [customTime, setCustomTime] = useState(false);
@@ -64,11 +68,6 @@ const ScheduleScreen: React.FC = () => {
         setErrorTitle(title);
         setErrorText(text);
         setErrorPopupVisible(true);
-    };
-
-    const toggleDay = (index: number) => {
-        haptics.tap();
-        setSelectedDays(prev => prev.map((v, i) => (i === index ? !v : v)));
     };
 
     const applyPreset = (preset: Preset) => {
@@ -147,29 +146,27 @@ const ScheduleScreen: React.FC = () => {
         ? 'Start and end time can’t be the same.'
         : null;
 
-    const backButton = (
-        <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={10}
-            style={[styles.back, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <Icon name="Back" size={20} />
-        </Pressable>
-    );
-
     return (
-        <BaseScreen title="Schedule" subtitle="When should this site be blocked?" headerLeft={backButton}>
+        <BaseScreen
+            title="Schedule"
+            subtitle={app ? 'When should this app be blocked?' : 'When should this site be blocked?'}
+            headerLeft={<BackButton />}>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 <FadeIn>
                     <ThemedView withBorder style={styles.siteCard}>
                         <View style={[styles.faviconWrap, { backgroundColor: theme.colors.elevated }]}>
-                            <Favicon url={websiteUrl} size={26} />
+                            {app ? (
+                                <AppIcon packageName={app.packageName} size={30} />
+                            ) : (
+                                <Favicon url={targetLabel} size={26} />
+                            )}
                         </View>
                         <View style={styles.flex}>
                             <ThemedText size="large" weight="strong" numberOfLines={1}>
-                                {websiteUrl}
+                                {targetLabel}
                             </ThemedText>
                             <ThemedText size="small" color="muted">
-                                New block
+                                {app ? 'New app block' : 'New website block'}
                             </ThemedText>
                         </View>
                     </ThemedView>
@@ -191,48 +188,23 @@ const ScheduleScreen: React.FC = () => {
                 <FadeIn delay={140}>
                     <SectionHeader title="Days" />
                     <ThemedView withBorder style={styles.card}>
-                        <View style={styles.daysRow}>
-                            {WEEK_DAYS.map((day, index) => {
-                                const on = selectedDays[index];
-                                return (
-                                    <Pressable
-                                        key={day}
-                                        onPress={() => toggleDay(index)}
-                                        style={[
-                                            styles.dayPill,
-                                            on
-                                                ? { backgroundColor: theme.colors.accent }
-                                                : { backgroundColor: theme.colors.elevated },
-                                        ]}>
-                                        <ThemedText
-                                            size="small"
-                                            weight="strong"
-                                            style={{ color: on ? theme.colors.onAccent : theme.colors.muted }}>
-                                            {day.charAt(0)}
-                                        </ThemedText>
-                                    </Pressable>
-                                );
-                            })}
-                        </View>
+                        <DayPicker value={selectedDays} onChange={setSelectedDays} />
                         <ThemedText size="small" color="muted" align="center" style={styles.cardFoot}>
-                            {noDays ? 'No days selected' : daysText === FULL_WEEK ? 'Every day' : daysText}
+                            {noDays ? 'No days selected' : describeDays(daysText)}
                         </ThemedText>
                     </ThemedView>
                 </FadeIn>
                 <FadeIn delay={210}>
                     <SectionHeader title="Time" />
                     <ThemedView withBorder style={styles.card}>
-                        <View style={[styles.segment, { backgroundColor: theme.colors.elevated }]}>
-                            <Segment label="All day" active={!customTime} onPress={clearTime} />
-                            <Segment
-                                label="Custom hours"
-                                active={customTime}
-                                onPress={() => {
-                                    animateLayout();
-                                    setCustomTime(true);
-                                }}
-                            />
-                        </View>
+                        <Segmented
+                            options={[
+                                { value: 'all', label: 'All day' },
+                                { value: 'custom', label: 'Custom hours' },
+                            ]}
+                            value={customTime ? 'custom' : 'all'}
+                            onChange={v => (v === 'all' ? clearTime() : setCustomTime(true))}
+                        />
                         {customTime && (
                             <View style={styles.timeRow}>
                                 <TimeInput
@@ -279,6 +251,7 @@ const ScheduleScreen: React.FC = () => {
                 days={daysText}
                 time={timeText}
                 websiteUrl={websiteUrl}
+                app={app}
                 onClose={() => setPopupVisible(false)}
                 showError={() => showError('Data Load Error', 'Failed to save blocked website data')}
             />
@@ -292,37 +265,24 @@ const ScheduleScreen: React.FC = () => {
     );
 };
 
-const Segment: React.FC<{ label: string; active: boolean; onPress: () => void }> = ({ label, active, onPress }) => {
-    const { theme } = useTheme();
-    return (
-        <Pressable onPress={onPress} style={[styles.segmentItem, active && { backgroundColor: theme.colors.card }]}>
-            <ThemedText size="small" weight="strong" style={{ color: active ? theme.colors.text : theme.colors.muted }}>
-                {label}
-            </ThemedText>
-        </Pressable>
-    );
-};
-
 interface PopupProps {
     navigation: NavigationProp<RootStackParamList>;
     visible: boolean;
     days: string;
     time: string;
-    websiteUrl: string;
+    websiteUrl?: string;
+    app?: { packageName: string; appName: string };
     onClose: () => void;
     showError: () => void;
 }
 
-const Popup: React.FC<PopupProps> = ({ navigation, visible, days, time, websiteUrl, onClose, showError }) => {
-    const onConfirm = async () => {
-        const newBlockedData: BlockedWebsitesData = {
-            days,
-            time,
-            websiteUrl,
-            visible: true,
-        };
+const Popup: React.FC<PopupProps> = ({ navigation, visible, days, time, websiteUrl, app, onClose, showError }) => {
+    const label = app ? app.appName : websiteUrl ?? '';
 
-        const success = await addBlockedWebsite(newBlockedData);
+    const onConfirm = async () => {
+        const success = app
+            ? await addBlockedApp({ days, time, packageName: app.packageName, appName: app.appName, visible: true })
+            : await addBlockedWebsite({ days, time, websiteUrl: websiteUrl ?? '', visible: true });
         if (success) {
             haptics.success();
             onClose();
@@ -337,12 +297,12 @@ const Popup: React.FC<PopupProps> = ({ navigation, visible, days, time, websiteU
             <ThemedText size="large" weight="strong" align="center" style={styles.popUpText}>
                 Block{' '}
                 <ThemedText size="large" weight="strong" color="accent">
-                    {websiteUrl}
+                    {label}
                 </ThemedText>
                 ?
             </ThemedText>
             <View style={styles.summary}>
-                <SummaryRow label="Days" value={days === FULL_WEEK ? 'Every day' : days} />
+                <SummaryRow label="Days" value={describeDays(days)} />
                 <SummaryRow label="Hours" value={time === ALL_DAY ? 'All day' : time} />
             </View>
             <View style={styles.buttonsContainer}>
@@ -367,15 +327,6 @@ const SummaryRow: React.FC<{ label: string; value: string }> = ({ label, value }
 const styles = StyleSheet.create({
     scroll: {
         paddingBottom: spacing.xl,
-    },
-    back: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: spacing.md,
     },
     flex: {
         flex: 1,
@@ -409,28 +360,6 @@ const styles = StyleSheet.create({
     },
     cardFoot: {
         marginTop: spacing.sm,
-    },
-    daysRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    dayPill: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    segment: {
-        flexDirection: 'row',
-        borderRadius: shapes.borderRadius.pill,
-        padding: 4,
-    },
-    segmentItem: {
-        flex: 1,
-        alignItems: 'center',
-        paddingVertical: 9,
-        borderRadius: shapes.borderRadius.pill,
     },
     timeRow: {
         flexDirection: 'row',

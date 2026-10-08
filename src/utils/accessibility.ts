@@ -1,5 +1,6 @@
 import { NativeModules } from 'react-native';
 import { Platform } from 'react-native';
+import { logger } from './logger';
 
 const { AccessibilityStatus, IntentLauncher } = NativeModules;
 
@@ -13,7 +14,10 @@ export async function checkAccessibilityEnabled(): Promise<boolean> {
 }
 
 export function openAccessibilitySettings() {
-    if (Platform.OS === 'android') {
+    if (Platform.OS !== 'android') return;
+    try {
         IntentLauncher.startActivity('com.sitelock.OpenAccessibilityActivity');
+    } catch (error) {
+        logger.warn('Could not open Accessibility settings', error);
     }
 }

@@ -12,10 +12,16 @@ import {
     CirclePlus,
     Clock,
     EyeOff,
+    Flame,
+    Check,
+    Bell,
+    Trophy,
+    ListChecks,
     Globe,
     KeyRound,
     Layers,
     LayoutDashboard,
+    LayoutGrid,
     LucideIcon,
     Moon,
     Palette,
@@ -62,6 +68,13 @@ const iconMap: Record<string, LucideIcon> = {
     Server: Server,
     Accessibility: Accessibility,
     Sparkles: Sparkles,
+    Apps: LayoutGrid,
+    // Habits
+    Habits: ListChecks,
+    Flame: Flame,
+    Check: Check,
+    Bell: Bell,
+    Trophy: Trophy,
 };
 
 type IconOpacity = 'normal' | 'muted' | 'faded';

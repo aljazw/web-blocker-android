@@ -48,11 +48,13 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class DnsVpnService : VpnService() {
 
+    // Nullable: Gson ignores Kotlin null-safety, and one malformed entry must not
+    // empty the whole DNS block list.
     data class BlockedWebsite(
-        val days: String,
-        val time: String,
-        val websiteUrl: String,
-        val visible: Boolean
+        val days: String? = null,
+        val time: String? = null,
+        val websiteUrl: String? = null,
+        val visible: Boolean? = null
     )
 
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -400,12 +402,14 @@ class DnsVpnService : VpnService() {
         val json = prefs.getString(PREF_BLOCKED, null)
         if (json.isNullOrEmpty()) { blockedDomains = emptySet(); return }
         blockedDomains = try {
-            val type = object : TypeToken<List<BlockedWebsite>>() {}.type
-            val list: List<BlockedWebsite> = Gson().fromJson(json, type) ?: emptyList()
+            val type = object : TypeToken<List<BlockedWebsite?>>() {}.type
+            val list: List<BlockedWebsite?> = Gson().fromJson(json, type) ?: emptyList()
             list.asSequence()
+                .filterNotNull()
                 // DNS only for always-blocked sites (no open window), per design.
                 .filter { it.days.equals("Full Week", true) && it.time.equals("All Day Long", true) }
-                .map { domainOf(it.websiteUrl) }
+                .mapNotNull { it.websiteUrl }
+                .map { domainOf(it) }
                 .filter { it.isNotEmpty() }
                 .toSet()
         } catch (e: Exception) {

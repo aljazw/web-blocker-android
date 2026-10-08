@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { shapes, spacing } from '../theme';
 import { useTheme } from '../context/ThemeContext';
@@ -10,7 +11,8 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 interface ButtonProps {
     label: string;
-    onPress: () => void;
+    /** If this returns a promise, the button shows a spinner and ignores taps until it settles. */
+    onPress: () => void | Promise<unknown>;
     variant?: ButtonVariant;
     icon?: string;
     disabled?: boolean;
@@ -19,7 +21,11 @@ interface ButtonProps {
     style?: StyleProp<ViewStyle>;
 }
 
-/** The app's one button: pill-shaped, themed, with optional trailing icon. */
+/**
+ * The app's one button: pill-shaped, themed, with optional trailing icon.
+ * Taps are ignored while a previous async onPress is still running, so an
+ * action (saving, deleting) can never run twice from a double tap.
+ */
 const Button: React.FC<ButtonProps> = ({
     label,
     onPress,
@@ -40,24 +46,44 @@ const Button: React.FC<ButtonProps> = ({
         danger: { bg: primaryRed, fg: '#FFFFFF', borderColor: primaryRed },
     };
     const { bg, fg, borderColor } = palette[variant];
-    const inactive = disabled || loading;
+
+    const [busy, setBusy] = useState(false);
+    const running = useRef(false);
+    const mounted = useRef(true);
+    useEffect(
+        () => () => {
+            mounted.current = false;
+        },
+        [],
+    );
+
+    const handlePress = async () => {
+        if (running.current) return;
+        running.current = true;
+        haptics.tap();
+        try {
+            const result = onPress();
+            if (result instanceof Promise) {
+                setBusy(true);
+                await result;
+            }
+        } finally {
+            running.current = false;
+            if (mounted.current) setBusy(false);
+        }
+    };
+
+    const inactive = disabled || loading || busy;
 
     return (
         <ScalePressable
-            onPress={
-                inactive
-                    ? undefined
-                    : () => {
-                          haptics.tap();
-                          onPress();
-                      }
-            }
+            onPress={inactive ? undefined : handlePress}
             disabled={!!inactive}
             accessibilityRole="button"
             accessibilityState={{ disabled: !!inactive }}
             containerStyle={[inactive && styles.disabled, style]}
             style={[styles.base, compact && styles.compact, { backgroundColor: bg, borderColor }]}>
-            {loading ? (
+            {loading || busy ? (
                 <ActivityIndicator color={fg} />
             ) : (
                 <View style={styles.row}>
@@ -73,7 +99,6 @@ const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
     base: {
-        flexGrow: 1,
         minHeight: 50,
         paddingHorizontal: spacing.lg,
         borderRadius: shapes.borderRadius.pill,

@@ -1,29 +1,39 @@
 import { Pressable, StyleSheet, View, ScrollView } from 'react-native';
-import BaseScreen from '../components/BaseScreen';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { BlockedWebsitesData, RootStackNavigation } from '../types/types';
-import ItemContainer from '../components/itemContainer';
+import { BlockEntry, RootStackNavigation } from '../types/types';
+import BaseScreen from '../components/BaseScreen';
+import ItemContainer from '../components/ItemContainer';
 import Favicon from '../components/Favicon';
+import AppIcon from '../components/AppIcon';
 import Icon from '../components/Icon';
 import ActionButton from '../components/ActionButton';
 import BlurModal from '../components/BlurModal';
 import Button from '../components/Button';
 import SearchBar from '../components/SearchBar';
 import SectionHeader from '../components/SectionHeader';
-import { shapes, spacing } from '../theme';
+import StatTile from '../components/StatTile';
+import PassphrasePopup from '../components/PassphrasePopup';
+import ErrorPopup from '../components/ErrorPopup';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
-import PassphrasePopup from '../components/PassphrasePopup';
+import { AnimatedNumber, FadeIn, animateLayout, stagger } from '../components/Motion';
 import { usePassphrase } from '../context/PassphraseContext';
 import { useTheme } from '../context/ThemeContext';
-import ErrorPopup from '../components/ErrorPopup';
-import { deleteBlockedWebsite, getBlockedWebsites, hideBlockedWebsite } from '../utils/storage';
+import { useBlockList } from '../hooks/useBlockList';
+import { useAppForeground } from '../hooks/useAppForeground';
+import { shapes, spacing } from '../theme';
 import { checkAccessibilityEnabled, openAccessibilitySettings } from '../utils/accessibility';
-import { describeDays, describeTime, isBlockActiveNow } from '../utils/schedule';
-import { ERRORS } from '../constants/strings';
-import { AnimatedNumber, FadeIn, animateLayout, stagger } from '../components/Motion';
+import { describeSchedule, isBlockActiveNow } from '../utils/schedule';
 import { haptics } from '../utils/haptics';
+import { ERRORS } from '../constants/strings';
+
+/** One popup at a time. */
+type Dialog =
+    | { kind: 'remove'; entry: BlockEntry }
+    | { kind: 'hide'; entry: BlockEntry }
+    | { kind: 'passphrase'; entry: BlockEntry }
+    | { kind: 'error'; title: string; text: string };
 
 const greeting = (date: Date) => {
     const h = date.getHours();
@@ -37,39 +47,40 @@ const HomeScreen: React.FC = () => {
     const { theme } = useTheme();
     const navigation = useNavigation<RootStackNavigation>();
 
-    const [websites, setWebsites] = useState<BlockedWebsitesData[]>([]);
+    const { isPassphraseEnabled } = usePassphrase();
+    const { entries, loadFailed, remove, hide } = useBlockList();
     const [protectionOn, setProtectionOn] = useState<boolean | null>(null);
     const [now, setNow] = useState(new Date());
     const [query, setQuery] = useState('');
-    const [removeSelectedWebsite, setRemoveSelectedWebsite] = useState<string | null>(null);
-    const [hideSelectedWebsite, setHideSelectedWebsite] = useState<string | null>(null);
-    const [errorPopupVisible, setErrorPopupVisible] = useState(false);
-    const [errorTitle, setErrorTitle] = useState('');
-    const [errorText, setErrorText] = useState('');
+    const [dialog, setDialog] = useState<Dialog | null>(null);
 
-    const showError = (title: string, text: string) => {
-        setErrorTitle(title);
-        setErrorText(text);
-        setErrorPopupVisible(true);
+    const close = () => setDialog(null);
+
+    const refreshProtection = useCallback(() => {
+        checkAccessibilityEnabled().then(setProtectionOn);
+        setNow(new Date());
+    }, []);
+    useFocusEffect(refreshProtection);
+    // Coming back from Accessibility settings should update the hero card at once.
+    useAppForeground(refreshProtection);
+
+    useEffect(() => {
+        if (loadFailed) setDialog({ kind: 'error', ...ERRORS.dataLoadError });
+    }, [loadFailed]);
+
+    /** Runs a list change and reports failure in the error popup. */
+    const apply = async (change: (entry: BlockEntry) => Promise<boolean>, entry: BlockEntry) => {
+        animateLayout();
+        if (await change(entry)) {
+            haptics.success();
+            close();
+        } else {
+            setDialog({ kind: 'error', ...ERRORS.saveFailed });
+        }
     };
 
-    const getWebsitesData = useCallback(async () => {
-        try {
-            const websitesData = await getBlockedWebsites();
-            setWebsites(websitesData);
-        } catch {
-            showError(ERRORS.dataLoadError.title, ERRORS.dataLoadError.text);
-        }
-    }, []);
-
-    // Reload whenever the tab comes into view, so newly added sites show up immediately.
-    useFocusEffect(
-        useCallback(() => {
-            getWebsitesData();
-            checkAccessibilityEnabled().then(setProtectionOn);
-            setNow(new Date());
-        }, [getWebsitesData]),
-    );
+    const confirmRemove = (entry: BlockEntry) =>
+        isPassphraseEnabled ? setDialog({ kind: 'passphrase', entry }) : apply(remove, entry);
 
     // Keep "Active now" badges fresh while the screen is open.
     useEffect(() => {
@@ -77,12 +88,12 @@ const HomeScreen: React.FC = () => {
         return () => clearInterval(id);
     }, []);
 
-    const visibleSites = useMemo(() => websites.filter(w => w.visible), [websites]);
-    const hiddenCount = websites.length - visibleSites.length;
-    const activeCount = useMemo(() => websites.filter(w => isBlockActiveNow(w, now)).length, [websites, now]);
+    const visibleSites = useMemo(() => entries.filter(w => w.visible), [entries]);
+    const hiddenCount = entries.length - visibleSites.length;
+    const activeCount = useMemo(() => entries.filter(w => isBlockActiveNow(w, now)).length, [entries, now]);
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
-        return q ? visibleSites.filter(w => w.websiteUrl.toLowerCase().includes(q)) : visibleSites;
+        return q ? visibleSites.filter(w => w.label.toLowerCase().includes(q)) : visibleSites;
     }, [visibleSites, query]);
 
     const goToAddSite = () => navigation.navigate('BottomTabs', { screen: 'Block' });
@@ -103,7 +114,11 @@ const HomeScreen: React.FC = () => {
                             <View style={styles.heroBadge}>
                                 <View style={[styles.dot, { backgroundColor: '#FFFFFF' }]} />
                                 <ThemedText size="tiny" weight="strong" style={styles.onHero}>
-                                    {protectionOn === false ? 'PROTECTION OFF' : 'PROTECTION ON'}
+                                    {protectionOn === null
+                                        ? 'CHECKING…'
+                                        : protectionOn
+                                        ? 'PROTECTION ON'
+                                        : 'PROTECTION OFF'}
                                 </ThemedText>
                             </View>
                             <Icon
@@ -114,7 +129,7 @@ const HomeScreen: React.FC = () => {
                         </View>
                         <AnimatedNumber value={activeCount} size="display" weight="strong" style={styles.onHero} />
                         <ThemedText weight="medium" style={styles.onHeroMuted}>
-                            {activeCount === 1 ? 'site blocked right now' : 'sites blocked right now'}
+                            {activeCount === 1 ? 'block active right now' : 'blocks active right now'}
                         </ThemedText>
                         {protectionOn === false && (
                             <Pressable onPress={openAccessibilitySettings} style={styles.heroAction}>
@@ -128,8 +143,8 @@ const HomeScreen: React.FC = () => {
 
                 {/* ---- Quick stats ---- */}
                 <FadeIn delay={80} style={styles.statsRow}>
-                    <StatTile label="On your list" value={websites.length} />
-                    <StatTile label="Paused now" value={websites.length - activeCount} />
+                    <StatTile label="On your list" value={entries.length} />
+                    <StatTile label="Paused now" value={entries.length - activeCount} />
                     <StatTile label="Hidden" value={hiddenCount} />
                 </FadeIn>
 
@@ -157,10 +172,10 @@ const HomeScreen: React.FC = () => {
                                 Nothing blocked yet
                             </ThemedText>
                             <ThemedText size="small" color="muted" align="center" style={styles.emptyText}>
-                                Add the sites that steal your time. You can block them all day or only during the hours
+                                Add the sites and apps that steal your time. Block them all day or only during the hours
                                 you choose.
                             </ThemedText>
-                            <Button label="Block your first site" icon="ArrowRight" onPress={goToAddSite} />
+                            <Button label="Add your first block" icon="ArrowRight" onPress={goToAddSite} />
                         </ThemedView>
                     </FadeIn>
                 ) : (
@@ -180,14 +195,18 @@ const HomeScreen: React.FC = () => {
                         {filtered.map((website, index) => {
                             const active = isBlockActiveNow(website, now);
                             return (
-                                <FadeIn key={website.websiteUrl} delay={140 + stagger(index)}>
+                                <FadeIn key={`${website.kind}:${website.key}`} delay={140 + stagger(index)}>
                                     <ItemContainer>
                                         <View style={[styles.faviconWrap, { backgroundColor: theme.colors.elevated }]}>
-                                            <Favicon url={website.websiteUrl} size={22} />
+                                            {website.kind === 'app' ? (
+                                                <AppIcon packageName={website.key} size={26} />
+                                            ) : (
+                                                <Favicon url={website.label} size={22} />
+                                            )}
                                         </View>
                                         <View style={styles.siteInfo}>
                                             <ThemedText weight="strong" numberOfLines={1}>
-                                                {website.websiteUrl}
+                                                {website.label}
                                             </ThemedText>
                                             <View style={styles.metaRow}>
                                                 <View
@@ -201,18 +220,18 @@ const HomeScreen: React.FC = () => {
                                                     ]}
                                                 />
                                                 <ThemedText size="small" color="muted" numberOfLines={1}>
-                                                    {active ? 'Blocked now' : 'Paused'} · {describeDays(website.days)} ·{' '}
-                                                    {describeTime(website.time)}
+                                                    {active ? 'Blocked now' : 'Paused'} ·{' '}
+                                                    {describeSchedule(website.days, website.time)}
                                                 </ThemedText>
                                             </View>
                                         </View>
                                         <IconButton
                                             icon="Hide"
-                                            onPress={() => setHideSelectedWebsite(website.websiteUrl)}
+                                            onPress={() => setDialog({ kind: 'hide', entry: website })}
                                         />
                                         <IconButton
                                             icon="Trash"
-                                            onPress={() => setRemoveSelectedWebsite(website.websiteUrl)}
+                                            onPress={() => setDialog({ kind: 'remove', entry: website })}
                                         />
                                     </ItemContainer>
                                 </FadeIn>
@@ -227,44 +246,30 @@ const HomeScreen: React.FC = () => {
                 )}
             </ScrollView>
 
-            {removeSelectedWebsite && (
-                <PopupRemove
-                    visible={!!removeSelectedWebsite}
-                    onClose={() => setRemoveSelectedWebsite(null)}
-                    url={removeSelectedWebsite}
-                    setRemoveSelectedWebsites={setRemoveSelectedWebsite}
-                    getWebsitesData={getWebsitesData}
-                    showError={() => showError(ERRORS.dataLoadError.title, ERRORS.dataLoadError.text)}
-                />
-            )}
-            {hideSelectedWebsite && (
-                <PopupHide
-                    onClose={() => setHideSelectedWebsite(null)}
-                    visible={!!hideSelectedWebsite}
-                    url={hideSelectedWebsite}
-                    setHideSelectedWebsite={() => setHideSelectedWebsite(null)}
-                    getWebsitesData={getWebsitesData}
-                    showError={() => showError(ERRORS.genericRetrieveError.title, ERRORS.genericRetrieveError.text)}
-                />
-            )}
+            <RemovePopup
+                entry={dialog?.kind === 'remove' ? dialog.entry : null}
+                onClose={close}
+                onConfirm={confirmRemove}
+            />
+            <HidePopup
+                entry={dialog?.kind === 'hide' ? dialog.entry : null}
+                onClose={close}
+                onConfirm={entry => apply(hide, entry)}
+            />
+            <PassphrasePopup
+                visible={dialog?.kind === 'passphrase'}
+                onClose={close}
+                onConfirm={() => dialog?.kind === 'passphrase' && apply(remove, dialog.entry)}
+            />
             <ErrorPopup
-                title={errorTitle}
-                text={errorText}
-                visible={errorPopupVisible}
-                onClose={() => setErrorPopupVisible(false)}
+                title={dialog?.kind === 'error' ? dialog.title : ''}
+                text={dialog?.kind === 'error' ? dialog.text : ''}
+                visible={dialog?.kind === 'error'}
+                onClose={close}
             />
         </BaseScreen>
     );
 };
-
-const StatTile: React.FC<{ label: string; value: number }> = ({ label, value }) => (
-    <ThemedView withBorder style={styles.statTile}>
-        <AnimatedNumber value={value} size="xlarge" weight="strong" />
-        <ThemedText size="tiny" color="muted" weight="medium">
-            {label}
-        </ThemedText>
-    </ThemedView>
-);
 
 const IconButton: React.FC<{ icon: string; onPress: () => void }> = ({ icon, onPress }) => {
     const { theme } = useTheme();
@@ -278,132 +283,52 @@ const IconButton: React.FC<{ icon: string; onPress: () => void }> = ({ icon, onP
     );
 };
 
-interface PopupRemoveProps {
-    url: string;
-    visible: boolean;
+interface EntryPopupProps {
+    /** The entry to act on; the popup is hidden while this is null. */
+    entry: BlockEntry | null;
     onClose: () => void;
-    setRemoveSelectedWebsites: React.Dispatch<React.SetStateAction<string | null>>;
-    getWebsitesData: () => void;
-    showError: () => void;
+    onConfirm: (entry: BlockEntry) => void | Promise<void>;
 }
 
-const PopupRemove: React.FC<PopupRemoveProps> = ({
-    url,
-    visible,
-    onClose,
-    setRemoveSelectedWebsites: setSelectedWebsites,
-    getWebsitesData,
-    showError,
-}) => {
-    const { isPassphraseEnabled } = usePassphrase();
-    const [showPassphrasePopup, setShowPassphrasePopup] = useState(false);
+const RemovePopup: React.FC<EntryPopupProps> = ({ entry, onClose, onConfirm }) => (
+    <BlurModal visible={entry !== null} onClose={onClose}>
+        <ThemedText size="large" weight="strong" align="center" style={styles.popupTitle}>
+            Remove this block?
+        </ThemedText>
+        <ThemedText align="center" color="muted">
+            <ThemedText color="accent" weight="strong">
+                {entry?.label}
+            </ThemedText>{' '}
+            will no longer be blocked.
+        </ThemedText>
+        <View style={styles.popupButtonsContainer}>
+            <ActionButton variant="cancel" onPress={onClose} />
+            <ActionButton variant="confirm" label="Remove" onPress={() => (entry ? onConfirm(entry) : undefined)} />
+        </View>
+    </BlurModal>
+);
 
-    const handleInitialConfirm = () => {
-        if (isPassphraseEnabled) {
-            setShowPassphrasePopup(true);
-        } else {
-            onConfirm();
-        }
-    };
-
-    const handlePassphraseConfirm = () => {
-        setShowPassphrasePopup(false);
-        onConfirm();
-    };
-
-    const onConfirm = async () => {
-        const success = await deleteBlockedWebsite(url);
-        if (success) {
-            haptics.success();
-            animateLayout();
-            setSelectedWebsites(null);
-            getWebsitesData();
-            onClose();
-        } else {
-            showError();
-        }
-    };
-
-    return (
-        <>
-            <BlurModal visible={visible} onClose={onClose}>
-                <ThemedText size="large" weight="strong" align="center" style={styles.popupTitle}>
-                    Remove this site?
-                </ThemedText>
-                <ThemedText align="center" color="muted">
-                    <ThemedText color="accent" weight="strong">
-                        {url}
-                    </ThemedText>{' '}
-                    will no longer be blocked.
-                </ThemedText>
-                <View style={styles.popupButtonsContainer}>
-                    <ActionButton variant="cancel" onPress={onClose} />
-                    <ActionButton variant="confirm" label="Remove" onPress={handleInitialConfirm} />
-                </View>
-            </BlurModal>
-
-            <PassphrasePopup
-                visible={showPassphrasePopup}
-                onClose={() => setShowPassphrasePopup(false)}
-                onConfirm={handlePassphraseConfirm}
-            />
-        </>
-    );
-};
-
-interface PopupVisibleProps {
-    onClose: () => void;
-    visible: boolean;
-    url: string;
-    setHideSelectedWebsite: React.Dispatch<React.SetStateAction<string | null>>;
-    getWebsitesData: () => void;
-    showError: () => void;
-}
-
-const PopupHide: React.FC<PopupVisibleProps> = ({
-    onClose,
-    visible,
-    url,
-    setHideSelectedWebsite,
-    getWebsitesData,
-    showError,
-}) => {
-    const onConfirm = async () => {
-        const success = await hideBlockedWebsite(url);
-        if (success) {
-            haptics.success();
-            animateLayout();
-            setHideSelectedWebsite(null);
-            getWebsitesData();
-            onClose();
-        } else {
-            showError();
-        }
-    };
-
-    return (
-        <BlurModal visible={visible} onClose={onClose}>
-            <ThemedText size="large" weight="strong" align="center" style={styles.popupTitle}>
-                Hide{' '}
-                <ThemedText size="large" weight="strong" color="accent">
-                    {url}
-                </ThemedText>
-                ?
+const HidePopup: React.FC<EntryPopupProps> = ({ entry, onClose, onConfirm }) => (
+    <BlurModal visible={entry !== null} onClose={onClose}>
+        <ThemedText size="large" weight="strong" align="center" style={styles.popupTitle}>
+            Hide{' '}
+            <ThemedText size="large" weight="strong" color="accent">
+                {entry?.label}
             </ThemedText>
-            <ThemedText color="muted" align="center">
-                It stays blocked but disappears from this list.
-            </ThemedText>
-            <ThemedText size="small" weight="strong" color="primaryRed" align="center" style={styles.warning}>
-                Once hidden, you won’t be able to remove it unless you clear the app’s data through your device
-                settings!
-            </ThemedText>
-            <View style={styles.popupButtonsContainer}>
-                <ActionButton variant="cancel" onPress={onClose} />
-                <ActionButton variant="confirm" label="Hide" onPress={onConfirm} />
-            </View>
-        </BlurModal>
-    );
-};
+            ?
+        </ThemedText>
+        <ThemedText color="muted" align="center">
+            It stays blocked but disappears from this list.
+        </ThemedText>
+        <ThemedText size="small" weight="strong" color="primaryRed" align="center" style={styles.warning}>
+            Once hidden, you won’t be able to remove it unless you clear the app’s data through your device settings!
+        </ThemedText>
+        <View style={styles.popupButtonsContainer}>
+            <ActionButton variant="cancel" onPress={onClose} />
+            <ActionButton variant="confirm" label="Hide" onPress={() => (entry ? onConfirm(entry) : undefined)} />
+        </View>
+    </BlurModal>
+);
 
 const styles = StyleSheet.create({
     scrollContainer: {
@@ -454,13 +379,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         marginHorizontal: spacing.md - 4,
         marginTop: spacing.sm,
-    },
-    statTile: {
-        flex: 1,
-        marginHorizontal: 4,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.md,
-        borderRadius: shapes.borderRadius.medium,
     },
     search: {
         marginHorizontal: spacing.md,

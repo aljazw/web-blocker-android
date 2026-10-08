@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from '../components/Icon';
 import HomeScreen from '../screens/HomeScreen';
+import HabitsScreen from '../screens/HabitsScreen';
 import BlockScreen from '../screens/BlockScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import { useTheme } from '../context/ThemeContext';
@@ -11,7 +12,8 @@ const Tab = createBottomTabNavigator();
 
 const TAB_LABELS: Record<string, string> = {
     Home: 'Overview',
-    Block: 'Add site',
+    Habits: 'Habits',
+    Block: 'Block',
     Settings: 'Settings',
 };
 
@@ -22,6 +24,7 @@ const BottomTabNavigator: React.FC = () => {
         <Tab.Navigator
             screenOptions={({ route }) => ({
                 headerShown: false,
+                tabBarHideOnKeyboard: true,
                 tabBarLabel: TAB_LABELS[route.name] ?? route.name,
                 tabBarActiveTintColor: theme.colors.accent,
                 tabBarInactiveTintColor: theme.colors.muted,
@@ -40,6 +43,7 @@ const BottomTabNavigator: React.FC = () => {
                 ),
             })}>
             <Tab.Screen name="Home" component={HomeScreen} />
+            <Tab.Screen name="Habits" component={HabitsScreen} />
             <Tab.Screen name="Block" component={BlockScreen} />
             <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>

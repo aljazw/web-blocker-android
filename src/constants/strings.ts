@@ -22,29 +22,6 @@ export const UNINSTALL_PREVENTION = {
     },
 };
 
-export const DNS_PROTECTION = {
-    title: 'Enable DNS blocking (network layer)?\n\n',
-    text:
-        'This adds a second layer of protection using a local VPN on your device. It keeps blocking your ' +
-        'always-blocked sites (Full Week + All Day Long) even if you turn the accessibility service off.\n\n' +
-        'Android will ask you to allow a VPN connection, and you’ll see a key icon in the status bar while it’s on. ' +
-        'All filtering happens on-device — no traffic leaves your phone through us.\n\n' +
-        'Note: sites with a schedule (specific days or hours) are NOT added here; those stay handled by the ' +
-        'accessibility service.',
-};
-
-export const ALWAYS_ON_VPN = {
-    title: 'Make DNS blocking permanent?\n\n',
-    text:
-        'This opens Android’s VPN settings. For the strongest protection:\n\n' +
-        '1. Tap the gear next to "SiteLock".\n' +
-        '2. Turn on "Always-on VPN".\n' +
-        '3. Turn on "Block connections without VPN".\n\n' +
-        'After this, the DNS filter restarts on boot and all internet is blocked whenever it’s off — so it ' +
-        'can’t be dropped with a couple of quick taps.\n\n' +
-        '(Enable DNS Blocking first if you haven’t.)',
-};
-
 export const ERRORS = {
     uninstallPrevention: {
         title: 'Uninstall Prevention Error',
@@ -54,9 +31,9 @@ export const ERRORS = {
         title: 'Data Load Error',
         text: 'We couldn’t access your blocked websites. Please try again later.',
     },
-    invalidUrl: {
-        title: 'Invalid URL',
-        text: 'The subdirectory does not exist.',
+    saveFailed: {
+        title: 'Couldn’t save that change',
+        text: 'Nothing was changed. Please try again.',
     },
     genericRetrieveError: {
         title: 'Oops! Something went wrong',
@@ -75,8 +52,6 @@ export const UNBLOCK_MESSAGES = [
     'Unlocked Now resist the urge to turn that quick peek into a deep dive Your future self will thank you for staying focused today',
     'Freedom tastes sweet but so does crushing your goals Unblock wisely and keep slaying that productivity game',
 ];
-
-export const SAMPLE_TEXTS = ['Hello world', 'React Native is cool', 'Keep coding!', 'This is a sample text'];
 
 export const ACCESSIBILITY_NOTIFICATION_TEXT = `🔧 Please enable Accessibility Service for SiteLock:
 

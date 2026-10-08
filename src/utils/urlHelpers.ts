@@ -28,3 +28,16 @@ export const isValidWebsiteInput = (value: string): boolean => {
     // one or more labels (letters/digits/hyphens) followed by a 2+ letter TLD
     return /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(domain);
 };
+
+/**
+ * Turns whatever the user typed into the canonical form we store, or null if
+ * it isn't a website. Lowercased, no scheme, no "www.", no trailing slash —
+ * so "https://www.YouTube.com/" and "youtube.com" are the same block.
+ */
+export const toBlockableUrl = (input: string): string | null => {
+    const trimmed = input.trim().toLowerCase();
+    if (!isValidWebsiteInput(trimmed)) {
+        return null;
+    }
+    return denormalizeUrl(normalizeUrl(trimmed)).replace(/\/+$/, '');
+};

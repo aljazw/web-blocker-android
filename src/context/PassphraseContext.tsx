@@ -1,5 +1,6 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { getPassphrasePreference, setPassphrasePreference } from '../utils/storage';
+import { logger } from '../utils/logger';
 
 type PassphraseContextType = {
     isPassphraseEnabled: boolean;
@@ -10,36 +11,27 @@ const PassphraseContext = createContext<PassphraseContextType | undefined>(undef
 
 export const PassphraseProvider = ({ children }: { children: ReactNode }) => {
     const [isPassphraseEnabled, setIsPassphraseEnabled] = useState(false);
+    // Latest value for the toggle, so it never acts on a stale render.
+    const current = useRef(isPassphraseEnabled);
+    current.current = isPassphraseEnabled;
 
     useEffect(() => {
-        const loadPassphrasePreference = async () => {
-            const saved = await getPassphrasePreference();
-            if (saved === null) {
-                await setPassphrasePreference(false);
-            } else {
-                setIsPassphraseEnabled(saved);
-            }
-        };
-        loadPassphrasePreference();
+        getPassphrasePreference()
+            .then(saved => {
+                if (saved !== null) setIsPassphraseEnabled(saved);
+            })
+            .catch(error => logger.warn('Could not load passphrase preference', error));
     }, []);
 
-    const togglePassphrase = async () => {
-        setIsPassphraseEnabled(prev => {
-            const next = !prev;
-            setPassphrasePreference(next);
-            return next;
-        });
-    };
+    const togglePassphrase = useCallback(() => {
+        const next = !current.current;
+        setIsPassphraseEnabled(next);
+        setPassphrasePreference(next).catch(error => logger.warn('Could not save passphrase preference', error));
+    }, []);
 
-    return (
-        <PassphraseContext.Provider
-            value={{
-                isPassphraseEnabled,
-                togglePassphrase,
-            }}>
-            {children}
-        </PassphraseContext.Provider>
-    );
+    const value = useMemo(() => ({ isPassphraseEnabled, togglePassphrase }), [isPassphraseEnabled, togglePassphrase]);
+
+    return <PassphraseContext.Provider value={value}>{children}</PassphraseContext.Provider>;
 };
 
 export const usePassphrase = () => {

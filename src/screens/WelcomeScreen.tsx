@@ -14,7 +14,8 @@ interface WelcomeScreenProps {
 }
 
 const HIGHLIGHTS = [
-    { title: 'Block on your terms', text: 'All day, work hours, bedtime — you pick when.' },
+    { title: 'Block on your terms', text: 'Sites and apps — all day, work hours, bedtime. You pick when.' },
+    { title: 'Build habits that stick', text: 'Daily check-ins, streaks and reminders that keep you going.' },
     { title: 'Hard to switch off', text: 'Passphrase, uninstall prevention and a watchdog keep you honest.' },
     { title: 'Private by design', text: 'Everything runs on your phone. No accounts, no tracking.' },
 ];
@@ -37,7 +38,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
                         SiteLock
                     </ThemedText>
                     <ThemedText align="center" color="muted" style={styles.subtitle}>
-                        Take back your focus. Block distracting websites — and make it stick.
+                        Take back your focus. Block distracting websites and apps — and make it stick.
                     </ThemedText>
                 </FadeIn>
 

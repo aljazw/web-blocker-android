@@ -10,6 +10,12 @@ class BlockedPageActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val blockedApp = intent.getStringExtra("blocked_app_name")
+        if (blockedApp != null) {
+            showAppBlocked(blockedApp)
+            return
+        }
+
         val blockedUrl = intent.getStringExtra("blocked_url") ?: "This site"
         val packageName = intent.getStringExtra("package_name") ?: "com.android.chrome"
 
@@ -26,6 +32,40 @@ class BlockedPageActivity : Activity() {
                 onPrimary = { leave(packageName) },
             ),
         )
+    }
+
+    /** Block page for an app: the only way out is the home screen. */
+    private fun showAppBlocked(appName: String) {
+        appBlocked = true
+        SiteLockScreen.show(
+            this,
+            SiteLockScreen.Spec(
+                iconRes = R.drawable.ic_ban,
+                tone = SiteLockScreen.Tone.DANGER,
+                eyebrow = "Blocked by SiteLock",
+                title = appName,
+                body = "This app is on your block list right now.",
+                quote = "“Don’t trade what you want most for what you want right now.”",
+                primaryLabel = "Go to home screen",
+                onPrimary = { goHome() },
+            ),
+        )
+    }
+
+    private var appBlocked = false
+
+    // Back must not drop the user into the blocked app.
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (appBlocked) goHome() else @Suppress("DEPRECATION") super.onBackPressed()
+    }
+
+    private fun goHome() {
+        startActivity(Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        })
+        finish()
     }
 
     private fun leave(packageName: String) {

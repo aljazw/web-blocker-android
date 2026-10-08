@@ -16,15 +16,26 @@ import java.time.format.DateTimeFormatter
 
 class BlockAccessibilityService : AccessibilityService() {
 
+    // Gson ignores Kotlin null-safety, so every stored field is nullable here and
+    // entries missing required fields are skipped instead of crashing later.
     data class BlockedWebsite(
-        val days: String,
-        val time: String,
-        val websiteUrl: String,
-        val visible: Boolean
+        val days: String? = null,
+        val time: String? = null,
+        val websiteUrl: String? = null,
+        val visible: Boolean? = null
     )
 
-    /** A blocked site with its schedule parsed once, when the list is loaded. */
+    data class BlockedApp(
+        val days: String? = null,
+        val time: String? = null,
+        val packageName: String? = null,
+        val appName: String? = null,
+        val visible: Boolean? = null
+    )
+
+    /** A blocked site or app with its schedule parsed once, when the list is loaded. */
     private class ParsedBlock(
+        /** Website URL, or the app's display name for app blocks. */
         val url: String,
         val days: Set<String>,
         val start: LocalTime?,
@@ -45,25 +56,31 @@ class BlockAccessibilityService : AccessibilityService() {
 
     // Default to an empty list to avoid UninitializedPropertyAccessException crashes
     private var blockedList: List<ParsedBlock> = emptyList()
+    /** Blocked apps keyed by package name, for an O(1) lookup on every event. */
+    private var blockedApps: Map<String, ParsedBlock> = emptyMap()
     private lateinit var sharedPref: SharedPreferences
 
     private var lastProcessedTime: Long = 0
     private var lastGuardTime: Long = 0
+    private var lastAppBlockTime: Long = 0
 
     companion object {
         private const val TAG = "BlockedService"
         private const val PREFS_NAME = "BlockedPrefs"
         private const val KEY_BLOCKED = "@blocked_websites"
+        private const val KEY_BLOCKED_APPS = "@blocked_apps"
         private const val FULL_WEEK = "Full Week"
         private const val ALL_DAY = "All Day Long"
         private const val APP_NAME = "SiteLock"
         private const val DEBOUNCE_INTERVAL = 500L
         private const val GUARD_DEBOUNCE = 1500L
+        private const val APP_BLOCK_DEBOUNCE = 800L
         private const val MAX_DETAIL_CLICKABLE = 3
         private const val MAX_TREE_DEPTH = 40
 
         private val gson = Gson()
-        private val listType = object : TypeToken<List<BlockedWebsite>>() {}.type
+        private val listType = object : TypeToken<List<BlockedWebsite?>>() {}.type
+        private val appListType = object : TypeToken<List<BlockedApp?>>() {}.type
         private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         private val timePattern = Regex("""^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$""")
         private val ALL_DAYS = setOf("mon", "tue", "wed", "thu", "fri", "sat", "sun")
@@ -76,8 +93,9 @@ class BlockAccessibilityService : AccessibilityService() {
     }
 
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == KEY_BLOCKED) {
-            loadBlockedList()
+        when (key) {
+            KEY_BLOCKED -> loadBlockedList()
+            KEY_BLOCKED_APPS -> loadBlockedApps()
         }
     }
 
@@ -86,6 +104,7 @@ class BlockAccessibilityService : AccessibilityService() {
         sharedPref = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         sharedPref.registerOnSharedPreferenceChangeListener(prefsListener)
         loadBlockedList()
+        loadBlockedApps()
 
         // Start the independent watchdog. From this moment, if the user ever
         // disables this service, the watchdog (a separate foreground service
@@ -132,8 +151,11 @@ class BlockAccessibilityService : AccessibilityService() {
         }
 
         blockedList = try {
-            gson.fromJson<List<BlockedWebsite>>(jsonData, listType)
-                ?.map(::parseBlock)
+            gson.fromJson<List<BlockedWebsite?>>(jsonData, listType)
+                ?.mapNotNull { item ->
+                    if (item == null || item.websiteUrl.isNullOrBlank()) null
+                    else parseSchedule(item.days, item.time, item.websiteUrl)
+                }
                 ?: emptyList()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse blocked list", e)
@@ -141,31 +163,81 @@ class BlockAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun parseBlock(item: BlockedWebsite): ParsedBlock {
-        val days = if (item.days == FULL_WEEK) {
-            ALL_DAYS
-        } else {
-            item.days.split(",").map { it.trim().trim('\'').lowercase() }.toSet()
+    private fun loadBlockedApps() {
+        val jsonData = sharedPref.getString(KEY_BLOCKED_APPS, null)
+        blockedApps = if (jsonData == null) {
+            emptyMap()
+        } else try {
+            gson.fromJson<List<BlockedApp?>>(jsonData, appListType)
+                ?.mapNotNull { item ->
+                    if (item == null || item.packageName.isNullOrBlank()) null
+                    else item.packageName to parseSchedule(item.days, item.time, item.appName ?: item.packageName)
+                }
+                ?.toMap()
+                ?: emptyMap()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse blocked apps", e)
+            emptyMap()
+        }
+    }
+
+    /**
+     * Parses one entry's schedule. Never throws: a bad time (e.g. "25:99") falls
+     * back to all day, so one damaged entry can't disable every other block.
+     */
+    private fun parseSchedule(daysText: String?, time: String?, label: String): ParsedBlock {
+        val days = when {
+            daysText == null || daysText == FULL_WEEK -> ALL_DAYS
+            else -> daysText.split(",").map { it.trim().trim('\'').lowercase() }.toSet()
         }
 
         var start: LocalTime? = null
         var end: LocalTime? = null
-        if (!item.time.equals(ALL_DAY, ignoreCase = true) && timePattern.matches(item.time)) {
-            val (startStr, endStr) = item.time.split("-").map { it.trim() }
-            start = LocalTime.parse(startStr, timeFormatter)
-            end = LocalTime.parse(endStr, timeFormatter)
+        if (time != null && !time.equals(ALL_DAY, ignoreCase = true) && timePattern.matches(time)) {
+            try {
+                val (startStr, endStr) = time.split("-").map { it.trim() }
+                start = LocalTime.parse(startStr, timeFormatter)
+                end = LocalTime.parse(endStr, timeFormatter)
+            } catch (e: Exception) {
+                Log.w(TAG, "Bad time range '$time' for $label, blocking all day", e)
+                start = null
+                end = null
+            }
         }
-        return ParsedBlock(item.websiteUrl, days, start, end)
+        return ParsedBlock(label, days, start, end)
     }
+
+    private fun today(): String = LocalDate.now().dayOfWeek.name.take(3).lowercase()
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+        // An uncaught exception here crashes the service, and Android then turns
+        // it off — silently disabling all protection. Never let that happen.
+        try {
+            handleEvent(event)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error while handling accessibility event", e)
+        }
+    }
 
+    private fun handleEvent(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString() ?: return
 
         if (isSettingsPackage(packageName)) {
             handleSettingsGuard()
             return
+        }
+
+        // A blocked app is on screen: cover it with the block page.
+        if (packageName != applicationContext.packageName) {
+            val app = blockedApps[packageName]
+            if (app != null && app.isActive(today(), LocalTime.now())) {
+                if (System.currentTimeMillis() - lastAppBlockTime > APP_BLOCK_DEBOUNCE) {
+                    lastAppBlockTime = System.currentTimeMillis()
+                    startBlockedAppActivity(packageName, app.url)
+                }
+                return
+            }
         }
 
         // Debounce browser evaluation
@@ -221,7 +293,7 @@ class BlockAccessibilityService : AccessibilityService() {
 
     /** First scheduled-active blocked site whose URL is shown in an unfocused URL bar. */
     private fun findBlockedMatch(root: AccessibilityNodeInfo): ParsedBlock? {
-        val currentDay = LocalDate.now().dayOfWeek.name.take(3).lowercase()
+        val currentDay = today()
         val now = LocalTime.now()
 
         for (item in blockedList) {
@@ -283,6 +355,15 @@ class BlockAccessibilityService : AccessibilityService() {
     @Suppress("DEPRECATION")
     private fun AccessibilityNodeInfo.recycleCompat() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) recycle()
+    }
+
+    private fun startBlockedAppActivity(packageName: String, appName: String) {
+        val intent = Intent()
+        intent.setClassName(applicationContext.packageName, BlockedPageActivity::class.java.name)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        intent.putExtra("blocked_app_name", appName)
+        intent.putExtra("package_name", packageName)
+        applicationContext.startActivity(intent)
     }
 
     private fun startBlockedActivity(url: String, packageName: String) {

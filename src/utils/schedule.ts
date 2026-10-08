@@ -1,5 +1,3 @@
-import { BlockedWebsitesData } from '../types/types';
-
 export const FULL_WEEK = 'Full Week';
 export const ALL_DAY = 'All Day Long';
 export const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -12,7 +10,7 @@ const toMinutes = (h: string, m: string) => parseInt(h, 10) * 60 + parseInt(m, 1
  * Mirrors BlockAccessibilityService: the site is blocked on its days, and within
  * its time range (start inclusive, end exclusive, may wrap past midnight).
  */
-export const isBlockActiveNow = (site: BlockedWebsitesData, now: Date = new Date()): boolean => {
+export const isBlockActiveNow = (site: { days: string; time: string }, now: Date = new Date()): boolean => {
     // JS getDay(): 0 = Sunday. Map to Mon..Sun labels.
     const today = WEEK_DAYS[(now.getDay() + 6) % 7].toLowerCase();
     const days =
@@ -50,3 +48,12 @@ export const describeDays = (days: string): string => {
 };
 
 export const describeTime = (time: string): string => (!time || time === ALL_DAY ? 'All day' : time);
+
+/** One-line schedule summary, e.g. "Always", "Weekdays · 09:00 - 17:00". */
+export const describeSchedule = (days: string, time: string): string => {
+    const allDay = !time || time === ALL_DAY;
+    if (days === FULL_WEEK && allDay) {
+        return 'Always';
+    }
+    return `${describeDays(days)} · ${describeTime(time)}`;
+};

@@ -7,7 +7,7 @@ interface ActionButtonProps {
     variant: ActionVariant;
     label?: string;
     style?: ViewStyle;
-    onPress: () => void;
+    onPress: () => void | Promise<unknown>;
 }
 
 /** Cancel / Confirm pair used at the bottom of popups. */
@@ -25,7 +25,6 @@ const styles = StyleSheet.create({
     button: {
         minWidth: 116,
         marginHorizontal: 6,
-        minHeight: 46,
     },
 });
 

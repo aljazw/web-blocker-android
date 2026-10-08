@@ -15,7 +15,7 @@ const BlurModal: React.FC<BlurModalProps> = ({ children, visible, onClose }) => 
     const { isDarkMode } = useTheme();
 
     return (
-        <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose} statusBarTranslucent>
+        <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
             <BlurView blurType={isDarkMode ? 'dark' : 'light'} blurAmount={12} style={styles.blurContainer}>
                 <View
                     style={[styles.scrim, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.35)' : 'rgba(17,21,39,0.15)' }]}
