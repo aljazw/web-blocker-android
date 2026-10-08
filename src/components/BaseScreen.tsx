@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StatusBar, StyleSheet, View } from 'react-native';
-import { spacing } from '../theme';
+import { gutter, spacing } from '../theme';
 import { ThemedText } from './ThemedText';
 import changeNavigationBarColor from 'react-native-navigation-bar-color';
 import { useTheme } from '../context/ThemeContext';
@@ -46,12 +46,12 @@ const BaseScreen: React.FC<BaseScreenProps> = ({
                     {headerLeft}
                     <View style={styles.titles}>
                         {title && (
-                            <ThemedText size="xlarge" weight="strong">
+                            <ThemedText size="xlarge" weight="bold" numberOfLines={1}>
                                 {title}
                             </ThemedText>
                         )}
                         {subtitle && (
-                            <ThemedText size="small" color="muted" style={styles.subtitle}>
+                            <ThemedText size="small" color="muted" style={styles.subtitle} numberOfLines={1}>
                                 {subtitle}
                             </ThemedText>
                         )}
@@ -74,9 +74,10 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: spacing.md + 4,
+        paddingHorizontal: gutter,
         paddingTop: spacing.md,
         paddingBottom: spacing.sm,
+        minHeight: 64,
     },
     titles: {
         flex: 1,

@@ -14,7 +14,9 @@ export async function checkAccessibilityEnabled(): Promise<boolean> {
 }
 
 export function openAccessibilitySettings() {
-    if (Platform.OS !== 'android') return;
+    if (Platform.OS !== 'android') {
+        return;
+    }
     try {
         IntentLauncher.startActivity('com.sitelock.OpenAccessibilityActivity');
     } catch (error) {

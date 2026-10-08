@@ -42,7 +42,9 @@ export const useHabits = () => {
      * rolls back if saving fails.
      */
     const toggleToday = useCallback(async (habit: Habit): Promise<ToggleResult> => {
-        if (pending.current.has(habit.id)) return { status: 'busy' };
+        if (pending.current.has(habit.id)) {
+            return { status: 'busy' };
+        }
         pending.current.add(habit.id);
 
         const updated = toggleCompletion(habit);

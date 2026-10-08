@@ -1,44 +1,55 @@
-# 🔒 SiteLock
+# SiteLock
 
-**SiteLock** is an Android focus and self-improvement app. It blocks the websites and apps that steal your time, and helps you build the habits you want, with streaks, reminders and a little celebration each time you show up. It's built with **React Native + TypeScript** and native **Kotlin** modules. Everything runs on your device: no accounts, no servers, no tracking.
+**SiteLock** is an Android focus and self-improvement app. It blocks the websites and apps that take your time, helps you build daily habits, and trains your breath-hold with freediving apnea tables. It's built with **React Native + TypeScript** and native **Kotlin** modules. Everything runs on your device: no accounts, no servers, no tracking.
 
-> ⚠️ **Android only.** SiteLock relies on Android Accessibility Services, `VpnService` and other Android-specific APIs.
+> **Android only.** SiteLock relies on Android Accessibility Services, `VpnService`, foreground services and other Android-specific APIs.
 
-## ✨ Features
+## Features
+
+### Apnea training
+
+-   **CO₂ and O₂ tables** generated from your personal best. A CO₂ table keeps the hold fixed (40–60% of your best) while the rest shrinks from 2:00 to 0:15. An O₂ table keeps a 2:00 rest while the hold grows to at most 85% of your best. Easy, Normal and Hard profiles, 4–12 rounds, every time snapped to 5 seconds.
+-   **Custom tables:** set your own rest and hold for each round, then save and reuse them.
+-   **Max-hold test:** an optional 1–3 minute breathe-up, then an open-ended hold with a live comparison to your best. You can also enter a time you measured elsewhere.
+-   **Runs with the app closed.** A native foreground service owns the session clock. It holds a wake lock, plays cues and shows a live notification with Pause, End hold and End session. If Android kills the app, the session is restored and continues where it left off.
+-   **Eyes-closed cues:** distinct tones and vibration patterns for hold and breathe, a 10-second warning, a 3-2-1 countdown, and an optional pulse every 30 s during a max hold.
+-   **Contraction tracking:** tap at each diaphragm contraction. History records the count and first-contraction time for every round.
+-   **Breathing exercises:** box breathing, breathe-up (1:2), 4-7-8 and resonance breathing, with an animated pacer.
+-   **Progress:** personal-best trend chart, weekly sessions and hold time, training streak, and full per-round history.
+-   **Safety first:** a one-time briefing (dry training only, no hyperventilation, never alone in water) before the first session.
 
 ### Habits
 
--   ✅ **Daily habits:** create tasks like "Workout 10 min", pick an emoji, and choose exactly which weekdays they're due.
--   🔥 **Streaks:** consecutive due days completed. Days off never break a streak, and today stays "pending" until it's over. Your best streak and total check-ins are tracked too.
--   🔔 **Reminders:** an optional notification at a time you choose, only on that habit's days.
--   🎉 **Motivation:** check-off animations, celebrations at 3, 7, 14, 30, 100+ day milestones, a "perfect day" moment, a weekly completion rate and a daily quote.
+-   **Daily habits** with an icon and the weekdays they're due.
+-   **Streaks:** consecutive due days completed. Days off never break a streak, and today stays pending until it's over. Best streak and a 7-day completion rate are tracked too.
+-   **Reminders:** an optional notification at a time you choose, only on that habit's days.
+-   **Automation:** a habit can complete itself when you finish an apnea session that day.
 
 ### Blocking
 
--   🔗 **Real-time URL blocking:** an Accessibility Service watches the address bar of Chrome, Firefox, Brave and Opera and redirects blocked sites to a block page.
--   📱 **App blocking:** block any installed app on the same schedules. Opening it shows the block page, and the only way out is the home screen. Settings and the phone dialer can't be blocked, so emergency calls always work.
--   🌐 **DNS filter (second layer):** an on-device VPN answers DNS lookups for always-blocked sites, so they stay blocked even if Accessibility is turned off. A guided wizard walks you through setup, and you can forward allowed sites to the system resolver or to AdGuard DNS to keep ad and tracker blocking.
--   ⏰ **Schedules:** block a site on chosen days and hours, including overnight ranges such as 22:00 to 07:00. Presets cover *Always*, *Work hours*, *Evenings*, *Bedtime* and *Weekends*.
--   ⚡ **Quick add:** one-tap suggestions for common distractions in Social, Video, Forums and Shopping.
+-   **Real-time URL blocking:** an Accessibility Service watches the address bar of Chrome, Firefox, Brave and Opera and redirects blocked sites to a block page.
+-   **App blocking:** block any installed app on the same schedules. Opening it shows the block page, and the only way out is the home screen. Settings and the phone dialer can't be blocked, so emergency calls always work.
+-   **DNS filter (second layer):** an on-device VPN answers DNS lookups for always-blocked sites, so they stay blocked even if Accessibility is turned off. A guided wizard walks you through setup, and allowed sites can be forwarded to the system resolver or to AdGuard DNS.
+-   **Schedules:** chosen days and hours, including overnight ranges such as 22:00 to 07:00, with presets for *Always*, *Work hours*, *Evenings*, *Bedtime* and *Weekends*.
 
 ### Making it stick
 
--   🐕 **Watchdog:** a separate foreground service notices the moment the Accessibility Service is switched off and shows a full-screen "turn protection back on" prompt.
--   🛡️ **Settings guard:** SiteLock's own Accessibility on/off page is guarded while protection is active.
--   🔁 **Restart after reboot:** protection layers restart after a reboot or an app update.
--   🔑 **Passphrase protection:** removing sites or weakening protection requires typing a long passphrase.
--   🚫 **Uninstall prevention:** SiteLock registers as a device admin so it can't be removed on impulse.
--   🙈 **Hidden sites:** you can hide a blocked site so it can't be removed from inside the app.
+-   **Watchdog:** a separate foreground service notices the moment the Accessibility Service is switched off and shows a full-screen prompt to turn it back on.
+-   **Settings guard:** SiteLock's own Accessibility toggle is guarded while protection is active.
+-   **Restart after reboot:** protection layers restart after a reboot or an app update.
+-   **Passphrase protection:** removing blocks or weakening protection requires typing a long passphrase.
+-   **Uninstall prevention:** SiteLock registers as a device admin so it can't be removed on impulse.
+-   **Hidden blocks:** a block can be hidden so it can't be removed from inside the app.
 
 ### App
 
--   📊 **Overview dashboard:** shows protection status, how many sites are blocked right now, and a searchable block list with each site's schedule.
--   🩺 **Protection health:** Settings shows which layers are active at a glance.
--   🎨 **Modern UI:** light and dark mode with six accent colors, crisp vector icons ([Lucide](https://lucide.dev)), smooth animations and light haptic feedback. The native block and re-enable screens match the app's theme and accent.
+-   **Overview:** protection status, today's habits, your apnea best and the searchable block list in one place.
+-   **Protection health:** Settings shows which layers are active at a glance.
+-   **Design:** a restrained, neutral design system in light and dark mode with six accent colors, tabular numerals for every timer and statistic, [Lucide](https://lucide.dev) icons and subtle motion. The native block screens match the app's theme.
 
-## 🛠️ Setup
+## Setup
 
-> 💡 First, set up your environment with the official [React Native Environment Setup Guide](https://reactnative.dev/docs/environment-setup) (choose the **React Native CLI** tab). The app targets Android 7.0+ (minSdk 24, targetSdk 35).
+> First, set up your environment with the official [React Native Environment Setup Guide](https://reactnative.dev/docs/environment-setup) (choose the **React Native CLI** tab). The app targets Android 7.0+ (minSdk 24, targetSdk 35).
 
 ```bash
 git clone https://github.com/aljazw/web-blocker-android.git
@@ -60,7 +71,7 @@ On first launch, follow the in-app steps to enable SiteLock under **Settings →
 
 If you get stuck, see the React Native [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
 
-## 🔐 Release build
+## Release build
 
 A debug build loads JavaScript from Metro and is signed with a throwaway key. For daily use, build a signed release APK:
 
@@ -92,27 +103,28 @@ A debug build loads JavaScript from Metro and is signed with a throwaway key. Fo
 
 > Debug and release builds are signed with different keys. To switch between them, uninstall first. This clears your block list.
 
-## 🗂️ Project structure
+## Project structure
 
 ```
 src/
-├── screens/      Overview (Home), Add site (Block), Schedule, Settings, Welcome
-├── components/   Design-system pieces: Button, Chip, SectionHeader, BlurModal, …
+├── screens/      Overview, Habits, Apnea (tables, session, history, settings), Block, Schedule, Settings
+├── components/   Design system: Card, ListGroup, Dialog, Button, StatTile, ProgressRing, Stepper, …
 ├── theme/        Light/dark palettes, accent colors, spacing & radius tokens
 ├── context/      Theme (dark mode + accent) and passphrase state
-├── hooks/        Screen logic: block list, protection status, app startup
-├── utils/        Storage, schedule logic and native-module bridges
-└── constants/    UI strings and quick-add suggestions
+├── hooks/        Screen logic: block list, habits, apnea data and live session, protection status
+├── utils/        Pure logic (schedules, streaks, apnea tables and stats), storage, native bridges
+└── constants/    UI strings, safety copy, habit icons and quick-add suggestions
 
 android/app/src/main/java/com/sitelock/
 ├── BlockAccessibilityService.kt   URL detection and settings guard
 ├── DnsVpnService.kt               On-device DNS filter
 ├── WatchdogService.kt             Re-enable prompt when protection is turned off
 ├── BootReceiver.kt                Restarts layers after reboot or update
+├── apnea/                         Session timeline, cue player and foreground service
 └── modules/ + *Module.kt          React Native bridges
 ```
 
-## 🤖 Built with Claude Code
+## Built with Claude Code
 
 SiteLock started as a hand-written learning project. From February 2025 to September 2026 I built the core myself: the React Native UI, the Accessibility-based blocker, schedules, the passphrase, dark mode and device-admin uninstall prevention. That work runs through commit `091096d`.
 
@@ -120,13 +132,15 @@ After that, I continued development with [Claude Code](https://claude.com/claude
 
 1. **Protection layers.** In an earlier Claude Code session we added the watchdog service, the settings-page guard, the full-screen re-enable prompt, the DNS-filtering VPN with its setup wizard, the AdGuard upstream option, and restarting protection on boot.
 2. **Code review and fixes** (commit `9a38a4a`). Claude reviewed `BlockAccessibilityService.kt` and fixed several bugs: schedule start times are now inclusive, deleted sites are unblocked immediately, and accessibility nodes are recycled to avoid leaks on Android 12 and below. It also refactored event handling so schedules are parsed once instead of on every screen event.
-3. **Redesign and new features.** We built a new design system with deeper dark and light palettes, rounded cards, pill buttons and selectable accent colors. Every screen was rebuilt on it, with Lucide vector icons, spring and fade animations, haptics, and restyled native block screens. Settings became scrollable on small phones, and we added the Overview dashboard, block-list search, quick-add suggestions, schedule presets and the protection-health summary.
+3. **Redesign and new features.** We built a first design system with selectable accent colors, Lucide icons, animations and haptics, made Settings scrollable on small phones, and added the Overview dashboard, block-list search, quick-add suggestions, schedule presets and the protection-health summary.
+4. **Habits and app blocking** (commit `35566e2`). Daily habits with streaks and reminders, blocking installed apps on the same schedules as websites, and a refactor into shared hooks and pure, unit-tested logic.
+5. **Apnea training and a professional redesign.** A Kotlin foreground service runs CO₂/O₂ tables, max-hold tests and breathing exercises with the app closed, with tested table generation and statistics. The whole app moved to a restrained design system: neutral palette, tabular numerals, list groups and standard dialogs instead of emoji and confetti.
 
-## 🤝 Contributing
+## Contributing
 
 _I'm still learning and this project is a work in progress. If you spot messy code, bad practices or things that could be done better, please jump in!_
 _Code improvements, performance tips and cleanups are all welcome, as suggestions or pull requests._
 
-## 📄 License
+## License
 
 _This project is licensed under the [Apache License 2.0](LICENSE)._

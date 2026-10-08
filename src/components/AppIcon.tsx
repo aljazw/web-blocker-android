@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, StyleProp, View, ViewStyle } from 'react-native';
+import { Image, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { getAppIcon } from '../utils/installedApps';
 import { useTheme } from '../context/ThemeContext';
 import Icon from './Icon';
@@ -25,12 +25,19 @@ const AppIcon: React.FC<AppIconProps> = ({ packageName, size = 24, style }) => {
 
     if (!uri) {
         return (
-            <View style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}>
+            <View style={[styles.placeholder, { width: size, height: size }, style]}>
                 <Icon name="Apps" size={size * 0.8} tint={theme.colors.muted} />
             </View>
         );
     }
     return <Image source={{ uri }} style={[{ width: size, height: size }, style as object]} />;
 };
+
+const styles = StyleSheet.create({
+    placeholder: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+});
 
 export default AppIcon;

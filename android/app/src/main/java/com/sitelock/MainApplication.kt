@@ -17,6 +17,7 @@ import com.sitelock.modules.AccessibilityStatusPackage
 import com.sitelock.modules.IntentLauncherPackage
 import com.sitelock.modules.DeviceAdminPackage
 import com.sitelock.modules.InstalledAppsPackage
+import com.sitelock.apnea.ApneaPackage
 
 
 
@@ -36,6 +37,7 @@ class MainApplication : Application(), ReactApplication {
               add(OverlayPackage())
               add(WatchdogPackage())
               add(InstalledAppsPackage())
+              add(ApneaPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

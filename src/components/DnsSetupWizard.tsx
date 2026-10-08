@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import BlurModal from './BlurModal';
 import { ThemedText } from './ThemedText';
 import { spacing } from '../theme';
@@ -45,21 +45,21 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
 
     return (
         <BlurModal visible={visible} onClose={finish}>
-            <ThemedText size="small" opacity="faded" align="center" style={styles.counter}>
+            <ThemedText size="tiny" weight="strong" color="muted" caps style={styles.counter}>
                 Step {step + 1} of {TOTAL_STEPS}
             </ThemedText>
 
             {step === 0 && (
                 <>
-                    <ThemedText weight="strong" size="large" align="center" style={styles.title}>
+                    <ThemedText weight="bold" size="large" style={styles.title}>
                         1. Turn on the DNS filter
                     </ThemedText>
-                    <ThemedText align="center" style={styles.body}>
-                        This starts the on-device filter. Android will ask you to allow a VPN connection — tap{' '}
+                    <ThemedText color="muted" style={styles.body}>
+                        This starts the on-device filter. Android will ask you to allow a VPN connection; tap{' '}
                         <ThemedText weight="strong">OK</ThemedText>. Nothing leaves your phone.
                     </ThemedText>
                     {enableError && (
-                        <ThemedText color="primaryRed" align="center" size="small" style={styles.body}>
+                        <ThemedText color="primaryRed" size="small" style={styles.body}>
                             {enableError}
                         </ThemedText>
                     )}
@@ -73,31 +73,31 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
 
             {step === 1 && (
                 <>
-                    <ThemedText weight="strong" size="large" align="center" style={styles.title}>
+                    <ThemedText weight="bold" size="large" style={styles.title}>
                         2. Turn OFF Private DNS
                     </ThemedText>
-                    <ThemedText align="center" style={styles.body}>
-                        Private DNS encrypts your lookups so the filter can’t read them. I’ll open the page — set it to{' '}
+                    <ThemedText color="muted" style={styles.body}>
+                        Private DNS encrypts lookups so the filter can’t read them. Open the page, set it to{' '}
                         <ThemedText weight="strong">Off</ThemedText>, then come back here.
                     </ThemedText>
-                    <ThemedText align="center" size="small" color="accent" style={styles.body}>
-                        Used AdGuard here? You won’t lose it — after setup, set “Allowed-sites resolver” to AdGuard in
-                        Settings and you keep ad/tracker blocking too.
+                    <ThemedText size="small" color="accent" style={styles.body}>
+                        Used AdGuard as Private DNS? After setup, set “Allowed-sites resolver” to AdGuard in Settings to
+                        keep ad and tracker blocking.
                     </ThemedText>
                     <SecondaryButton label="Open Private DNS settings" onPress={() => openPrivateDnsSettings()} />
-                    <PrimaryButton label="I set it to Off — Next" onPress={() => setStep(2)} />
+                    <PrimaryButton label="It's off. Next" onPress={() => setStep(2)} />
                     <BackButton onPress={() => setStep(0)} />
                 </>
             )}
 
             {step === 2 && (
                 <>
-                    <ThemedText weight="strong" size="large" align="center" style={styles.title}>
+                    <ThemedText weight="bold" size="large" style={styles.title}>
                         3. Turn off Chrome’s Secure DNS
                     </ThemedText>
-                    <ThemedText align="center" style={styles.body}>
-                        Chrome can run its own encrypted DNS. In Chrome: ⋮ → Settings → Privacy and security →{' '}
-                        <ThemedText weight="strong">Use secure DNS → Off</ThemedText>. Skip if you don’t use Chrome.
+                    <ThemedText color="muted" style={styles.body}>
+                        Chrome can run its own encrypted DNS. In Chrome open Settings, Privacy and security,{' '}
+                        <ThemedText weight="strong">Use secure DNS: Off</ThemedText>. Skip this if you don’t use Chrome.
                     </ThemedText>
                     <PrimaryButton label="Next" onPress={() => setStep(3)} />
                     <BackButton onPress={() => setStep(1)} />
@@ -106,11 +106,11 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
 
             {step === 3 && (
                 <>
-                    <ThemedText weight="strong" size="large" align="center" style={styles.title}>
+                    <ThemedText weight="bold" size="large" style={styles.title}>
                         4. Make it permanent
                     </ThemedText>
-                    <ThemedText align="center" style={styles.body}>
-                        So it can’t be dropped in a couple taps. I’ll open VPN settings — tap the gear next to{' '}
+                    <ThemedText color="muted" style={styles.body}>
+                        So it can’t be switched off in a couple of taps. In VPN settings, tap the gear next to{' '}
                         <ThemedText weight="strong">SiteLock</ThemedText>, then turn on{' '}
                         <ThemedText weight="strong">Always-on VPN</ThemedText> and{' '}
                         <ThemedText weight="strong">Block connections without VPN</ThemedText>.
@@ -135,11 +135,7 @@ const SecondaryButton: React.FC<{ label: string; onPress: () => void }> = ({ lab
 );
 
 const BackButton: React.FC<{ onPress: () => void }> = ({ onPress }) => (
-    <Pressable onPress={onPress} style={styles.backBtn}>
-        <ThemedText size="small" color="muted">
-            Back
-        </ThemedText>
-    </Pressable>
+    <Button variant="ghost" compact label="Back" onPress={onPress} style={styles.button} />
 );
 
 const styles = StyleSheet.create({
@@ -155,11 +151,6 @@ const styles = StyleSheet.create({
     button: {
         alignSelf: 'stretch',
         marginTop: spacing.xs + 2,
-    },
-    backBtn: {
-        alignItems: 'center',
-        paddingVertical: 10,
-        marginTop: spacing.xs,
     },
 });
 

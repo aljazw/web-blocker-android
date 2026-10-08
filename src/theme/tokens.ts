@@ -7,11 +7,14 @@ export const spacing = {
     xxl: 60,
 };
 
+/** Horizontal page margin shared by every screen. */
+export const gutter = spacing.md;
+
 export const shapes = {
     borderRadius: {
-        small: 10,
-        medium: 16,
-        large: 24,
+        small: 6,
+        medium: 10,
+        large: 14,
         pill: 999,
     },
     borderWidth: {

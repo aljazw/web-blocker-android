@@ -1,12 +1,14 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
 import React, { useState } from 'react';
-import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { RootStackNavigation, RootStackParamList } from '../types/types';
 import TimeInput from '../components/TimeInput';
-import ActionButton from '../components/ActionButton';
-import BlurModal from '../components/BlurModal';
 import Button from '../components/Button';
+import Card from '../components/Card';
+import Dialog, { confirmActions } from '../components/Dialog';
+import IconTile from '../components/IconTile';
+import { KeyValueRow } from '../components/ListGroup';
 import Chip from '../components/Chip';
 import Segmented from '../components/Segmented';
 import DayPicker from '../components/DayPicker';
@@ -14,13 +16,12 @@ import BackButton from '../components/BackButton';
 import AppIcon from '../components/AppIcon';
 import Favicon from '../components/Favicon';
 import SectionHeader from '../components/SectionHeader';
-import { shapes, spacing } from '../theme';
+import { gutter, spacing } from '../theme';
 import { ThemedText } from '../components/ThemedText';
-import { ThemedView } from '../components/ThemedView';
 import { addBlockedApp, addBlockedWebsite } from '../utils/storage';
 import ErrorPopup from '../components/ErrorPopup';
-import { useTheme } from '../context/ThemeContext';
-import { ALL_DAY, FULL_WEEK, WEEK_DAYS, describeDays } from '../utils/schedule';
+import { ALL_DAY, buildSchedule, describeDays } from '../utils/schedule';
+import { ERRORS } from '../constants/strings';
 import { FadeIn, animateLayout } from '../components/Motion';
 import { haptics } from '../utils/haptics';
 
@@ -43,7 +44,6 @@ const PRESETS: Preset[] = [
 ];
 
 const ScheduleScreen: React.FC = () => {
-    const { theme } = useTheme();
     const navigation = useNavigation<RootStackNavigation>();
     type ScheduleScreenRouteProp = RouteProp<RootStackParamList, 'Schedule'>;
 
@@ -59,16 +59,7 @@ const ScheduleScreen: React.FC = () => {
     const [endHour, setEndHour] = useState<string>('');
     const [endMinutes, setEndMinutes] = useState<string>('');
 
-    const [popupVisible, setPopupVisible] = useState(false);
-    const [errorPopupVisible, setErrorPopupVisible] = useState(false);
-    const [errorTitle, setErrorTitle] = useState('');
-    const [errorText, setErrorText] = useState('');
-
-    const showError = (title: string, text: string) => {
-        setErrorTitle(title);
-        setErrorText(text);
-        setErrorPopupVisible(true);
-    };
+    const [dialog, setDialog] = useState<'review' | 'error' | null>(null);
 
     const applyPreset = (preset: Preset) => {
         animateLayout();
@@ -87,35 +78,13 @@ const ScheduleScreen: React.FC = () => {
 
     const isPresetActive = (preset: Preset) => {
         const sameDays = preset.days.every((v, i) => v === selectedDays[i]);
-        if (!sameDays) return false;
-        if (!preset.time) return !customTime;
+        if (!sameDays) {
+            return false;
+        }
+        if (!preset.time) {
+            return !customTime;
+        }
         return customTime && [startHour, startMinutes, endHour, endMinutes].join() === preset.time.join();
-    };
-
-    const getSelectedDaysText = () => {
-        if (selectedDays.every(selectedDay => selectedDay)) {
-            return FULL_WEEK;
-        }
-        return WEEK_DAYS.filter((_, index) => selectedDays[index]).join(', ');
-    };
-
-    const getSelectedTimeText = () => {
-        if (!customTime || !startHour || !startMinutes || !endHour || !endMinutes) {
-            return ALL_DAY;
-        }
-
-        // Ensure the start and end times are valid (hours between 00-23, minutes between 00-59)
-        if (
-            parseInt(startHour, 10) > 23 ||
-            parseInt(startMinutes, 10) > 59 ||
-            parseInt(endHour, 10) > 23 ||
-            parseInt(endMinutes, 10) > 59
-        ) {
-            return 'Invalid Time';
-        }
-
-        const pad = (v: string) => v.padStart(2, '0');
-        return `${pad(startHour)}:${pad(startMinutes)} - ${pad(endHour)}:${pad(endMinutes)}`;
     };
 
     const clearTime = () => {
@@ -127,24 +96,31 @@ const ScheduleScreen: React.FC = () => {
         setCustomTime(false);
     };
 
-    const daysText = getSelectedDaysText();
-    const timeText = getSelectedTimeText();
-    const noDays = !selectedDays.some(Boolean);
-    const incompleteTime = customTime && [startHour, startMinutes, endHour, endMinutes].some(v => v.length === 0);
-    const toMinutes = (h: string, m: string) => parseInt(h || '0', 10) * 60 + parseInt(m || '0', 10);
-    const startTotal = toMinutes(startHour, startMinutes);
-    const endTotal = toMinutes(endHour, endMinutes);
-    const sameStartEnd = customTime && !incompleteTime && startTotal === endTotal;
-    const overnight = customTime && !incompleteTime && timeText !== 'Invalid Time' && endTotal < startTotal;
-    const problem = noDays
-        ? 'Pick at least one day.'
-        : timeText === 'Invalid Time'
-        ? 'That time isn’t valid.'
-        : incompleteTime
-        ? 'Fill in both start and end times, or choose “All day”.'
-        : sameStartEnd
-        ? 'Start and end time can’t be the same.'
-        : null;
+    const save = async () => {
+        const success = app
+            ? await addBlockedApp({
+                  days: daysText,
+                  time: timeText,
+                  packageName: app.packageName,
+                  appName: app.appName,
+                  visible: true,
+              })
+            : await addBlockedWebsite({ days: daysText, time: timeText, websiteUrl: websiteUrl ?? '', visible: true });
+        if (success) {
+            haptics.success();
+            setDialog(null);
+            navigation.navigate('BottomTabs', { screen: 'Home' });
+        } else {
+            setDialog('error');
+        }
+    };
+
+    const {
+        days: daysText,
+        time: timeText,
+        problem,
+        overnight,
+    } = buildSchedule(selectedDays, customTime ? { startHour, startMinutes, endHour, endMinutes } : null);
 
     return (
         <BaseScreen
@@ -153,14 +129,14 @@ const ScheduleScreen: React.FC = () => {
             headerLeft={<BackButton />}>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 <FadeIn>
-                    <ThemedView withBorder style={styles.siteCard}>
-                        <View style={[styles.faviconWrap, { backgroundColor: theme.colors.elevated }]}>
+                    <Card style={styles.siteCard}>
+                        <IconTile size={44} style={styles.leading}>
                             {app ? (
-                                <AppIcon packageName={app.packageName} size={30} />
+                                <AppIcon packageName={app.packageName} size={28} />
                             ) : (
-                                <Favicon url={targetLabel} size={26} />
+                                <Favicon url={targetLabel} size={24} />
                             )}
-                        </View>
+                        </IconTile>
                         <View style={styles.flex}>
                             <ThemedText size="large" weight="strong" numberOfLines={1}>
                                 {targetLabel}
@@ -169,7 +145,7 @@ const ScheduleScreen: React.FC = () => {
                                 {app ? 'New app block' : 'New website block'}
                             </ThemedText>
                         </View>
-                    </ThemedView>
+                    </Card>
                 </FadeIn>
 
                 <FadeIn delay={70}>
@@ -187,16 +163,16 @@ const ScheduleScreen: React.FC = () => {
                 </FadeIn>
                 <FadeIn delay={140}>
                     <SectionHeader title="Days" />
-                    <ThemedView withBorder style={styles.card}>
+                    <Card>
                         <DayPicker value={selectedDays} onChange={setSelectedDays} />
                         <ThemedText size="small" color="muted" align="center" style={styles.cardFoot}>
-                            {noDays ? 'No days selected' : describeDays(daysText)}
+                            {selectedDays.some(Boolean) ? describeDays(daysText) : 'No days selected'}
                         </ThemedText>
-                    </ThemedView>
+                    </Card>
                 </FadeIn>
                 <FadeIn delay={210}>
                     <SectionHeader title="Time" />
-                    <ThemedView withBorder style={styles.card}>
+                    <Card>
                         <Segmented
                             options={[
                                 { value: 'all', label: 'All day' },
@@ -229,7 +205,7 @@ const ScheduleScreen: React.FC = () => {
                                 Runs overnight, past midnight.
                             </ThemedText>
                         )}
-                    </ThemedView>
+                    </Card>
                 </FadeIn>
                 {problem && (
                     <ThemedText size="small" color="primaryRed" align="center" style={styles.problem}>
@@ -237,92 +213,30 @@ const ScheduleScreen: React.FC = () => {
                     </ThemedText>
                 )}
                 <Button
-                    label="Review & block"
-                    icon="ArrowRight"
+                    label="Review block"
                     disabled={!!problem}
-                    onPress={() => setPopupVisible(true)}
+                    onPress={() => setDialog('review')}
                     style={styles.save}
                 />
             </ScrollView>
 
-            <Popup
-                navigation={navigation}
-                visible={popupVisible}
-                days={daysText}
-                time={timeText}
-                websiteUrl={websiteUrl}
-                app={app}
-                onClose={() => setPopupVisible(false)}
-                showError={() => showError('Data Load Error', 'Failed to save blocked website data')}
+            <Dialog
+                visible={dialog === 'review'}
+                onClose={() => setDialog(null)}
+                icon="Ban"
+                title={`Block ${targetLabel}?`}
+                message={
+                    <View>
+                        <KeyValueRow label="Days" value={describeDays(daysText)} />
+                        <KeyValueRow label="Hours" value={timeText === ALL_DAY ? 'All day' : timeText} />
+                    </View>
+                }
+                actions={confirmActions(() => setDialog(null), 'Block', save)}
             />
-            <ErrorPopup
-                title={errorTitle}
-                text={errorText}
-                visible={errorPopupVisible}
-                onClose={() => setErrorPopupVisible(false)}
-            />
+            <ErrorPopup {...ERRORS.saveFailed} visible={dialog === 'error'} onClose={() => setDialog(null)} />
         </BaseScreen>
     );
 };
-
-interface PopupProps {
-    navigation: NavigationProp<RootStackParamList>;
-    visible: boolean;
-    days: string;
-    time: string;
-    websiteUrl?: string;
-    app?: { packageName: string; appName: string };
-    onClose: () => void;
-    showError: () => void;
-}
-
-const Popup: React.FC<PopupProps> = ({ navigation, visible, days, time, websiteUrl, app, onClose, showError }) => {
-    const label = app ? app.appName : websiteUrl ?? '';
-
-    const onConfirm = async () => {
-        const success = app
-            ? await addBlockedApp({ days, time, packageName: app.packageName, appName: app.appName, visible: true })
-            : await addBlockedWebsite({ days, time, websiteUrl: websiteUrl ?? '', visible: true });
-        if (success) {
-            haptics.success();
-            onClose();
-            navigation.navigate('BottomTabs', { screen: 'Home' });
-        } else {
-            showError();
-        }
-    };
-
-    return (
-        <BlurModal visible={visible} onClose={onClose}>
-            <ThemedText size="large" weight="strong" align="center" style={styles.popUpText}>
-                Block{' '}
-                <ThemedText size="large" weight="strong" color="accent">
-                    {label}
-                </ThemedText>
-                ?
-            </ThemedText>
-            <View style={styles.summary}>
-                <SummaryRow label="Days" value={describeDays(days)} />
-                <SummaryRow label="Hours" value={time === ALL_DAY ? 'All day' : time} />
-            </View>
-            <View style={styles.buttonsContainer}>
-                <ActionButton variant="cancel" onPress={onClose} />
-                <ActionButton variant="confirm" label="Block it" onPress={onConfirm} />
-            </View>
-        </BlurModal>
-    );
-};
-
-const SummaryRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-    <View style={styles.summaryRow}>
-        <ThemedText size="small" color="muted">
-            {label}
-        </ThemedText>
-        <ThemedText size="small" weight="strong">
-            {value}
-        </ThemedText>
-    </View>
-);
 
 const styles = StyleSheet.create({
     scroll: {
@@ -334,29 +248,16 @@ const styles = StyleSheet.create({
     siteCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginHorizontal: spacing.md,
         marginTop: spacing.xs,
-        padding: spacing.md,
-        borderRadius: shapes.borderRadius.large,
     },
-    faviconWrap: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: spacing.md,
+    leading: {
+        marginRight: spacing.md - 4,
     },
     chips: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginHorizontal: spacing.md,
+        marginHorizontal: gutter,
         marginTop: spacing.xs,
-    },
-    card: {
-        marginHorizontal: spacing.md,
-        padding: spacing.md,
-        borderRadius: shapes.borderRadius.large,
     },
     cardFoot: {
         marginTop: spacing.sm,
@@ -370,28 +271,11 @@ const styles = StyleSheet.create({
     },
     problem: {
         marginTop: spacing.lg,
-        marginHorizontal: spacing.md,
+        marginHorizontal: gutter,
     },
     save: {
-        marginHorizontal: spacing.md,
+        marginHorizontal: gutter,
         marginTop: spacing.md,
-    },
-    summary: {
-        alignSelf: 'stretch',
-        marginVertical: spacing.sm,
-    },
-    summaryRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingVertical: 6,
-    },
-    buttonsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: spacing.md,
-    },
-    popUpText: {
-        marginBottom: spacing.sm,
     },
 });
 

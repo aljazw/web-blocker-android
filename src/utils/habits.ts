@@ -1,30 +1,8 @@
+/** Pure streak logic for habits, over local "YYYY-MM-DD" day keys (see dates.ts). */
 import { Habit } from '../types/types';
+import { addDays, fromDateKey, newId, toDateKey, weekdayIndex } from './dates';
 
-/**
- * Pure date & streak logic for habits. Dates are LOCAL calendar days stored as
- * "YYYY-MM-DD" keys, so a check-in at 23:59 and one at 00:01 land on different
- * days the way the user expects, regardless of time zone.
- */
-
-const pad = (n: number) => String(n).padStart(2, '0');
-
-export const toDateKey = (date: Date): string =>
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-
-/** Parses a key at local noon, so adding days never trips over DST changes. */
-export const fromDateKey = (key: string): Date => {
-    const [y, m, d] = key.split('-').map(Number);
-    return new Date(y, m - 1, d, 12);
-};
-
-export const addDays = (date: Date, days: number): Date => {
-    const next = new Date(date);
-    next.setDate(next.getDate() + days);
-    return next;
-};
-
-/** 0 = Monday … 6 = Sunday. */
-export const weekdayIndex = (date: Date): number => (date.getDay() + 6) % 7;
+export { addDays, fromDateKey, toDateKey, weekdayIndex };
 
 export const isScheduled = (habit: Habit, date: Date): boolean => habit.days[weekdayIndex(date)] === true;
 
@@ -39,7 +17,9 @@ const MAX_LOOKBACK_DAYS = 3660;
  * today is "still pending", so it doesn't break the streak.
  */
 export const currentStreak = (habit: Habit, today: Date = new Date()): number => {
-    if (!habit.days.some(Boolean)) return 0;
+    if (!habit.days.some(Boolean)) {
+        return 0;
+    }
     const done = new Set(habit.completions);
     const start = habit.createdAt;
     let day = today;
@@ -49,8 +29,12 @@ export const currentStreak = (habit: Habit, today: Date = new Date()): number =>
         day = addDays(day, -1); // today is still pending
     }
     for (let i = 0; i < MAX_LOOKBACK_DAYS && toDateKey(day) >= start; i++, day = addDays(day, -1)) {
-        if (!isScheduled(habit, day)) continue;
-        if (!done.has(toDateKey(day))) break;
+        if (!isScheduled(habit, day)) {
+            continue;
+        }
+        if (!done.has(toDateKey(day))) {
+            break;
+        }
         streak++;
     }
     return streak;
@@ -58,7 +42,9 @@ export const currentStreak = (habit: Habit, today: Date = new Date()): number =>
 
 /** Longest run of completed due days since the habit was created. */
 export const bestStreak = (habit: Habit, today: Date = new Date()): number => {
-    if (!habit.days.some(Boolean)) return 0;
+    if (!habit.days.some(Boolean)) {
+        return 0;
+    }
     const done = new Set(habit.completions);
     const todayKey = toDateKey(today);
     let day = fromDateKey(habit.createdAt);
@@ -66,7 +52,9 @@ export const bestStreak = (habit: Habit, today: Date = new Date()): number => {
     let best = 0;
 
     for (let i = 0; i < MAX_LOOKBACK_DAYS && toDateKey(day) <= todayKey; i++, day = addDays(day, 1)) {
-        if (!isScheduled(habit, day)) continue;
+        if (!isScheduled(habit, day)) {
+            continue;
+        }
         const key = toDateKey(day);
         if (done.has(key)) {
             run++;
@@ -109,7 +97,9 @@ export const completionRate = (habits: Habit[], days = 7, today: Date = new Date
     let done = 0;
     for (const habit of habits) {
         for (const day of recentDays(habit, days, today)) {
-            if (!day.scheduled) continue;
+            if (!day.scheduled) {
+                continue;
+            }
             if (day.done) {
                 due++;
                 done++;
@@ -135,23 +125,8 @@ export const toggleCompletion = (habit: Habit, date: Date = new Date()): Habit =
     return { ...habit, completions };
 };
 
-export const newHabitId = (): string => `h_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+/** Returns the habit checked off for `date` (unchanged if it already is). */
+export const markDone = (habit: Habit, date: Date = new Date()): Habit =>
+    isDoneOn(habit, date) ? habit : toggleCompletion(habit, date);
 
-const QUOTES = [
-    'Small steps every day add up to big results.',
-    'You don’t have to be great to start, but you have to start to be great.',
-    'Discipline is choosing what you want most over what you want now.',
-    'Success is the sum of small efforts, repeated day in and day out.',
-    'Motivation gets you going. Habit keeps you going.',
-    'The secret of getting ahead is getting started.',
-    'Don’t break the chain.',
-    'Progress, not perfection.',
-    'Every check-in is a vote for the person you want to become.',
-    'One day or day one. You decide.',
-];
-
-/** Same quote all day, a new one tomorrow. */
-export const quoteOfTheDay = (today: Date = new Date()): string => {
-    const key = toDateKey(today).replace(/-/g, '');
-    return QUOTES[Number(key) % QUOTES.length];
-};
+export const newHabitId = (): string => newId('h');

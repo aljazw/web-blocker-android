@@ -1,4 +1,4 @@
-import { describeDays, describeSchedule, isBlockActiveNow } from '../src/utils/schedule';
+import { buildSchedule, describeDays, describeSchedule, isBlockActiveNow } from '../src/utils/schedule';
 
 // 2026-10-07 is a Wednesday.
 const at = (hhmm: string, date = '2026-10-07') => new Date(`${date}T${hhmm}:00`);
@@ -47,5 +47,50 @@ describe('describeSchedule', () => {
         expect(describeSchedule('Full Week', 'All Day Long')).toBe('Always');
         expect(describeSchedule('Mon, Tue, Wed, Thu, Fri', '09:00 - 17:00')).toBe('Weekdays · 09:00 - 17:00');
         expect(describeSchedule('Sat, Sun', 'All Day Long')).toBe('Weekends · All day');
+    });
+});
+
+describe('buildSchedule', () => {
+    const EVERY = [true, true, true, true, true, true, true];
+    const WEEKDAYS = [true, true, true, true, true, false, false];
+    const window = (startHour: string, startMinutes: string, endHour: string, endMinutes: string) => ({
+        startHour,
+        startMinutes,
+        endHour,
+        endMinutes,
+    });
+
+    it('stores a full week, all day, by default', () => {
+        expect(buildSchedule(EVERY, null)).toEqual({
+            days: 'Full Week',
+            time: 'All Day Long',
+            problem: null,
+            overnight: false,
+        });
+    });
+
+    it('lists selected days and pads the time window', () => {
+        const r = buildSchedule(WEEKDAYS, window('9', '0', '17', '30'));
+        expect(r.days).toBe('Mon, Tue, Wed, Thu, Fri');
+        expect(r.time).toBe('09:00 - 17:30');
+        expect(r.problem).toBeNull();
+    });
+
+    it('flags overnight windows without rejecting them', () => {
+        const r = buildSchedule(EVERY, window('22', '00', '07', '00'));
+        expect(r.overnight).toBe(true);
+        expect(r.problem).toBeNull();
+    });
+
+    it('rejects no days, incomplete, invalid and empty windows', () => {
+        expect(
+            buildSchedule(
+                EVERY.map(() => false),
+                null,
+            ).problem,
+        ).toMatch(/day/);
+        expect(buildSchedule(EVERY, window('09', '', '17', '00')).problem).toMatch(/Fill in/);
+        expect(buildSchedule(EVERY, window('24', '00', '17', '00')).problem).toMatch(/valid/);
+        expect(buildSchedule(EVERY, window('09', '00', '09', '00')).problem).toMatch(/same/);
     });
 });

@@ -8,7 +8,6 @@ import notifee, {
 import { ACCESSIBILITY_NOTIFICATION_TEXT } from '../constants/strings';
 import { checkAccessibilityEnabled } from './accessibility';
 
-
 export async function scheduleDailyNotification() {
     // 1. Check if accessibility is ALREADY enabled
     const isEnabled = await checkAccessibilityEnabled();

@@ -28,7 +28,6 @@ class ReenableActivity : Activity() {
                 title = "Your blocks aren’t working",
                 body = "SiteLock’s accessibility service was switched off, so blocked sites can load " +
                     "again. Turn it back on to restore them.",
-                quote = "“Don’t trade what you want most for what you want right now.”",
                 primaryLabel = "Turn protection back on",
                 onPrimary = { openAccessibilitySettings() },
             ),

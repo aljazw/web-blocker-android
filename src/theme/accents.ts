@@ -2,14 +2,14 @@ import { Theme } from './types';
 
 export type AccentName = 'indigo' | 'violet' | 'teal' | 'emerald' | 'amber' | 'rose';
 
-/** Accent colors the user can pick in Settings: [dark mode, light mode]. */
+/** Accent colors the user can pick in Settings. Keys are stored, so they never change. */
 export const ACCENTS: Record<AccentName, { label: string; dark: string; light: string }> = {
-    indigo: { label: 'Indigo', dark: '#7C8CFF', light: '#4F5BD5' },
-    violet: { label: 'Violet', dark: '#B18CFF', light: '#7C4DDB' },
-    teal: { label: 'Teal', dark: '#2DD4CF', light: '#0E9490' },
-    emerald: { label: 'Emerald', dark: '#3DDC97', light: '#12A26B' },
-    amber: { label: 'Amber', dark: '#FFB547', light: '#C77700' },
-    rose: { label: 'Rose', dark: '#FF7A9C', light: '#D6336C' },
+    indigo: { label: 'Blue', dark: '#4C8DF6', light: '#2463EB' },
+    violet: { label: 'Violet', dark: '#8E7CF0', light: '#6550CF' },
+    teal: { label: 'Teal', dark: '#2AAE9F', light: '#0E7F73' },
+    emerald: { label: 'Green', dark: '#3DA66E', light: '#1E8150' },
+    amber: { label: 'Amber', dark: '#E2A336', light: '#AD6F0B' },
+    rose: { label: 'Crimson', dark: '#E1607A', light: '#BE3455' },
 };
 
 export const DEFAULT_ACCENT: AccentName = 'indigo';
@@ -17,8 +17,8 @@ export const DEFAULT_ACCENT: AccentName = 'indigo';
 export const isAccentName = (value: unknown): value is AccentName => typeof value === 'string' && value in ACCENTS;
 
 const hexToRgba = (hex: string, alpha: number) => {
-    const n = parseInt(hex.slice(1), 16);
-    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
 /** Returns the base theme recolored with the chosen accent. */
@@ -30,7 +30,7 @@ export const withAccent = (base: Theme, accent: AccentName): Theme => {
             ...base.colors,
             accent: color,
             primaryBlue: color,
-            accentSoft: hexToRgba(color, base.mode === 'dark' ? 0.16 : 0.12),
+            accentSoft: hexToRgba(color, base.mode === 'dark' ? 0.14 : 0.1),
         },
     };
 };

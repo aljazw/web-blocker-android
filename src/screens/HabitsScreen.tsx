@@ -1,30 +1,30 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Habit, RootStackNavigation } from '../types/types';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
-import Celebration from '../components/Celebration';
+import Card from '../components/Card';
+import Dialog from '../components/Dialog';
 import ErrorPopup from '../components/ErrorPopup';
 import HabitCard from '../components/HabitCard';
-import Icon from '../components/Icon';
+import IconButton from '../components/IconButton';
+import IconTile from '../components/IconTile';
+import ProgressBar from '../components/ProgressBar';
 import SectionHeader from '../components/SectionHeader';
+import StatRow from '../components/StatRow';
 import StatTile from '../components/StatTile';
 import { ThemedText } from '../components/ThemedText';
-import { ThemedView } from '../components/ThemedView';
-import { AnimatedBar, FadeIn, animateLayout, stagger } from '../components/Motion';
+import { FadeIn, animateLayout, stagger } from '../components/Motion';
 import { useTheme } from '../context/ThemeContext';
 import { useHabits } from '../hooks/useHabits';
-import { shapes, spacing } from '../theme';
-import { completionRate, currentStreak, isDoneOn, isScheduled, milestoneFor, quoteOfTheDay } from '../utils/habits';
+import { spacing } from '../theme';
+import { completionRate, currentStreak, isDoneOn, isScheduled, milestoneFor } from '../utils/habits';
 import { milestoneMessage } from '../utils/habitText';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 
-type Moment =
-    | { kind: 'milestone'; habit: Habit; days: number }
-    | { kind: 'perfectDay' }
-    | { kind: 'error'; title: string; text: string };
+type Moment = { kind: 'milestone'; habit: Habit; days: number } | { kind: 'error' };
 
 const todayLabel = (date: Date) =>
     date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
@@ -54,104 +54,94 @@ const HabitsScreen: React.FC = () => {
             return;
         }
         if (result.status === 'failed') {
-            setMoment({ kind: 'error', ...ERRORS.saveFailed });
+            setMoment({ kind: 'error' });
             return;
         }
-        const updated = result.habit;
         if (wasDone) {
             haptics.tap();
             return;
         }
         haptics.success();
-
-        const milestone = milestoneFor(currentStreak(updated, today));
-        const nowAllDone = due.every(h => (h.id === habit.id ? true : isDoneOn(h, today)));
+        const milestone = milestoneFor(currentStreak(result.habit, today));
         if (milestone) {
-            setMoment({ kind: 'milestone', habit: updated, days: milestone });
-        } else if (nowAllDone && due.length > 1) {
-            setMoment({ kind: 'perfectDay' });
+            setMoment({ kind: 'milestone', habit: result.habit, days: milestone });
         }
     };
 
-    const addButton = (
-        <Pressable
-            onPress={() => openEditor()}
-            accessibilityRole="button"
-            accessibilityLabel="New habit"
-            hitSlop={8}
-            style={[styles.addButton, { backgroundColor: theme.colors.accent }]}>
-            <Icon name="Plus" size={22} tint={theme.colors.onAccent} />
-        </Pressable>
-    );
+    const summary =
+        habits.length === 0
+            ? 'No habits yet'
+            : due.length === 0
+            ? 'Nothing scheduled today'
+            : allDone
+            ? 'All done for today'
+            : `${due.length - doneCount} remaining`;
 
     return (
-        <BaseScreen title="Today" subtitle={todayLabel(today)} headerRight={addButton}>
+        <BaseScreen
+            title="Habits"
+            subtitle={todayLabel(today)}
+            headerRight={
+                <IconButton icon="Plus" variant="filled" accessibilityLabel="New habit" onPress={() => openEditor()} />
+            }>
             <ScrollView contentContainerStyle={styles.scroll}>
-                {/* ---- Progress hero ---- */}
-                <FadeIn>
-                    <View
-                        style={[
-                            styles.hero,
-                            { backgroundColor: allDone ? theme.colors.primaryGreen : theme.colors.accent },
-                        ]}>
-                        <ThemedText size="tiny" weight="strong" style={styles.heroEyebrow}>
-                            {allDone ? 'PERFECT DAY' : 'TODAY’S PROGRESS'}
-                        </ThemedText>
-                        <ThemedText size="display" weight="strong" style={styles.onHero}>
-                            {habits.length === 0 ? 'Day one' : due.length === 0 ? 'Rest day' : `${doneCount} / ${due.length}`}
-                        </ThemedText>
-                        <ThemedText weight="medium" style={styles.onHeroMuted}>
-                            {due.length === 0
-                                ? habits.length === 0
-                                    ? 'Create a habit to start your first streak.'
-                                    : 'Nothing due today — enjoy it.'
-                                : allDone
-                                ? 'Every habit done. You showed up today 🎉'
-                                : `${due.length - doneCount} to go — you’ve got this.`}
-                        </ThemedText>
-                        {due.length > 0 && (
-                            <View style={styles.heroTrack}>
-                                <AnimatedBar
-                                    fraction={doneCount / due.length}
-                                    color="#FFFFFF"
-                                    style={styles.heroFill}
-                                />
-                            </View>
-                        )}
-                        <ThemedText size="small" style={styles.quote}>
-                            “{quoteOfTheDay(today)}”
-                        </ThemedText>
-                    </View>
-                </FadeIn>
-
                 {habits.length > 0 && (
-                    <FadeIn delay={80} style={styles.statsRow}>
-                        <StatTile label="Top streak" value={topStreak} suffix="🔥" />
-                        <StatTile label="This week" value={Math.round((weekRate ?? 0) * 100)} suffix="%" />
-                        <StatTile label="Check-ins" value={totalCheckIns} />
+                    <FadeIn>
+                        <Card>
+                            <ThemedText size="tiny" weight="strong" color="muted" caps>
+                                Today
+                            </ThemedText>
+                            <View style={styles.progressRow}>
+                                <ThemedText size="display" weight="bold" tabular>
+                                    {doneCount}
+                                    <ThemedText size="large" color="muted" weight="medium">
+                                        {' '}
+                                        / {due.length}
+                                    </ThemedText>
+                                </ThemedText>
+                                <ThemedText
+                                    size="small"
+                                    weight="medium"
+                                    color={allDone ? 'primaryGreen' : 'muted'}
+                                    style={styles.summary}>
+                                    {summary}
+                                </ThemedText>
+                            </View>
+                            {due.length > 0 && (
+                                <ProgressBar
+                                    fraction={doneCount / due.length}
+                                    color={allDone ? theme.colors.primaryGreen : theme.colors.accent}
+                                    style={styles.progress}
+                                />
+                            )}
+                        </Card>
+                        <StatRow>
+                            <StatTile label="Best streak" value={topStreak} suffix=" d" />
+                            <StatTile label="7-day rate" value={Math.round((weekRate ?? 0) * 100)} suffix="%" />
+                            <StatTile label="Check-ins" value={totalCheckIns} />
+                        </StatRow>
                     </FadeIn>
                 )}
 
-                {/* ---- Lists ---- */}
                 {loaded && habits.length === 0 ? (
-                    <FadeIn delay={140}>
-                        <ThemedView withBorder style={styles.empty}>
-                            <ThemedText style={styles.emptyEmoji}>🌱</ThemedText>
-                            <ThemedText size="large" weight="strong" align="center">
-                                Build your first habit
+                    <FadeIn delay={60}>
+                        <Card style={styles.empty}>
+                            <IconTile icon="Habits" tone="accent" size={44} />
+                            <ThemedText size="large" weight="bold" style={styles.emptyTitle}>
+                                Build a daily routine
                             </ThemedText>
-                            <ThemedText size="small" color="muted" align="center" style={styles.emptyText}>
-                                Small daily wins add up. Pick something tiny — like a 10-minute workout — and check it
-                                off each day to grow your streak.
+                            <ThemedText color="muted" style={styles.emptyText}>
+                                Track small, repeatable actions such as a 10-minute workout or reading. Choose the days
+                                each habit is due and check it off to build a streak.
                             </ThemedText>
-                            <Button label="Create a habit" icon="ArrowRight" onPress={() => openEditor()} />
-                        </ThemedView>
+                            <Button label="Create a habit" icon="Plus" iconLeading onPress={() => openEditor()} />
+                        </Card>
                     </FadeIn>
                 ) : (
                     <>
-                        {due.length > 0 && <SectionHeader title={`Due today · ${doneCount}/${due.length}`} />}
+                        {due.length > 0 && <SectionHeader title="Due today" />}
                         {due.map((habit, i) => (
-                            <FadeIn key={habit.id} delay={120 + stagger(i)}>
+                            <FadeIn key={habit.id} delay={60 + stagger(i)}>
                                 <HabitCard
                                     habit={habit}
                                     dueToday
@@ -162,7 +152,7 @@ const HabitsScreen: React.FC = () => {
                         ))}
                         {notDue.length > 0 && <SectionHeader title="Other days" />}
                         {notDue.map((habit, i) => (
-                            <FadeIn key={habit.id} delay={160 + stagger(due.length + i)}>
+                            <FadeIn key={habit.id} delay={80 + stagger(due.length + i)}>
                                 <HabitCard
                                     habit={habit}
                                     dueToday={false}
@@ -175,30 +165,16 @@ const HabitsScreen: React.FC = () => {
                 )}
             </ScrollView>
 
-            <Celebration
+            <Dialog
                 visible={moment?.kind === 'milestone'}
-                emoji="🔥"
-                title={moment?.kind === 'milestone' ? `${moment.days}-day streak!` : ''}
-                message={
-                    moment?.kind === 'milestone'
-                        ? `${moment.habit.emoji} ${moment.habit.title}. ${milestoneMessage(moment.days)}`
-                        : ''
-                }
                 onClose={() => setMoment(null)}
+                icon="Award"
+                tone="success"
+                title={moment?.kind === 'milestone' ? `${moment.days}-day streak` : ''}
+                message={moment?.kind === 'milestone' ? `${moment.habit.title}. ${milestoneMessage(moment.days)}` : ''}
+                actions={[{ label: 'Continue', onPress: () => setMoment(null) }]}
             />
-            <Celebration
-                visible={moment?.kind === 'perfectDay'}
-                emoji="🏆"
-                title="Perfect day!"
-                message="Every habit for today is done. That’s how progress is made."
-                onClose={() => setMoment(null)}
-            />
-            <ErrorPopup
-                title={moment?.kind === 'error' ? moment.title : ERRORS.saveFailed.title}
-                text={moment?.kind === 'error' ? moment.text : ''}
-                visible={moment?.kind === 'error'}
-                onClose={() => setMoment(null)}
-            />
+            <ErrorPopup {...ERRORS.saveFailed} visible={moment?.kind === 'error'} onClose={() => setMoment(null)} />
         </BaseScreen>
     );
 };
@@ -207,62 +183,24 @@ const styles = StyleSheet.create({
     scroll: {
         paddingBottom: spacing.xl,
     },
-    addButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    hero: {
-        marginHorizontal: spacing.md,
-        marginTop: spacing.sm,
-        padding: spacing.lg,
-        borderRadius: shapes.borderRadius.large,
-    },
-    heroEyebrow: {
-        color: 'rgba(255,255,255,0.85)',
-        letterSpacing: 1.2,
-        marginBottom: spacing.xs,
-    },
-    onHero: {
-        color: '#FFFFFF',
-    },
-    onHeroMuted: {
-        color: 'rgba(255,255,255,0.9)',
-    },
-    heroTrack: {
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: 'rgba(255,255,255,0.25)',
-        overflow: 'hidden',
-        marginTop: spacing.md,
-    },
-    heroFill: {
-        height: '100%',
-        borderRadius: 4,
-    },
-    quote: {
-        color: 'rgba(255,255,255,0.8)',
-        fontStyle: 'italic',
-        marginTop: spacing.md,
-    },
-    statsRow: {
+    progressRow: {
         flexDirection: 'row',
-        marginHorizontal: spacing.md - 4,
-        marginTop: spacing.sm,
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+        marginTop: spacing.xs,
+    },
+    summary: {
+        marginLeft: spacing.sm,
+    },
+    progress: {
+        marginTop: spacing.md,
     },
     empty: {
-        marginHorizontal: spacing.md,
-        marginTop: spacing.lg,
+        marginTop: spacing.md,
         padding: spacing.lg,
-        borderRadius: shapes.borderRadius.large,
-        alignItems: 'center',
     },
-    emptyEmoji: {
-        fontSize: 48,
-        lineHeight: 60,
-        marginBottom: spacing.sm,
+    emptyTitle: {
+        marginTop: spacing.md,
     },
     emptyText: {
         marginTop: spacing.xs,

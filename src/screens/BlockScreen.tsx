@@ -7,12 +7,12 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { RootStackNavigation } from '../types/types';
 import ItemContainer from '../components/ItemContainer';
 import Favicon from '../components/Favicon';
-import BlurModal from '../components/BlurModal';
-import Button from '../components/Button';
+import Dialog from '../components/Dialog';
+import IconTile from '../components/IconTile';
 import Chip from '../components/Chip';
 import SectionHeader from '../components/SectionHeader';
 import { toBlockableUrl } from '../utils/urlHelpers';
-import { shapes, spacing } from '../theme/tokens';
+import { gutter, shapes, spacing } from '../theme/tokens';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
 import ErrorPopup from '../components/ErrorPopup';
@@ -23,6 +23,7 @@ import { SITE_SUGGESTIONS } from '../constants/suggestions';
 import { FadeIn, stagger } from '../components/Motion';
 import Segmented from '../components/Segmented';
 import AppIcon from '../components/AppIcon';
+import Badge from '../components/Badge';
 import { getBlockedApps } from '../utils/storage';
 import { getLaunchableApps, InstalledApp } from '../utils/installedApps';
 
@@ -34,17 +35,9 @@ const BlockScreen: React.FC = () => {
     const [blocked, setBlocked] = useState<Set<string>>(new Set());
     const [blockedApps, setBlockedApps] = useState<Set<string>>(new Set());
     const [alreadyBlockedUrl, setAlreadyBlockedUrl] = useState<string | null>(null);
-    const [errorPopupVisible, setErrorPopupVisible] = useState(false);
-    const [errorTitle, setErrorTitle] = useState('');
-    const [errorText, setErrorText] = useState('');
+    const [loadError, setLoadError] = useState(false);
 
     const navigation = useNavigation<RootStackNavigation>();
-
-    const showError = (title: string, text: string) => {
-        setErrorTitle(title);
-        setErrorText(text);
-        setErrorPopupVisible(true);
-    };
 
     // Know which suggestions are already on the list each time the tab opens.
     useFocusEffect(
@@ -74,7 +67,7 @@ const BlockScreen: React.FC = () => {
             }
             navigation.navigate('Schedule', { websiteUrl: url });
         } catch {
-            showError(ERRORS.dataLoadError.title, ERRORS.dataLoadError.text);
+            setLoadError(true);
         }
     };
 
@@ -120,17 +113,13 @@ const BlockScreen: React.FC = () => {
                                             style={[
                                                 styles.result,
                                                 { borderColor: theme.colors.accent },
-                                                pressed && styles.pressed,
+                                                pressed && { backgroundColor: theme.colors.elevated },
                                             ]}>
-                                            <View
-                                                style={[
-                                                    styles.faviconWrap,
-                                                    { backgroundColor: theme.colors.elevated },
-                                                ]}>
-                                                <Favicon url={websiteUrl} size={22} />
-                                            </View>
+                                            <IconTile size={36} style={styles.leading}>
+                                                <Favicon url={websiteUrl} size={20} />
+                                            </IconTile>
                                             <View style={styles.flex}>
-                                                <ThemedText weight="strong" numberOfLines={1}>
+                                                <ThemedText weight="medium" numberOfLines={1}>
                                                     {websiteUrl}
                                                 </ThemedText>
                                                 <ThemedText size="small" color="muted">
@@ -149,7 +138,7 @@ const BlockScreen: React.FC = () => {
                         ) : (
                             <ThemedText size="small" color="muted" style={styles.hint}>
                                 Enter a valid address like{' '}
-                                <ThemedText size="small" weight="strong" color="accent">
+                                <ThemedText size="small" weight="medium" color="text">
                                     facebook.com
                                 </ThemedText>{' '}
                                 to block it.
@@ -165,7 +154,8 @@ const BlockScreen: React.FC = () => {
                                     return (
                                         <Chip
                                             key={site}
-                                            label={isBlocked ? `✓ ${site}` : site}
+                                            icon={isBlocked ? 'Check' : undefined}
+                                            label={site}
                                             selected={isBlocked}
                                             disabled={isBlocked}
                                             onPress={() => goToSchedule(site)}
@@ -190,17 +180,14 @@ const BlockScreen: React.FC = () => {
                 </ScrollView>
             )}
 
-            <AlreadyBlockedPopup
+            <Dialog
                 visible={!!alreadyBlockedUrl}
-                websiteUrl={alreadyBlockedUrl ?? ''}
                 onClose={() => setAlreadyBlockedUrl(null)}
+                icon="Check"
+                title="Already blocked"
+                message={`${alreadyBlockedUrl ?? ''} is already on your block list.`}
             />
-            <ErrorPopup
-                title={errorTitle}
-                text={errorText}
-                visible={errorPopupVisible}
-                onClose={() => setErrorPopupVisible(false)}
-            />
+            <ErrorPopup {...ERRORS.dataLoadError} visible={loadError} onClose={() => setLoadError(false)} />
         </BaseScreen>
     );
 };
@@ -249,10 +236,10 @@ const AppPicker: React.FC<AppPickerProps> = ({ blocked, onPick }) => {
                         return (
                             <Pressable onPress={() => onPick(item)}>
                                 {({ pressed }) => (
-                                    <ItemContainer style={pressed && styles.pressed}>
+                                    <ItemContainer style={pressed && { backgroundColor: theme.colors.elevated }}>
                                         <AppIcon packageName={item.packageName} size={36} style={styles.appIcon} />
                                         <View style={styles.flex}>
-                                            <ThemedText weight="strong" numberOfLines={1}>
+                                            <ThemedText weight="medium" numberOfLines={1}>
                                                 {item.label}
                                             </ThemedText>
                                             <ThemedText size="tiny" color="muted" numberOfLines={1}>
@@ -260,9 +247,7 @@ const AppPicker: React.FC<AppPickerProps> = ({ blocked, onPick }) => {
                                             </ThemedText>
                                         </View>
                                         {isBlocked ? (
-                                            <ThemedText size="small" weight="strong" color="accent">
-                                                Blocked
-                                            </ThemedText>
+                                            <Badge label="Blocked" tone="accent" />
                                         ) : (
                                             <View
                                                 style={[styles.addBadge, { backgroundColor: theme.colors.accentSoft }]}>
@@ -296,35 +281,12 @@ const Tip: React.FC<{ n: number; text: string }> = ({ n, text }) => {
     );
 };
 
-interface AlreadyBlockedPopupProps {
-    visible: boolean;
-    websiteUrl: string;
-    onClose: () => void;
-}
-
-const AlreadyBlockedPopup: React.FC<AlreadyBlockedPopupProps> = ({ visible, websiteUrl, onClose }) => {
-    return (
-        <BlurModal visible={visible} onClose={onClose}>
-            <ThemedText size="large" weight="strong" align="center" style={styles.popupTitle}>
-                Already blocked
-            </ThemedText>
-            <ThemedText align="center" color="muted">
-                <ThemedText color="accent" weight="strong">
-                    {websiteUrl}
-                </ThemedText>{' '}
-                is already on your block list. No need to add it again!
-            </ThemedText>
-            <Button label="Got it" compact onPress={onClose} style={styles.popupButton} />
-        </BlurModal>
-    );
-};
-
 const styles = StyleSheet.create({
     scroll: {
         paddingBottom: spacing.xl,
     },
     modeSwitch: {
-        marginHorizontal: spacing.md,
+        marginHorizontal: gutter,
         marginTop: spacing.xs,
         marginBottom: spacing.sm,
     },
@@ -335,31 +297,23 @@ const styles = StyleSheet.create({
         marginRight: spacing.sm + 2,
     },
     search: {
-        marginHorizontal: spacing.md,
+        marginHorizontal: gutter,
         marginTop: spacing.xs,
     },
     result: {
         marginTop: spacing.md,
         borderWidth: 1.5,
     },
-    pressed: {
-        opacity: 0.85,
-    },
-    faviconWrap: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: spacing.sm + 2,
-    },
     flex: {
         flex: 1,
     },
+    leading: {
+        marginRight: spacing.sm + 2,
+    },
     addBadge: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 28,
+        height: 28,
+        borderRadius: shapes.borderRadius.small + 2,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -370,11 +324,11 @@ const styles = StyleSheet.create({
     chips: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginHorizontal: spacing.md,
+        marginHorizontal: gutter,
         marginTop: spacing.xs,
     },
     tips: {
-        marginHorizontal: spacing.md,
+        marginHorizontal: gutter,
         padding: spacing.md,
         borderRadius: shapes.borderRadius.medium,
     },
@@ -386,17 +340,10 @@ const styles = StyleSheet.create({
     tipNumber: {
         width: 22,
         height: 22,
-        borderRadius: 11,
+        borderRadius: shapes.borderRadius.small,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: spacing.sm,
-    },
-    popupTitle: {
-        marginBottom: spacing.sm,
-    },
-    popupButton: {
-        marginTop: spacing.lg,
-        alignSelf: 'stretch',
     },
 });
 

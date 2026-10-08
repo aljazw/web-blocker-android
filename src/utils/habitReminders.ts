@@ -46,7 +46,9 @@ export const cancelHabitReminders = async (habitId: string): Promise<void> => {
  */
 export const syncHabitReminders = async (habit: Habit): Promise<void> => {
     await cancelHabitReminders(habit.id);
-    if (!habit.reminder) return;
+    if (!habit.reminder) {
+        return;
+    }
 
     try {
         await notifee.createChannel({ id: CHANNEL_ID, name: 'Habit reminders', importance: AndroidImportance.HIGH });
@@ -59,7 +61,7 @@ export const syncHabitReminders = async (habit: Habit): Promise<void> => {
                     ? notifee.createTriggerNotification(
                           {
                               id: `${idPrefix(habit.id)}${weekday}`,
-                              title: `${habit.emoji} ${habit.title}`,
+                              title: habit.title,
                               body: 'Time to keep your streak going. Tap to check it off.',
                               android: {
                                   channelId: CHANNEL_ID,

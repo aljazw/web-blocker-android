@@ -1,23 +1,30 @@
 import React from 'react';
-import { StyleSheet, Image, ScrollView, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
+import Card from '../components/Card';
+import IconTile from '../components/IconTile';
+import { IconName } from '../components/Icon';
+import SectionHeader from '../components/SectionHeader';
 import { ThemedText } from '../components/ThemedText';
-import { ThemedView } from '../components/ThemedView';
-import { shapes, spacing } from '../theme';
-import { useTheme } from '../context/ThemeContext';
-import { ACCESSIBILITY_SETUP_STEPS } from '../constants/strings';
 import { FadeIn, stagger } from '../components/Motion';
+import { useTheme } from '../context/ThemeContext';
+import { gutter, shapes, spacing } from '../theme';
+import { ACCESSIBILITY_SETUP_STEPS } from '../constants/strings';
 
 interface WelcomeScreenProps {
     onContinue: () => void;
 }
 
-const HIGHLIGHTS = [
-    { title: 'Block on your terms', text: 'Sites and apps — all day, work hours, bedtime. You pick when.' },
-    { title: 'Build habits that stick', text: 'Daily check-ins, streaks and reminders that keep you going.' },
-    { title: 'Hard to switch off', text: 'Passphrase, uninstall prevention and a watchdog keep you honest.' },
-    { title: 'Private by design', text: 'Everything runs on your phone. No accounts, no tracking.' },
+const HIGHLIGHTS: { icon: IconName; title: string; text: string }[] = [
+    { icon: 'Ban', title: 'Block distractions', text: 'Websites and apps, all day or on the schedule you choose.' },
+    { icon: 'Habits', title: 'Build habits', text: 'Daily check-ins, streaks and reminders on the days you pick.' },
+    { icon: 'Waves', title: 'Train breath-holds', text: 'CO₂ and O₂ tables, max-hold tests and breathing exercises.' },
+    {
+        icon: 'Shield',
+        title: 'Private and robust',
+        text: 'Runs entirely on your phone. Hard to switch off on impulse.',
+    },
 ];
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
@@ -26,43 +33,50 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
     return (
         <BaseScreen showHeader={false}>
             <ScrollView contentContainerStyle={styles.container}>
-                <FadeIn offset={24}>
-                    <View style={[styles.logoWrap, { backgroundColor: theme.colors.accentSoft }]}>
+                <FadeIn>
+                    <View
+                        style={[styles.logo, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                         <Image
                             source={require('../assets/icons/ic_sitelock.png')}
                             style={styles.image}
                             resizeMode="contain"
                         />
                     </View>
-                    <ThemedText weight="strong" size="display" align="center">
+                    <ThemedText weight="bold" size="display" style={styles.title}>
                         SiteLock
                     </ThemedText>
-                    <ThemedText align="center" color="muted" style={styles.subtitle}>
-                        Take back your focus. Block distracting websites and apps — and make it stick.
+                    <ThemedText color="muted" size="large" style={styles.subtitle}>
+                        Focus and self-improvement. Remove distractions, build routines and train your breath.
                     </ThemedText>
                 </FadeIn>
 
-                {HIGHLIGHTS.map((h, i) => (
-                    <FadeIn key={h.title} delay={150 + stagger(i, 90)}>
-                        <ThemedView withBorder style={styles.highlight}>
-                            <View style={[styles.highlightDot, { backgroundColor: theme.colors.accent }]} />
-                            <View style={styles.flex}>
-                                <ThemedText weight="strong">{h.title}</ThemedText>
-                                <ThemedText size="small" color="muted">
-                                    {h.text}
-                                </ThemedText>
+                <Card style={styles.highlights} flush>
+                    {HIGHLIGHTS.map((h, i) => (
+                        <FadeIn key={h.title} delay={80 + stagger(i, 50)}>
+                            <View
+                                style={[
+                                    styles.highlight,
+                                    i > 0 && {
+                                        borderTopColor: theme.colors.border,
+                                        borderTopWidth: StyleSheet.hairlineWidth,
+                                    },
+                                ]}>
+                                <IconTile icon={h.icon} tone="accent" size={36} />
+                                <View style={styles.flex}>
+                                    <ThemedText weight="medium">{h.title}</ThemedText>
+                                    <ThemedText size="small" color="muted">
+                                        {h.text}
+                                    </ThemedText>
+                                </View>
                             </View>
-                        </ThemedView>
-                    </FadeIn>
-                ))}
+                        </FadeIn>
+                    ))}
+                </Card>
 
-                <FadeIn delay={450}>
-                    <ThemedText size="tiny" weight="strong" color="muted" style={styles.stepsTitle}>
-                        ONE-TIME SETUP
-                    </ThemedText>
+                <FadeIn delay={300}>
+                    <SectionHeader title="One-time setup" />
                     <StepList />
-
-                    <Button label="Enable Accessibility" icon="ArrowRight" onPress={onContinue} style={styles.button} />
+                    <Button label="Open Accessibility settings" onPress={onContinue} style={styles.button} />
                 </FadeIn>
             </ScrollView>
         </BaseScreen>
@@ -72,11 +86,11 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
 export function StepList() {
     const { theme } = useTheme();
     return (
-        <ThemedView withBorder style={styles.steps}>
+        <Card>
             {ACCESSIBILITY_SETUP_STEPS.map((step, index) => (
                 <View key={index} style={styles.stepRow}>
-                    <View style={[styles.stepNumber, { backgroundColor: theme.colors.accentSoft }]}>
-                        <ThemedText size="tiny" weight="strong" color="accent">
+                    <View style={[styles.stepNumber, { borderColor: theme.colors.border }]}>
+                        <ThemedText size="tiny" weight="strong" color="muted" tabular>
                             {index + 1}
                         </ThemedText>
                     </View>
@@ -85,59 +99,48 @@ export function StepList() {
                     </ThemedText>
                 </View>
             ))}
-        </ThemedView>
+        </Card>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        padding: spacing.lg,
         paddingTop: spacing.xl,
+        paddingBottom: spacing.xl,
     },
     flex: {
         flex: 1,
     },
-    logoWrap: {
-        alignSelf: 'center',
-        width: 120,
-        height: 120,
-        borderRadius: 36,
+    logo: {
+        width: 64,
+        height: 64,
+        borderRadius: shapes.borderRadius.large,
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
+        marginHorizontal: gutter,
         marginBottom: spacing.lg,
     },
     image: {
-        width: 84,
-        height: 84,
+        width: 40,
+        height: 40,
+    },
+    title: {
+        marginHorizontal: gutter,
     },
     subtitle: {
         marginTop: spacing.sm,
-        marginBottom: spacing.lg,
-        paddingHorizontal: spacing.md,
+        marginHorizontal: gutter,
+        lineHeight: 24,
+    },
+    highlights: {
+        marginTop: spacing.xl,
     },
     highlight: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
+        gap: spacing.sm + 2,
         padding: spacing.md,
-        borderRadius: shapes.borderRadius.medium,
-        marginBottom: spacing.sm,
-    },
-    highlightDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        marginTop: 7,
-        marginRight: spacing.sm + 2,
-    },
-    stepsTitle: {
-        letterSpacing: 1.2,
-        marginTop: spacing.lg,
-        marginBottom: spacing.sm,
-        marginLeft: 4,
-    },
-    steps: {
-        padding: spacing.md,
-        borderRadius: shapes.borderRadius.medium,
     },
     stepRow: {
         flexDirection: 'row',
@@ -145,14 +148,16 @@ const styles = StyleSheet.create({
         marginVertical: 5,
     },
     stepNumber: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        width: 22,
+        height: 22,
+        borderRadius: shapes.borderRadius.small,
+        borderWidth: 1,
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: spacing.sm,
     },
     button: {
+        marginHorizontal: gutter,
         marginTop: spacing.xl,
     },
 });

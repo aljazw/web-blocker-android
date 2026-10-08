@@ -58,12 +58,12 @@ object SiteLockScreen {
 
     /** Mirrors src/theme/accents.ts: name -> (dark, light). */
     private val ACCENTS = mapOf(
-        "indigo" to ("#7C8CFF" to "#4F5BD5"),
-        "violet" to ("#B18CFF" to "#7C4DDB"),
-        "teal" to ("#2DD4CF" to "#0E9490"),
-        "emerald" to ("#3DDC97" to "#12A26B"),
-        "amber" to ("#FFB547" to "#C77700"),
-        "rose" to ("#FF7A9C" to "#D6336C"),
+        "indigo" to ("#4C8DF6" to "#2463EB"),
+        "violet" to ("#8E7CF0" to "#6550CF"),
+        "teal" to ("#2AAE9F" to "#0E7F73"),
+        "emerald" to ("#3DA66E" to "#1E8150"),
+        "amber" to ("#E2A336" to "#AD6F0B"),
+        "rose" to ("#E1607A" to "#BE3455"),
     )
 
     private fun palette(context: Context): Palette {
@@ -76,24 +76,24 @@ object SiteLockScreen {
         return if (dark) {
             Palette(
                 dark = true,
-                background = Color.parseColor("#0B0F1A"),
-                card = Color.parseColor("#151B2B"),
-                border = Color.parseColor("#252E44"),
-                text = Color.parseColor("#F3F5FA"),
-                muted = Color.parseColor("#8A93A8"),
+                background = Color.parseColor("#0B0C0E"),
+                card = Color.parseColor("#141518"),
+                border = Color.parseColor("#272A30"),
+                text = Color.parseColor("#ECEDEF"),
+                muted = Color.parseColor("#8B9099"),
                 accent = Color.parseColor(accentDark),
-                danger = Color.parseColor("#FF6B6B"),
+                danger = Color.parseColor("#E5484D"),
             )
         } else {
             Palette(
                 dark = false,
-                background = Color.parseColor("#F4F6FB"),
+                background = Color.parseColor("#F5F6F8"),
                 card = Color.parseColor("#FFFFFF"),
-                border = Color.parseColor("#E2E6F0"),
-                text = Color.parseColor("#111527"),
-                muted = Color.parseColor("#6B7389"),
+                border = Color.parseColor("#E2E5EA"),
+                text = Color.parseColor("#111316"),
+                muted = Color.parseColor("#62676F"),
                 accent = Color.parseColor(accentLight),
-                danger = Color.parseColor("#E5484D"),
+                danger = Color.parseColor("#D1343A"),
             )
         }
     }
@@ -109,17 +109,17 @@ object SiteLockScreen {
             setPadding(dp(28), dp(32), dp(28), dp(32))
         }
 
-        // Icon badge: tinted circle with the glyph inside.
+        // Icon badge: tinted rounded square with the glyph inside.
         val badge = FrameLayout(activity).apply {
             background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(withAlpha(tone, 0.16f))
+                cornerRadius = dp(20).toFloat()
+                setColor(withAlpha(tone, 0.14f))
             }
-            layoutParams = LinearLayout.LayoutParams(dp(96), dp(96))
+            layoutParams = LinearLayout.LayoutParams(dp(72), dp(72))
             addView(ImageView(activity).apply {
                 setImageResource(spec.iconRes)
                 setColorFilter(tone)
-                layoutParams = FrameLayout.LayoutParams(dp(44), dp(44), Gravity.CENTER)
+                layoutParams = FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER)
             })
         }
 
@@ -130,13 +130,13 @@ object SiteLockScreen {
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             setTextColor(tone)
             setPadding(dp(12), dp(6), dp(12), dp(6))
-            background = pill(withAlpha(tone, 0.14f))
+            background = rounded(withAlpha(tone, 0.14f), dp(6).toFloat())
             layoutParams = margins(top = dp(28))
         }
 
         val title = TextView(activity).apply {
             text = spec.title
-            textSize = 28f
+            textSize = 24f
             letterSpacing = -0.01f
             gravity = Gravity.CENTER
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
@@ -168,7 +168,7 @@ object SiteLockScreen {
                 setTextColor(p.text)
                 setPadding(dp(20), dp(18), dp(20), dp(18))
                 background = GradientDrawable().apply {
-                    cornerRadius = dp(20).toFloat()
+                    cornerRadius = dp(14).toFloat()
                     setColor(p.card)
                     setStroke(dp(1), p.border)
                 }
@@ -182,7 +182,7 @@ object SiteLockScreen {
             gravity = Gravity.CENTER
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             setTextColor(Color.WHITE)
-            background = pill(tone)
+            background = rounded(tone, dp(12).toFloat())
             isClickable = true
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)).apply {
                 topMargin = dp(36)
@@ -237,8 +237,8 @@ object SiteLockScreen {
     private fun withAlpha(color: Int, alpha: Float): Int =
         Color.argb((alpha * 255).toInt(), Color.red(color), Color.green(color), Color.blue(color))
 
-    private fun pill(color: Int) = GradientDrawable().apply {
-        cornerRadius = 999f
+    private fun rounded(color: Int, radius: Float) = GradientDrawable().apply {
+        cornerRadius = radius
         setColor(color)
     }
 

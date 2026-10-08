@@ -128,16 +128,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: shapes.borderWidth.thin,
         borderRadius: shapes.borderRadius.medium,
-        height: 60,
+        height: 52,
         marginTop: spacing.xs + 2,
     },
     input: {
         marginHorizontal: spacing.xs,
-        fontSize: 24,
-        fontWeight: '700',
+        fontSize: 22,
+        fontWeight: '600',
+        fontVariant: ['tabular-nums'],
         textAlign: 'center',
         width: 44,
-        height: 56,
+        height: 50,
     },
 });
 

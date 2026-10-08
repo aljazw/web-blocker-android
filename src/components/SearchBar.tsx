@@ -26,7 +26,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ placeholder = 'Search...', onSear
 
     return (
         <ThemedView withBorder style={[styles.container, focused && { borderColor: theme.colors.accent }]}>
-            <Icon name={'Search'} size={20} tint={theme.colors.muted} style={styles.iconSearch} />
+            <Icon name="Search" size={18} tint={theme.colors.muted} style={styles.iconSearch} />
             <TextInput
                 style={[styles.input, { color: theme.colors.text }]}
                 placeholder={placeholder}
@@ -43,7 +43,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ placeholder = 'Search...', onSear
             />
             {query.length > 0 && (
                 <Pressable onPress={() => update('')} hitSlop={10}>
-                    <Icon name={'Close'} size={14} tint={theme.colors.muted} style={styles.iconClose} />
+                    <Icon name="Close" size={14} tint={theme.colors.muted} style={styles.iconClose} />
                 </Pressable>
             )}
         </ThemedView>
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
         alignItems: 'center',
-        height: 52,
+        height: 46,
         paddingHorizontal: spacing.sm,
         borderRadius: shapes.borderRadius.medium,
     },

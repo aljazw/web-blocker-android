@@ -1,19 +1,23 @@
 import { Theme } from './types';
 
+/** Neutral graphite: low-contrast surfaces, one accent, muted status colors. */
 export const darkTheme: Theme = {
     mode: 'dark',
     colors: {
-        background: '#0B0F1A',
-        text: '#F3F5FA',
-        muted: '#8A93A8',
-        primaryRed: '#FF6B6B',
-        primaryBlue: '#7C8CFF',
-        primaryGreen: '#3DDC97',
-        card: '#151B2B',
-        elevated: '#1D2538',
-        border: '#252E44',
-        accent: '#7C8CFF',
-        accentSoft: 'rgba(124, 140, 255, 0.16)',
+        background: '#0B0C0E',
+        text: '#ECEDEF',
+        muted: '#8B9099',
+        primaryRed: '#E5484D',
+        primaryBlue: '#4C8DF6',
+        primaryGreen: '#3DA66E',
+        warning: '#E2A336',
+        card: '#141518',
+        elevated: '#1C1E22',
+        border: '#272A30',
+        accent: '#4C8DF6',
+        accentSoft: 'rgba(76, 141, 246, 0.14)',
         onAccent: '#FFFFFF',
+        redSoft: 'rgba(229, 72, 77, 0.14)',
+        greenSoft: 'rgba(61, 166, 110, 0.14)',
     },
 };

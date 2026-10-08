@@ -25,8 +25,12 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         Promise.all([getThemePreference(), getAccentPreference()])
             .then(([savedDark, savedAccent]) => {
-                if (savedDark !== null) setIsDarkMode(savedDark);
-                if (isAccentName(savedAccent)) setAccentState(savedAccent);
+                if (savedDark !== null) {
+                    setIsDarkMode(savedDark);
+                }
+                if (isAccentName(savedAccent)) {
+                    setAccentState(savedAccent);
+                }
             })
             .catch(error => logger.warn('Could not load theme preferences', error));
     }, []);

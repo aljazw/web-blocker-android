@@ -2,21 +2,23 @@ import { StyleProp, StyleSheet, ViewStyle } from 'react-native';
 import { shapes, spacing } from '../theme';
 import { useTheme } from '../context/ThemeContext';
 import { ThemedText } from './ThemedText';
+import Icon, { IconName } from './Icon';
 import { ScalePressable } from './Motion';
 import { haptics } from '../utils/haptics';
 
 interface ChipProps {
     label: string;
+    icon?: IconName;
     selected?: boolean;
     disabled?: boolean;
     onPress?: () => void;
     style?: StyleProp<ViewStyle>;
 }
 
-/** Small rounded pill for tags, filters, presets and quick-add suggestions. */
-const Chip: React.FC<ChipProps> = ({ label, selected, disabled, onPress, style }) => {
-    const { theme } = useTheme();
-    const { accent, accentSoft, elevated, border, text, muted } = theme.colors;
+/** Compact selectable tag for filters, presets and quick-add suggestions. */
+const Chip: React.FC<ChipProps> = ({ label, icon, selected, disabled, onPress, style }) => {
+    const { accent, accentSoft, card, border, text, muted } = useTheme().theme.colors;
+    const fg = selected ? accent : disabled ? muted : text;
 
     return (
         <ScalePressable
@@ -29,19 +31,15 @@ const Chip: React.FC<ChipProps> = ({ label, selected, disabled, onPress, style }
                       }
             }
             disabled={!onPress || disabled}
-            scaleTo={0.94}
+            accessibilityRole="button"
+            accessibilityState={{ selected: !!selected, disabled: !!disabled }}
             containerStyle={[styles.spacing, disabled && styles.disabled, style]}
             style={[
                 styles.chip,
-                {
-                    backgroundColor: selected ? accentSoft : elevated,
-                    borderColor: selected ? accent : border,
-                },
+                { backgroundColor: selected ? accentSoft : card, borderColor: selected ? accent : border },
             ]}>
-            <ThemedText
-                size="small"
-                weight={selected ? 'strong' : 'medium'}
-                style={{ color: selected ? accent : disabled ? muted : text }}>
+            {icon && <Icon name={icon} size={14} tint={fg} strokeWidth={2} style={styles.icon} />}
+            <ThemedText size="small" weight="medium" style={{ color: fg }}>
                 {label}
             </ThemedText>
         </ScalePressable>
@@ -50,17 +48,22 @@ const Chip: React.FC<ChipProps> = ({ label, selected, disabled, onPress, style }
 
 const styles = StyleSheet.create({
     chip: {
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: shapes.borderRadius.pill,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: shapes.borderRadius.medium,
         borderWidth: shapes.borderWidth.thin,
     },
+    icon: {
+        marginRight: 6,
+    },
     spacing: {
-        marginRight: spacing.sm,
-        marginBottom: spacing.sm,
+        marginRight: spacing.sm - 2,
+        marginBottom: spacing.sm - 2,
     },
     disabled: {
-        opacity: 0.55,
+        opacity: 0.5,
     },
 });
 

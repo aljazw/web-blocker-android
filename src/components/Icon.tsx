@@ -2,59 +2,108 @@ import { StyleProp, ViewStyle } from 'react-native';
 import {
     Accessibility,
     Activity,
+    Apple,
     ArrowRight,
+    Award,
     Ban,
+    BedDouble,
+    Bell,
+    BookOpen,
+    Brain,
     CalendarDays,
+    ChartColumn,
+    Check,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
     CircleCheck,
     CirclePlus,
     Clock,
+    Code,
+    Coffee,
+    Droplet,
+    Dumbbell,
     EyeOff,
     Flame,
-    Check,
-    Bell,
-    Trophy,
-    ListChecks,
+    Footprints,
     Globe,
+    Hourglass,
+    Info,
     KeyRound,
     Layers,
     LayoutDashboard,
     LayoutGrid,
+    Leaf,
+    ListChecks,
     LucideIcon,
+    Minus,
     Moon,
+    Music,
     Palette,
+    Pause,
+    PenLine,
+    Pencil,
+    PhoneOff,
+    Play,
     Plus,
+    RotateCcw,
     Search,
     Server,
     Settings,
     ShieldAlert,
     ShieldCheck,
+    SkipForward,
+    SlidersHorizontal,
     Sparkles,
+    Square,
+    Sun,
+    Target,
+    Timer,
     Trash2,
+    TrendingUp,
+    TriangleAlert,
+    Trophy,
+    Vibrate,
+    Volume2,
+    Waves,
+    Wind,
     X,
+    Zap,
 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 
-const iconMap: Record<string, LucideIcon> = {
+const ICONS = {
     // Tabs (keyed by route name)
     Home: LayoutDashboard,
+    Habits: ListChecks,
+    Breathe: Waves,
     Block: CirclePlus,
     Settings: Settings,
     // General
     Search: Search,
     Close: X,
     Plus: Plus,
+    Minus: Minus,
     Next: ChevronRight,
     Back: ChevronLeft,
     ArrowRight: ArrowRight,
     Arrow: ChevronDown,
     Selected: CircleCheck,
+    Check: Check,
     Calendar: CalendarDays,
     Time: Clock,
     Trash: Trash2,
     Hide: EyeOff,
+    Edit: Pencil,
+    Info: Info,
+    Alert: TriangleAlert,
+    Bell: Bell,
+    Trophy: Trophy,
+    Award: Award,
+    Flame: Flame,
+    Chart: ChartColumn,
+    Trend: TrendingUp,
+    Sliders: SlidersHorizontal,
     // Protection & settings
     Shield: ShieldCheck,
     ShieldOff: ShieldAlert,
@@ -69,18 +118,45 @@ const iconMap: Record<string, LucideIcon> = {
     Accessibility: Accessibility,
     Sparkles: Sparkles,
     Apps: LayoutGrid,
-    // Habits
-    Habits: ListChecks,
-    Flame: Flame,
-    Check: Check,
-    Bell: Bell,
-    Trophy: Trophy,
-};
+    // Training
+    Timer: Timer,
+    Hourglass: Hourglass,
+    Wind: Wind,
+    Waves: Waves,
+    Play: Play,
+    Pause: Pause,
+    Stop: Square,
+    Skip: SkipForward,
+    Restart: RotateCcw,
+    Target: Target,
+    Zap: Zap,
+    Sound: Volume2,
+    Vibrate: Vibrate,
+    // Habit icons
+    Dumbbell: Dumbbell,
+    Book: BookOpen,
+    Brain: Brain,
+    Droplet: Droplet,
+    Footprints: Footprints,
+    Sun: Sun,
+    Pen: PenLine,
+    Music: Music,
+    Code: Code,
+    Apple: Apple,
+    Bed: BedDouble,
+    PhoneOff: PhoneOff,
+    Leaf: Leaf,
+    Coffee: Coffee,
+} satisfies Record<string, LucideIcon>;
+
+export type IconName = keyof typeof ICONS;
+
+export const isIconName = (value: unknown): value is IconName => typeof value === 'string' && value in ICONS;
 
 type IconOpacity = 'normal' | 'muted' | 'faded';
 
 interface IconProps {
-    name: string;
+    name: IconName;
     size?: number;
     opacity?: IconOpacity;
     /** false = success green (used for "done" checks); a string = that color; default = text color. */
@@ -89,15 +165,15 @@ interface IconProps {
     style?: StyleProp<ViewStyle>;
 }
 
-const opacityMap: Record<IconOpacity, number> = {
+const OPACITY: Record<IconOpacity, number> = {
     normal: 1,
     muted: 0.8,
     faded: 0.6,
 };
 
-const Icon: React.FC<IconProps> = ({ name, size = 24, opacity = 'normal', tint, strokeWidth = 2, style }) => {
+const Icon: React.FC<IconProps> = ({ name, size = 24, opacity = 'normal', tint, strokeWidth = 1.8, style }) => {
     const { theme } = useTheme();
-    const Glyph = iconMap[name] ?? CircleCheck;
+    const Glyph = ICONS[name] ?? CircleCheck;
     const color = tint === false ? theme.colors.primaryGreen : tint ?? theme.colors.text;
 
     return (
@@ -105,7 +181,7 @@ const Icon: React.FC<IconProps> = ({ name, size = 24, opacity = 'normal', tint, 
             size={size}
             color={color}
             strokeWidth={strokeWidth}
-            style={[{ opacity: opacityMap[opacity] }, style] as any}
+            style={[{ opacity: OPACITY[opacity] }, style] as any}
         />
     );
 };

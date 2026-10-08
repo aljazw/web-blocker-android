@@ -28,13 +28,13 @@ interface FadeInProps {
 }
 
 /** Fades and slides its children up into place on mount. */
-export const FadeIn: React.FC<FadeInProps> = ({ children, delay = 0, offset = 14, style }) => {
+export const FadeIn: React.FC<FadeInProps> = ({ children, delay = 0, offset = 6, style }) => {
     const progress = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         Animated.timing(progress, {
             toValue: 1,
-            duration: 380,
+            duration: 260,
             delay,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
@@ -49,7 +49,7 @@ export const FadeIn: React.FC<FadeInProps> = ({ children, delay = 0, offset = 14
 };
 
 /** Stagger delay for the n-th item in a list, capped so long lists don't drag. */
-export const stagger = (index: number, step = 45, max = 8) => Math.min(index, max) * step;
+export const stagger = (index: number, step = 30, max = 8) => Math.min(index, max) * step;
 
 interface ScalePressableProps extends Omit<PressableProps, 'style'> {
     style?: StyleProp<ViewStyle>;
@@ -58,11 +58,11 @@ interface ScalePressableProps extends Omit<PressableProps, 'style'> {
     children: React.ReactNode;
 }
 
-/** Pressable that springs down slightly while held — the "squishy" modern press feel. */
+/** Pressable that eases down slightly while held, for tactile feedback. */
 export const ScalePressable: React.FC<ScalePressableProps> = ({
     style,
     containerStyle,
-    scaleTo = 0.96,
+    scaleTo = 0.98,
     children,
     onPressIn,
     onPressOut,
@@ -72,7 +72,7 @@ export const ScalePressable: React.FC<ScalePressableProps> = ({
     const scale = useRef(new Animated.Value(1)).current;
 
     const springTo = (toValue: number) =>
-        Animated.spring(scale, { toValue, useNativeDriver: true, speed: 40, bounciness: 6 }).start();
+        Animated.timing(scale, { toValue, duration: 90, useNativeDriver: true }).start();
 
     return (
         <Animated.View style={[containerStyle, { transform: [{ scale }] }]}>
@@ -102,7 +102,7 @@ interface AnimatedNumberProps extends Omit<ThemedTextProps, 'children'> {
 }
 
 /** Counts up (or down) to `value` whenever it changes. */
-export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({ value, duration = 650, ...textProps }) => {
+export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({ value, duration = 450, ...textProps }) => {
     const anim = useRef(new Animated.Value(0)).current;
     const [display, setDisplay] = useState(0);
 
@@ -133,7 +133,7 @@ export const AnimatedBar: React.FC<AnimatedBarProps> = ({ fraction, color, style
     useEffect(() => {
         Animated.timing(width, {
             toValue: fraction,
-            duration: 700,
+            duration: 450,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: false,
         }).start();

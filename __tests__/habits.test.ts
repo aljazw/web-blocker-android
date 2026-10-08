@@ -18,7 +18,7 @@ const WEEKDAYS = [true, true, true, true, true, false, false];
 const habit = (over: Partial<Habit> = {}): Habit => ({
     id: 'h1',
     title: 'Workout',
-    emoji: '💪',
+    icon: 'Dumbbell',
     days: EVERY_DAY,
     reminder: null,
     createdAt: '2026-09-01',
@@ -120,5 +120,16 @@ describe('describeHabitDays', () => {
         expect(describeHabitDays([false, false, false, false, false, true, true])).toBe('Weekends');
         expect(describeHabitDays([true, false, true, false, false, false, false])).toBe('Mon, Wed');
         expect(describeHabitDays(Array(7).fill(false))).toBe('No days');
+    });
+});
+
+describe('markDone', () => {
+    const { markDone } = require('../src/utils/habits');
+    const day = new Date(2026, 9, 8, 12);
+
+    it('checks the day off once and never unchecks it', () => {
+        const once = markDone(habit(), day);
+        expect(once.completions).toEqual(['2026-10-08']);
+        expect(markDone(once, day).completions).toEqual(['2026-10-08']);
     });
 });

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import BlurModal from './BlurModal';
 import { ThemedText } from './ThemedText';
-import ActionButton from './ActionButton';
+import Button from './Button';
 import { shapes, spacing } from '../theme';
 import { UNBLOCK_MESSAGES } from '../constants/strings';
 import { useTheme } from '../context/ThemeContext';
@@ -49,10 +49,10 @@ const PassphrasePopup: React.FC<PassphrasePopupProps> = ({ visible, onClose, onC
 
     return (
         <BlurModal visible={visible} onClose={onClose}>
-            <ThemedText weight="strong" size="large" align="center">
+            <ThemedText weight="bold" size="large">
                 Type to confirm
             </ThemedText>
-            <ThemedText size="small" color="muted" align="center" style={styles.subtitle}>
+            <ThemedText size="small" color="muted" style={styles.subtitle}>
                 Passphrase protection is on. Type the text below exactly to continue.
             </ThemedText>
 
@@ -99,8 +99,14 @@ const PassphrasePopup: React.FC<PassphrasePopupProps> = ({ visible, onClose, onC
             )}
 
             <View style={styles.buttons}>
-                <ActionButton variant="cancel" onPress={onClose} />
-                <ActionButton variant="confirm" onPress={handleConfirm} />
+                <Button label="Cancel" variant="secondary" compact onPress={onClose} style={styles.flex} />
+                <Button
+                    label="Confirm"
+                    compact
+                    disabled={input.length === 0}
+                    onPress={handleConfirm}
+                    style={[styles.flex, styles.gap]}
+                />
             </View>
         </BlurModal>
     );
@@ -164,7 +170,7 @@ const styles = StyleSheet.create({
         alignSelf: 'stretch',
         minHeight: 96,
         maxHeight: 180,
-        borderWidth: 1.5,
+        borderWidth: 1,
         borderRadius: shapes.borderRadius.medium,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
@@ -177,8 +183,13 @@ const styles = StyleSheet.create({
     },
     buttons: {
         flexDirection: 'row',
-        justifyContent: 'center',
         marginTop: spacing.lg,
+    },
+    flex: {
+        flex: 1,
+    },
+    gap: {
+        marginLeft: spacing.sm,
     },
 });
 

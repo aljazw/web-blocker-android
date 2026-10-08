@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleProp, StyleSheet, View, ViewStyle } from 'react
 import { shapes, spacing } from '../theme';
 import { useTheme } from '../context/ThemeContext';
 import { ThemedText } from './ThemedText';
-import Icon from './Icon';
+import Icon, { IconName } from './Icon';
 import { ScalePressable } from './Motion';
 import { haptics } from '../utils/haptics';
 
@@ -14,7 +14,9 @@ interface ButtonProps {
     /** If this returns a promise, the button shows a spinner and ignores taps until it settles. */
     onPress: () => void | Promise<unknown>;
     variant?: ButtonVariant;
-    icon?: string;
+    icon?: IconName;
+    /** Put the icon before the label instead of after it. */
+    iconLeading?: boolean;
     disabled?: boolean;
     loading?: boolean;
     compact?: boolean;
@@ -22,30 +24,28 @@ interface ButtonProps {
 }
 
 /**
- * The app's one button: pill-shaped, themed, with optional trailing icon.
- * Taps are ignored while a previous async onPress is still running, so an
- * action (saving, deleting) can never run twice from a double tap.
+ * The app's one button. Taps are ignored while a previous async onPress is
+ * still running, so an action (saving, deleting) can never run twice from a
+ * double tap.
  */
 const Button: React.FC<ButtonProps> = ({
     label,
     onPress,
     variant = 'primary',
     icon,
+    iconLeading,
     disabled,
     loading,
     compact,
     style,
 }) => {
-    const { theme } = useTheme();
-    const { accent, accentSoft, onAccent, primaryRed, text, border } = theme.colors;
-
-    const palette: Record<ButtonVariant, { bg: string; fg: string; borderColor: string }> = {
-        primary: { bg: accent, fg: onAccent, borderColor: accent },
-        secondary: { bg: accentSoft, fg: accent, borderColor: 'transparent' },
-        ghost: { bg: 'transparent', fg: text, borderColor: border },
-        danger: { bg: primaryRed, fg: '#FFFFFF', borderColor: primaryRed },
-    };
-    const { bg, fg, borderColor } = palette[variant];
+    const { colors } = useTheme().theme;
+    const { bg, fg, borderColor } = {
+        primary: { bg: colors.accent, fg: colors.onAccent, borderColor: colors.accent },
+        secondary: { bg: colors.elevated, fg: colors.text, borderColor: colors.border },
+        ghost: { bg: 'transparent', fg: colors.text, borderColor: 'transparent' },
+        danger: { bg: colors.redSoft, fg: colors.primaryRed, borderColor: 'transparent' },
+    }[variant];
 
     const [busy, setBusy] = useState(false);
     const running = useRef(false);
@@ -58,7 +58,9 @@ const Button: React.FC<ButtonProps> = ({
     );
 
     const handlePress = async () => {
-        if (running.current) return;
+        if (running.current) {
+            return;
+        }
         running.current = true;
         haptics.tap();
         try {
@@ -69,17 +71,29 @@ const Button: React.FC<ButtonProps> = ({
             }
         } finally {
             running.current = false;
-            if (mounted.current) setBusy(false);
+            if (mounted.current) {
+                setBusy(false);
+            }
         }
     };
 
     const inactive = disabled || loading || busy;
+    const iconView = icon && (
+        <Icon
+            name={icon}
+            size={compact ? 15 : 17}
+            tint={fg}
+            strokeWidth={2}
+            style={iconLeading ? styles.iconLeading : styles.iconTrailing}
+        />
+    );
 
     return (
         <ScalePressable
             onPress={inactive ? undefined : handlePress}
             disabled={!!inactive}
             accessibilityRole="button"
+            accessibilityLabel={label}
             accessibilityState={{ disabled: !!inactive }}
             containerStyle={[inactive && styles.disabled, style]}
             style={[styles.base, compact && styles.compact, { backgroundColor: bg, borderColor }]}>
@@ -87,10 +101,11 @@ const Button: React.FC<ButtonProps> = ({
                 <ActivityIndicator color={fg} />
             ) : (
                 <View style={styles.row}>
+                    {iconLeading && iconView}
                     <ThemedText weight="strong" size={compact ? 'small' : 'normal'} style={{ color: fg }}>
                         {label}
                     </ThemedText>
-                    {icon && <Icon name={icon} size={compact ? 15 : 18} tint={fg} style={styles.icon} />}
+                    {!iconLeading && iconView}
                 </View>
             )}
         </ScalePressable>
@@ -99,9 +114,9 @@ const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
     base: {
-        minHeight: 50,
+        minHeight: 48,
         paddingHorizontal: spacing.lg,
-        borderRadius: shapes.borderRadius.pill,
+        borderRadius: shapes.borderRadius.medium,
         borderWidth: shapes.borderWidth.thin,
         alignItems: 'center',
         justifyContent: 'center',
@@ -114,11 +129,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
     },
-    icon: {
-        marginLeft: spacing.sm,
+    iconTrailing: {
+        marginLeft: spacing.sm - 2,
+    },
+    iconLeading: {
+        marginRight: spacing.sm - 2,
     },
     disabled: {
-        opacity: 0.5,
+        opacity: 0.45,
     },
 });
 

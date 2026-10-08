@@ -24,7 +24,9 @@ function Segmented<T extends string>({ options, value, onChange, style }: Segmen
                     <Pressable
                         key={option.value}
                         onPress={() => {
-                            if (active) return;
+                            if (active) {
+                                return;
+                            }
                             haptics.tap();
                             animateLayout();
                             onChange(option.value);
@@ -32,7 +34,7 @@ function Segmented<T extends string>({ options, value, onChange, style }: Segmen
                         style={[styles.item, active && { backgroundColor: theme.colors.card }]}>
                         <ThemedText
                             size="small"
-                            weight="strong"
+                            weight="medium"
                             style={{ color: active ? theme.colors.text : theme.colors.muted }}>
                             {option.label}
                         </ThemedText>
@@ -46,14 +48,14 @@ function Segmented<T extends string>({ options, value, onChange, style }: Segmen
 const styles = StyleSheet.create({
     track: {
         flexDirection: 'row',
-        borderRadius: shapes.borderRadius.pill,
-        padding: 4,
+        borderRadius: shapes.borderRadius.medium,
+        padding: 3,
     },
     item: {
         flex: 1,
         alignItems: 'center',
-        paddingVertical: 9,
-        borderRadius: shapes.borderRadius.pill,
+        paddingVertical: 8,
+        borderRadius: shapes.borderRadius.medium - 2,
     },
 });
 

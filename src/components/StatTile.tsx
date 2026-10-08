@@ -6,20 +6,25 @@ import { AnimatedNumber } from './Motion';
 
 interface StatTileProps {
     label: string;
-    value: number;
-    /** Shown after the number, e.g. "%" or "d". */
+    /** A number counts up; a string (e.g. "2:45") is shown as is. */
+    value: number | string;
+    /** Shown after a number, e.g. "%" or "d". */
     suffix?: string;
 }
 
-/** Small card with a big counting-up number and a label. Use inside a row. */
+/** Metric card: small caps label over a large tabular value. Use inside a row. */
 const StatTile: React.FC<StatTileProps> = ({ label, value, suffix }) => (
     <ThemedView withBorder style={styles.tile}>
-        <ThemedText size="xlarge" weight="strong">
-            <AnimatedNumber value={value} size="xlarge" weight="strong" />
-            {suffix}
-        </ThemedText>
-        <ThemedText size="tiny" color="muted" weight="medium">
+        <ThemedText size="tiny" color="muted" weight="strong" caps numberOfLines={1}>
             {label}
+        </ThemedText>
+        <ThemedText size="xlarge" weight="bold" tabular style={styles.value} numberOfLines={1}>
+            {typeof value === 'number' ? <AnimatedNumber value={value} size="xlarge" weight="bold" tabular /> : value}
+            {suffix ? (
+                <ThemedText size="small" color="muted" weight="medium">
+                    {suffix}
+                </ThemedText>
+            ) : null}
         </ThemedText>
     </ThemedView>
 );
@@ -28,9 +33,12 @@ const styles = StyleSheet.create({
     tile: {
         flex: 1,
         marginHorizontal: 4,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.md,
-        borderRadius: shapes.borderRadius.medium,
+        paddingVertical: spacing.sm + 2,
+        paddingHorizontal: spacing.sm + 2,
+        borderRadius: shapes.borderRadius.large,
+    },
+    value: {
+        marginTop: 6,
     },
 });
 

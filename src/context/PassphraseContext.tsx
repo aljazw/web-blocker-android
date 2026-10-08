@@ -18,7 +18,9 @@ export const PassphraseProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         getPassphrasePreference()
             .then(saved => {
-                if (saved !== null) setIsPassphraseEnabled(saved);
+                if (saved !== null) {
+                    setIsPassphraseEnabled(saved);
+                }
             })
             .catch(error => logger.warn('Could not load passphrase preference', error));
     }, []);

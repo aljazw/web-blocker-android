@@ -1,5 +1,5 @@
 export const PASSPHRASE_PROTECTION = {
-    title: 'Are you sure you want to enable passphrase protection?\n\n',
+    title: 'Turn on passphrase protection?',
     text:
         'This will require you to type a long phrase every time you attempt to remove a blocked website.\n\n' +
         "It's designed to help you stay focused and stick to your goals.",
@@ -7,14 +7,14 @@ export const PASSPHRASE_PROTECTION = {
 
 export const UNINSTALL_PREVENTION = {
     enable: {
-        title: 'Are you sure you want to enable uninstall prevention?\n\n',
+        title: 'Turn on uninstall prevention?',
         text:
             'Granting this permission will make the app a Device Administrator.\n\n' +
             'Once enabled, you won’t be able to uninstall the app without first disabling this protection in settings.\n\n' +
             'This helps ensure you stay focused and committed to your goals.',
     },
     disable: {
-        title: 'Are you sure you want to disable uninstall prevention?\n\n',
+        title: 'Turn off uninstall prevention?',
         text:
             'Disabling this permission will remove the app’s Device Administrator rights.\n\n' +
             'Once disabled, you will be able to uninstall the app without any restrictions.\n\n' +
@@ -24,11 +24,11 @@ export const UNINSTALL_PREVENTION = {
 
 export const ERRORS = {
     uninstallPrevention: {
-        title: 'Uninstall Prevention Error',
+        title: 'Couldn’t change uninstall prevention',
         text: 'Failed to change uninstall prevention settings. Please try again later.',
     },
     dataLoadError: {
-        title: 'Data Load Error',
+        title: 'Couldn’t load your data',
         text: 'We couldn’t access your blocked websites. Please try again later.',
     },
     saveFailed: {
@@ -36,32 +36,30 @@ export const ERRORS = {
         text: 'Nothing was changed. Please try again.',
     },
     genericRetrieveError: {
-        title: 'Oops! Something went wrong',
+        title: 'Something went wrong',
         text: 'We couldn’t retrieve your blocked websites. Please try again later.',
     },
     dnsBlocking: {
-        title: 'DNS Blocking Error',
+        title: 'Couldn’t start DNS blocking',
         text: 'We couldn’t start DNS blocking. Make sure no other VPN is active and try again.',
     },
 };
 
+/** Phrases typed to confirm a protected action; long enough that it can't be done on impulse. */
 export const UNBLOCK_MESSAGES = [
-    'I told myself I should stop procrastinating but then I thought why put off until tomorrow what you can do the day after tomorrow',
-    'Congrats You are about to unblock a site Just dont let it turn into a quick break that lasts all day Stay strong champion of focus',
-    'Removing a block means saying yes to your goals Keep your focus sharp and your distractions away',
-    'Unlocked Now resist the urge to turn that quick peek into a deep dive Your future self will thank you for staying focused today',
-    'Freedom tastes sweet but so does crushing your goals Unblock wisely and keep slaying that productivity game',
+    'I am choosing to remove this block deliberately and I accept that this decision may cost me focus I worked hard to build',
+    'The urge I feel right now will pass within minutes and the goals I set for myself will still matter tomorrow morning',
+    'Before removing this block I have paused and asked myself whether this change serves the person I am trying to become',
+    'Distraction is easy to start and hard to stop so I will make this change only because I have a clear reason to do it',
+    'I set this block when I was thinking clearly and I am overriding that decision now knowing exactly what I am doing',
 ];
 
-export const ACCESSIBILITY_NOTIFICATION_TEXT = `🔧 Please enable Accessibility Service for SiteLock:
+export const ACCESSIBILITY_NOTIFICATION_TEXT = `SiteLock needs its Accessibility service to block sites and apps.
 
-1️⃣ Open Accessibility settings (click here).
-2️⃣ Scroll to 'Installed Services' (or 'Downloaded Services').
-3️⃣ Find & tap 'SiteLock'.
-4️⃣ Toggle it ON
-5️⃣ Confirm any prompts.
-
-This lets the app block distracting sites and keep you focused! 🔒`;
+1. Tap to open Accessibility settings.
+2. Open "Installed services" (or "Downloaded services").
+3. Select SiteLock and switch it on.
+4. Confirm the prompts.`;
 
 export const ACCESSIBILITY_SETUP_STEPS = [
     'Open Accessibility settings (click below).',

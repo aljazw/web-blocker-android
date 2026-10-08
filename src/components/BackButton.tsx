@@ -1,35 +1,25 @@
-import { Pressable, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useTheme } from '../context/ThemeContext';
+import { StyleSheet } from 'react-native';
 import { spacing } from '../theme';
-import Icon from './Icon';
+import IconButton from './IconButton';
 
-/** Round "back" button for the left side of a screen header. */
-const BackButton: React.FC = () => {
-    const { theme } = useTheme();
+/** "Back" button for the left side of a screen header. */
+const BackButton: React.FC<{ onPress?: () => void }> = ({ onPress }) => {
     const navigation = useNavigation();
-
     return (
-        <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={10}
-            accessibilityRole="button"
+        <IconButton
+            icon="Back"
+            variant="outline"
             accessibilityLabel="Back"
-            style={[styles.button, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-            <Icon name="Back" size={20} />
-        </Pressable>
+            onPress={onPress ?? (() => navigation.goBack())}
+            style={styles.button}
+        />
     );
 };
 
 const styles = StyleSheet.create({
     button: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: spacing.md,
+        marginRight: spacing.md - 4,
     },
 });
 

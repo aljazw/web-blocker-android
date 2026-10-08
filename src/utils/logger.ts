@@ -6,9 +6,13 @@
  */
 export const logger = {
     warn: (message: string, error?: unknown) => {
-        if (__DEV__) console.warn(message, error);
+        if (__DEV__) {
+            console.warn(message, error);
+        }
     },
     error: (message: string, error?: unknown) => {
-        if (__DEV__) console.error(message, error);
+        if (__DEV__) {
+            console.error(message, error);
+        }
     },
 };
