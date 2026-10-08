@@ -16,8 +16,8 @@ export type RootStackParamList = {
     Schedule: { websiteUrl?: string; app?: { packageName: string; appName: string } };
     /** No habitId = create a new habit. */
     HabitEditor: { habitId?: string } | undefined;
-    /** A generated CO2/O2 table, or a custom one (no tableId = create). */
-    ApneaTable: { kind: 'co2' | 'o2' } | { kind: 'custom'; tableId?: string };
+    /** A generated CO2/O2 table, or a custom one (no tableId = create, optionally prefilled). */
+    ApneaTable: { kind: 'co2' | 'o2' } | { kind: 'custom'; tableId?: string; name?: string; rounds?: TableRound[] };
     /** The live (or just finished) training session. */
     ApneaSession: undefined;
     ApneaHistory: undefined;
@@ -70,12 +70,20 @@ export interface Habit {
 // ---- Apnea training ---------------------------------------------------------
 
 export type ApneaKind = 'co2' | 'o2' | 'custom' | 'pb' | 'breathing';
-export type Difficulty = 'easy' | 'normal' | 'hard';
 
 /** One row of a breath-hold table, in seconds: rest (breathe) first, then hold. */
 export interface TableRound {
     breathe: number;
     hold: number;
+}
+
+/** Inputs of a generated table, in seconds. */
+export interface TableParams {
+    hold: number;
+    breathe: number;
+    /** Change per round: less breathe time (CO₂) or more hold (O₂). */
+    step: number;
+    rounds: number;
 }
 
 export interface CustomTable {
@@ -91,8 +99,9 @@ export interface ApneaSettings {
     holdPulse: boolean;
     /** Relaxed breathing before a max-hold test, in seconds (0 = none). */
     breatheUp: number;
-    difficulty: Difficulty;
-    rounds: number;
+    /** Parameters of the generated CO₂ and O₂ tables (see utils/apnea TableParams). */
+    co2: TableParams;
+    o2: TableParams;
     safetyAccepted: boolean;
 }
 

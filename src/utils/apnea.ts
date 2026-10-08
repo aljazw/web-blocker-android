@@ -1,4 +1,6 @@
-import { ApneaKind, ApneaRecord, Difficulty, TableRound } from '../types/types';
+import { ApneaKind, ApneaRecord, TableParams, TableRound } from '../types/types';
+
+export type { TableParams };
 import { addDays, startOfWeek, toDateKey } from './dates';
 
 /**
@@ -8,84 +10,74 @@ import { addDays, startOfWeek, toDateKey } from './dates';
 
 // ---- Tables -------------------------------------------------------------------
 
-export const ROUNDS = { min: 4, max: 12, default: 8 };
-/** Shortest hold a generated table will ask for, in seconds. */
-export const MIN_HOLD = 10;
-/** Generated times snap to this many seconds, so tables read cleanly. */
-const STEP = 5;
+export type GeneratedKind = 'co2' | 'o2';
 
-interface TableProfile {
-    /** CO2: fixed hold as a share of the personal best. */
-    co2Hold: number;
-    /** CO2: rest shrinks linearly from start to end, in seconds. */
-    co2RestStart: number;
-    co2RestEnd: number;
-    /** O2: hold grows linearly between these shares of the personal best. */
-    o2HoldStart: number;
-    o2HoldEnd: number;
-    /** O2: fixed rest, in seconds. */
-    o2Rest: number;
-}
+/** Limits for the table editor's controls. */
+export const TABLE_LIMITS = {
+    hold: { min: 10, max: 600 },
+    breathe: { min: 5, max: 600 },
+    step: { min: 0, max: 60 },
+    rounds: { min: 1, max: 20 },
+    /** Every time moves in 5-second increments. */
+    increment: 5,
+};
+
+/** Shortest hold a custom table allows, in seconds. */
+export const MIN_HOLD = TABLE_LIMITS.hold.min;
+
+/** Easy starting templates; everything is editable. */
+export const DEFAULT_TABLE_PARAMS: Record<GeneratedKind, TableParams> = {
+    co2: { hold: 60, breathe: 60, step: 5, rounds: 8 },
+    o2: { hold: 60, breathe: 60, step: 10, rounds: 8 },
+};
+
+const clamp = (value: number, { min, max }: { min: number; max: number }) =>
+    Math.min(max, Math.max(min, Math.round(value)));
+
+/** Keeps every parameter inside its limits. */
+export const normalizeParams = (p: TableParams): TableParams => ({
+    hold: clamp(p.hold, TABLE_LIMITS.hold),
+    breathe: clamp(p.breathe, TABLE_LIMITS.breathe),
+    step: clamp(p.step, TABLE_LIMITS.step),
+    rounds: clamp(p.rounds, TABLE_LIMITS.rounds),
+});
+
+/** CO₂ table: the same hold every round while the breathe time shrinks by `step` (never below the minimum). */
+export const co2Table = (params: TableParams): TableRound[] => {
+    const p = normalizeParams(params);
+    return Array.from({ length: p.rounds }, (_, i) => ({
+        breathe: Math.max(TABLE_LIMITS.breathe.min, p.breathe - i * p.step),
+        hold: p.hold,
+    }));
+};
+
+/** O₂ table: the same breathe time every round while the hold grows by `step`. */
+export const o2Table = (params: TableParams): TableRound[] => {
+    const p = normalizeParams(params);
+    return Array.from({ length: p.rounds }, (_, i) => ({
+        breathe: p.breathe,
+        hold: Math.min(TABLE_LIMITS.hold.max, p.hold + i * p.step),
+    }));
+};
+
+export const generateTable = (kind: GeneratedKind, params: TableParams): TableRound[] =>
+    kind === 'co2' ? co2Table(params) : o2Table(params);
+
+const snap = (seconds: number) => Math.round(seconds / TABLE_LIMITS.increment) * TABLE_LIMITS.increment;
 
 /**
- * Conventional static-apnea table parameters. The O2 table never goes past
- * 85% of the personal best; maximal attempts belong in a max test, not a table.
+ * Conventional parameters from a personal best, offered as a suggestion only:
+ * CO₂ holds half the best with 2:00 rest shrinking 15 s a round; O₂ grows from
+ * 40% to 80% of the best with 2:00 rest.
  */
-export const DIFFICULTY: Record<Difficulty, TableProfile & { label: string }> = {
-    easy: {
-        label: 'Easy',
-        co2Hold: 0.4,
-        co2RestStart: 120,
-        co2RestEnd: 30,
-        o2HoldStart: 0.35,
-        o2HoldEnd: 0.7,
-        o2Rest: 120,
-    },
-    normal: {
-        label: 'Normal',
-        co2Hold: 0.5,
-        co2RestStart: 120,
-        co2RestEnd: 15,
-        o2HoldStart: 0.4,
-        o2HoldEnd: 0.8,
-        o2Rest: 120,
-    },
-    hard: {
-        label: 'Hard',
-        co2Hold: 0.6,
-        co2RestStart: 105,
-        co2RestEnd: 15,
-        o2HoldStart: 0.45,
-        o2HoldEnd: 0.85,
-        o2Rest: 105,
-    },
-};
-
-const snap = (seconds: number) => Math.round(seconds / STEP) * STEP;
-const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
-const clampRounds = (rounds: number) => Math.min(ROUNDS.max, Math.max(ROUNDS.min, Math.round(rounds)));
-/** 0 for the first round, 1 for the last. */
-const progressOf = (index: number, rounds: number) => (rounds <= 1 ? 0 : index / (rounds - 1));
-
-/** CO2 tolerance table: the same hold every round while the rest between holds shrinks. */
-export const co2Table = (personalBestSec: number, difficulty: Difficulty, rounds = ROUNDS.default): TableRound[] => {
-    const p = DIFFICULTY[difficulty];
-    const n = clampRounds(rounds);
-    const hold = Math.max(MIN_HOLD, snap(personalBestSec * p.co2Hold));
-    return Array.from({ length: n }, (_, i) => ({
-        breathe: Math.max(STEP, snap(lerp(p.co2RestStart, p.co2RestEnd, progressOf(i, n)))),
-        hold,
-    }));
-};
-
-/** O2 (hypoxia) table: the same rest every round while the hold grows. */
-export const o2Table = (personalBestSec: number, difficulty: Difficulty, rounds = ROUNDS.default): TableRound[] => {
-    const p = DIFFICULTY[difficulty];
-    const n = clampRounds(rounds);
-    return Array.from({ length: n }, (_, i) => ({
-        breathe: p.o2Rest,
-        hold: Math.max(MIN_HOLD, snap(personalBestSec * lerp(p.o2HoldStart, p.o2HoldEnd, progressOf(i, n)))),
-    }));
+export const paramsFromBest = (kind: GeneratedKind, bestSec: number): TableParams => {
+    const rounds = 8;
+    if (kind === 'co2') {
+        return normalizeParams({ hold: snap(bestSec * 0.5), breathe: 120, step: 15, rounds });
+    }
+    const first = snap(bestSec * 0.4);
+    const step = Math.max(TABLE_LIMITS.increment, snap((bestSec * 0.8 - first) / (rounds - 1)));
+    return normalizeParams({ hold: first, breathe: 120, step, rounds });
 };
 
 /** Total length of a table in seconds. */

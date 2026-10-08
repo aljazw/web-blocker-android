@@ -14,12 +14,12 @@ export const TABLE_INFO = {
     co2: {
         title: 'CO₂ table',
         summary:
-            'The hold stays the same while the rest between holds gets shorter. Builds tolerance to the urge to breathe caused by rising carbon dioxide.',
+            'The hold stays the same while the breathe time between holds gets shorter. Builds tolerance to the urge to breathe caused by rising carbon dioxide.',
     },
     o2: {
         title: 'O₂ table',
         summary:
-            'The rest stays the same while the hold grows each round. Trains your body to work with less oxygen. Never exceeds 85% of your best.',
+            'The breathe time stays the same while the hold grows each round. Trains your body to work with less oxygen. Keep the last hold well below your maximum.',
     },
     custom: {
         title: 'Custom table',

@@ -29,13 +29,12 @@ import { gutter, spacing } from '../theme';
 import {
     BREATHING_EXERCISES,
     BreathingExercise,
-    co2Table,
     exercisePhases,
     formatClock,
     formatMinutes,
+    generateTable,
     maxHoldHistory,
     maxTestPhases,
-    o2Table,
     PHASE_LABEL,
     personalBest,
     tableDuration,
@@ -74,7 +73,6 @@ const BreatheScreen: React.FC = () => {
     const history = useMemo(() => maxHoldHistory(records), [records]);
     const stats = useMemo(() => trainingStats(records), [records]);
     const recent = useMemo(() => [...records].reverse().slice(0, RECENT_COUNT), [records]);
-    const bestSec = best ? Math.round(best.ms / 1000) : 0;
     const sessionLive = session?.status === 'running' || session?.status === 'paused';
 
     // The safety briefing must be acknowledged once before any training.
@@ -86,8 +84,7 @@ const BreatheScreen: React.FC = () => {
             startSession({ kind: 'pb', title: 'Max hold', phases: maxTestPhases(settings.breatheUp) }, settings),
         );
 
-    const openTable = (kind: 'co2' | 'o2') =>
-        guard(() => (best ? navigation.navigate('ApneaTable', { kind }) : startMaxTest()));
+    const openTable = (kind: 'co2' | 'o2') => guard(() => navigation.navigate('ApneaTable', { kind }));
 
     const deleteRecord = async (record: ApneaRecord) => {
         close();
@@ -99,10 +96,7 @@ const BreatheScreen: React.FC = () => {
     };
 
     const tablePreview = (kind: 'co2' | 'o2') => {
-        if (!best) {
-            return 'Needs a personal best';
-        }
-        const rounds = (kind === 'co2' ? co2Table : o2Table)(bestSec, settings.difficulty, settings.rounds);
+        const rounds = generateTable(kind, settings[kind]);
         const holds = rounds.map(r => r.hold);
         const holdText =
             kind === 'co2'
@@ -165,7 +159,8 @@ const BreatheScreen: React.FC = () => {
                             </>
                         ) : (
                             <ThemedText color="muted" style={styles.pbEmpty}>
-                                Measure your maximum static breath-hold. Your CO₂ and O₂ tables are calculated from it.
+                                Measure your maximum static breath-hold to track progress. Tables can suggest times from
+                                it.
                             </ThemedText>
                         )}
                         <View style={styles.buttons}>

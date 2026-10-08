@@ -1,6 +1,10 @@
 import { ApneaRecord } from '../src/types/types';
 import {
     co2Table,
+    DEFAULT_TABLE_PARAMS,
+    generateTable,
+    paramsFromBest,
+    TABLE_LIMITS,
     exercisePhases,
     BREATHING_EXERCISES,
     formatClock,
@@ -31,46 +35,46 @@ const record = (overrides: Partial<ApneaRecord>): ApneaRecord => ({
 });
 
 describe('co2Table', () => {
-    it('keeps the hold fixed at half the PB and shrinks the rest from 2:00 to 0:15', () => {
-        const table = co2Table(180, 'normal', 8);
+    it('keeps the hold fixed and shortens the breathe time by the step each round', () => {
+        const table = co2Table({ hold: 60, breathe: 60, step: 5, rounds: 8 });
         expect(table).toHaveLength(8);
-        expect(table.every(r => r.hold === 90)).toBe(true);
-        expect(table[0].breathe).toBe(120);
-        expect(table[7].breathe).toBe(15);
-        for (let i = 1; i < table.length; i++) {
-            expect(table[i].breathe).toBeLessThanOrEqual(table[i - 1].breathe);
-        }
+        expect(table.every(r => r.hold === 60)).toBe(true);
+        expect(table.map(r => r.breathe)).toEqual([60, 55, 50, 45, 40, 35, 30, 25]);
     });
 
-    it('snaps every time to 5 seconds', () => {
-        const table = co2Table(173, 'hard', 7);
-        expect(table.every(r => r.breathe % 5 === 0 && r.hold % 5 === 0)).toBe(true);
+    it('never lets the breathe time drop below the minimum', () => {
+        const table = co2Table({ hold: 60, breathe: 30, step: 15, rounds: 6 });
+        expect(Math.min(...table.map(r => r.breathe))).toBe(TABLE_LIMITS.breathe.min);
     });
 
-    it('never asks for a hold shorter than the minimum', () => {
-        expect(co2Table(5, 'easy')[0].hold).toBe(MIN_HOLD);
-    });
-
-    it('clamps the number of rounds', () => {
-        expect(co2Table(120, 'normal', 1)).toHaveLength(4);
-        expect(co2Table(120, 'normal', 40)).toHaveLength(12);
+    it('clamps parameters to their limits', () => {
+        expect(co2Table({ hold: 1, breathe: 60, step: 5, rounds: 99 })).toHaveLength(TABLE_LIMITS.rounds.max);
+        expect(co2Table({ hold: 1, breathe: 60, step: 5, rounds: 4 })[0].hold).toBe(MIN_HOLD);
     });
 });
 
 describe('o2Table', () => {
-    it('keeps the rest fixed and grows the hold up to 80% of the PB', () => {
-        const table = o2Table(200, 'normal', 8);
-        expect(table.every(r => r.breathe === 120)).toBe(true);
-        expect(table[0].hold).toBe(80);
-        expect(table[7].hold).toBe(160);
-        for (let i = 1; i < table.length; i++) {
-            expect(table[i].hold).toBeGreaterThanOrEqual(table[i - 1].hold);
-        }
+    it('keeps the breathe time fixed and lengthens the hold by the step each round', () => {
+        const table = o2Table(DEFAULT_TABLE_PARAMS.o2);
+        expect(table.every(r => r.breathe === 60)).toBe(true);
+        expect(table.map(r => r.hold)).toEqual([60, 70, 80, 90, 100, 110, 120, 130]);
     });
 
-    it('never exceeds 85% of the PB, even on hard', () => {
-        const pb = 300;
-        expect(Math.max(...o2Table(pb, 'hard').map(r => r.hold))).toBeLessThanOrEqual(pb * 0.85);
+    it('works without a personal best, from the default template', () => {
+        expect(generateTable('co2', DEFAULT_TABLE_PARAMS.co2)[0]).toEqual({ breathe: 60, hold: 60 });
+    });
+});
+
+describe('paramsFromBest', () => {
+    it('suggests a CO2 hold of half the best with 2:00 shrinking 15 s', () => {
+        expect(paramsFromBest('co2', 180)).toEqual({ hold: 90, breathe: 120, step: 15, rounds: 8 });
+    });
+
+    it('suggests O2 holds growing from 40% to about 80% of the best', () => {
+        const table = o2Table(paramsFromBest('o2', 200));
+        expect(table[0].hold).toBe(80);
+        expect(table[table.length - 1].hold).toBeLessThanOrEqual(165);
+        expect(table[table.length - 1].hold).toBeGreaterThanOrEqual(150);
     });
 });
 
@@ -100,7 +104,7 @@ describe('session plans', () => {
     });
 
     it('sums a table duration', () => {
-        expect(tableDuration(co2Table(180, 'normal', 8))).toBeGreaterThan(8 * 90);
+        expect(tableDuration(co2Table(DEFAULT_TABLE_PARAMS.co2))).toBe(8 * 60 + (60 + 25) * 4);
     });
 });
 

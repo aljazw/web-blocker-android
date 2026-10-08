@@ -6,10 +6,11 @@ import {
     BlockedWebsitesData,
     CustomTable,
     Habit,
+    TableParams,
     TableRound,
 } from '../types/types';
 import { habitIconFrom } from '../constants/habitIcons';
-import { isApneaKind } from './apnea';
+import { DEFAULT_TABLE_PARAMS, isApneaKind, normalizeParams } from './apnea';
 
 const { SharedStorage } = NativeModules;
 
@@ -260,13 +261,18 @@ const toCustomTable = (v: any): CustomTable | null => {
     return rounds.length ? { id: v.id, name: isString(v.name) ? v.name : 'Custom table', rounds } : null;
 };
 
+const toTableParams = (v: any, fallback: TableParams): TableParams =>
+    v && isNumber(v.hold) && isNumber(v.breathe) && isNumber(v.step) && isNumber(v.rounds)
+        ? normalizeParams({ hold: v.hold, breathe: v.breathe, step: v.step, rounds: v.rounds })
+        : fallback;
+
 export const DEFAULT_APNEA_SETTINGS: ApneaSettings = {
     sound: true,
     vibration: true,
     holdPulse: true,
     breatheUp: 120,
-    difficulty: 'normal',
-    rounds: 8,
+    co2: DEFAULT_TABLE_PARAMS.co2,
+    o2: DEFAULT_TABLE_PARAMS.o2,
     safetyAccepted: false,
 };
 
@@ -305,8 +311,8 @@ export const getApneaSettings = async (): Promise<ApneaSettings> => {
         vibration: bool(v.vibration, d.vibration),
         holdPulse: bool(v.holdPulse, d.holdPulse),
         breatheUp: isNumber(v.breatheUp) && v.breatheUp >= 0 && v.breatheUp <= 600 ? v.breatheUp : d.breatheUp,
-        difficulty: v.difficulty === 'easy' || v.difficulty === 'hard' ? v.difficulty : 'normal',
-        rounds: isNumber(v.rounds) ? Math.min(12, Math.max(4, Math.round(v.rounds))) : d.rounds,
+        co2: toTableParams(v.co2, d.co2),
+        o2: toTableParams(v.o2, d.o2),
         safetyAccepted: bool(v.safetyAccepted, d.safetyAccepted),
     };
 };

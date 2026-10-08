@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import { CustomTable, Difficulty, RootStackNavigation, RootStackParamList, TableRound } from '../types/types';
+import { CustomTable, RootStackNavigation, RootStackParamList, TableParams, TableRound } from '../types/types';
 import BackButton from '../components/BackButton';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
@@ -10,7 +10,7 @@ import Dialog, { confirmActions } from '../components/Dialog';
 import ErrorPopup from '../components/ErrorPopup';
 import IconButton from '../components/IconButton';
 import SectionHeader from '../components/SectionHeader';
-import Segmented from '../components/Segmented';
+import { ListGroup, ListRow } from '../components/ListGroup';
 import Stepper from '../components/Stepper';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
@@ -19,14 +19,14 @@ import { useApneaData } from '../hooks/useApneaData';
 import { useStartSession } from '../hooks/useApneaSession';
 import { gutter, shapes, spacing } from '../theme';
 import {
-    co2Table,
-    DIFFICULTY,
+    DEFAULT_TABLE_PARAMS,
     formatClock,
     formatMinutes,
+    generateTable,
     MIN_HOLD,
-    o2Table,
+    paramsFromBest,
     personalBest,
-    ROUNDS,
+    TABLE_LIMITS,
     tableDuration,
     tablePhases,
 } from '../utils/apnea';
@@ -35,11 +35,6 @@ import { deleteCustomTable, saveCustomTable } from '../utils/storage';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 import { TABLE_INFO } from '../constants/apnea';
-
-const DIFFICULTIES = (Object.keys(DIFFICULTY) as Difficulty[]).map(value => ({
-    value,
-    label: DIFFICULTY[value].label,
-}));
 
 /** A sensible starting point for a new custom table. */
 const STARTER_ROUNDS: TableRound[] = Array.from({ length: 6 }, () => ({ breathe: 90, hold: 60 }));
@@ -62,8 +57,10 @@ const ApneaTableScreen: React.FC = () => {
     const existing = tables.find(t => t.id === tableId);
 
     // Custom table being edited (local until saved or started).
-    const [name, setName] = useState('');
-    const [custom, setCustom] = useState<TableRound[]>(STARTER_ROUNDS);
+    const [name, setName] = useState(params.kind === 'custom' ? params.name ?? '' : '');
+    const [custom, setCustom] = useState<TableRound[]>(
+        params.kind === 'custom' && params.rounds?.length ? params.rounds : STARTER_ROUNDS,
+    );
     const [initialised, setInitialised] = useState(!tableId);
     useEffect(() => {
         if (!initialised && existing) {
@@ -74,17 +71,19 @@ const ApneaTableScreen: React.FC = () => {
     }, [existing, initialised]);
 
     const best = useMemo(() => personalBest(records), [records]);
-    const bestSec = best ? Math.round(best.ms / 1000) : 0;
 
-    const rounds = useMemo(() => {
-        if (params.kind === 'co2') {
-            return co2Table(bestSec, settings.difficulty, settings.rounds);
+    const tableParams = params.kind === 'custom' ? null : settings[params.kind];
+    const rounds = useMemo(
+        () => (params.kind === 'custom' || !tableParams ? custom : generateTable(params.kind, tableParams)),
+        [params.kind, tableParams, custom],
+    );
+
+    /** Changes one parameter of the generated table; saved for next time. */
+    const setParam = (change: Partial<TableParams>) => {
+        if (params.kind !== 'custom' && tableParams) {
+            changeSettings({ [params.kind]: { ...tableParams, ...change } });
         }
-        if (params.kind === 'o2') {
-            return o2Table(bestSec, settings.difficulty, settings.rounds);
-        }
-        return custom;
-    }, [params.kind, bestSec, settings.difficulty, settings.rounds, custom]);
+    };
 
     const info = TABLE_INFO[params.kind];
     const title = isCustom ? existing?.name ?? 'New table' : info.title;
@@ -130,18 +129,24 @@ const ApneaTableScreen: React.FC = () => {
     const editRound = (index: number, change: Partial<TableRound>) =>
         setCustom(prev => prev.map((r, i) => (i === index ? { ...r, ...change } : r)));
 
-    // Leave if what this screen needs is gone (personal best or table deleted elsewhere).
-    const missingBest = loaded && ((!isCustom && !best) || (!!tableId && !existing));
+    // Leave if the table was deleted elsewhere.
+    const missing = loaded && !!tableId && !existing;
     useEffect(() => {
-        if (missingBest) {
+        if (missing) {
             navigation.goBack();
         }
-    }, [missingBest, navigation]);
+    }, [missing, navigation]);
 
     return (
         <BaseScreen
             title={title}
-            subtitle={isCustom ? 'Custom table' : `Based on your best of ${formatClock(best?.ms ?? 0)}`}
+            subtitle={
+                isCustom
+                    ? 'Custom table'
+                    : params.kind === 'co2'
+                    ? 'Fixed hold, shorter breathe each round'
+                    : 'Fixed breathe, longer hold each round'
+            }
             headerLeft={<BackButton />}
             headerRight={
                 existing ? (
@@ -153,7 +158,7 @@ const ApneaTableScreen: React.FC = () => {
                     />
                 ) : undefined
             }
-            isLoading={!loaded || !initialised || missingBest}>
+            isLoading={!loaded || !initialised || missing}>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 <Card>
                     <ThemedText size="small" color="muted">
@@ -189,26 +194,65 @@ const ApneaTableScreen: React.FC = () => {
                         />
                     </>
                 ) : (
-                    <>
-                        <SectionHeader title="Difficulty" />
-                        <View style={styles.gutter}>
-                            <Segmented
-                                options={DIFFICULTIES}
-                                value={settings.difficulty}
-                                onChange={difficulty => changeSettings({ difficulty })}
+                    tableParams && (
+                        <>
+                            <SectionHeader
+                                title="Settings"
+                                right={
+                                    <Button
+                                        label="Reset"
+                                        variant="ghost"
+                                        compact
+                                        onPress={() => setParam(DEFAULT_TABLE_PARAMS[params.kind as 'co2' | 'o2'])}
+                                        style={styles.headerButton}
+                                    />
+                                }
                             />
-                        </View>
-                        <Card style={styles.roundsCard}>
-                            <ThemedText weight="medium">Rounds</ThemedText>
-                            <Stepper
-                                value={settings.rounds}
-                                min={ROUNDS.min}
-                                max={ROUNDS.max}
-                                onChange={value => changeSettings({ rounds: value })}
-                                accessibilityLabel="rounds"
-                            />
-                        </Card>
-                    </>
+                            <ListGroup>
+                                <ParamRow
+                                    title={params.kind === 'co2' ? 'Hold' : 'First hold'}
+                                    value={tableParams.hold}
+                                    limits={TABLE_LIMITS.hold}
+                                    onChange={hold => setParam({ hold })}
+                                />
+                                <ParamRow
+                                    title={params.kind === 'co2' ? 'First breathe' : 'Breathe'}
+                                    value={tableParams.breathe}
+                                    limits={TABLE_LIMITS.breathe}
+                                    onChange={breathe => setParam({ breathe })}
+                                />
+                                <ParamRow
+                                    title={params.kind === 'co2' ? 'Breathe shorter by' : 'Hold longer by'}
+                                    description="Each round"
+                                    value={tableParams.step}
+                                    limits={TABLE_LIMITS.step}
+                                    onChange={step => setParam({ step })}
+                                />
+                                <ListRow title="Rounds">
+                                    <Stepper
+                                        value={tableParams.rounds}
+                                        min={TABLE_LIMITS.rounds.min}
+                                        max={TABLE_LIMITS.rounds.max}
+                                        onChange={value => setParam({ rounds: value })}
+                                        accessibilityLabel="rounds"
+                                    />
+                                </ListRow>
+                            </ListGroup>
+                            {best && (
+                                <Button
+                                    label={`Suggest from my best (${formatClock(best.ms)})`}
+                                    variant="secondary"
+                                    compact
+                                    onPress={() =>
+                                        setParam(
+                                            paramsFromBest(params.kind as 'co2' | 'o2', Math.round(best.ms / 1000)),
+                                        )
+                                    }
+                                    style={styles.addRound}
+                                />
+                            )}
+                        </>
+                    )
                 )}
 
                 <SectionHeader title="Rounds" />
@@ -299,6 +343,20 @@ const ApneaTableScreen: React.FC = () => {
                     />
                 )}
 
+                {!isCustom && (
+                    <Button
+                        label="Customize rounds individually"
+                        icon="Edit"
+                        iconLeading
+                        variant="ghost"
+                        compact
+                        onPress={() =>
+                            navigation.navigate('ApneaTable', { kind: 'custom', name: `My ${info.title}`, rounds })
+                        }
+                        style={styles.addRound}
+                    />
+                )}
+
                 <View style={styles.actions}>
                     <Button label="Start session" icon="Play" iconLeading onPress={start} />
                     {isCustom && (
@@ -321,6 +379,26 @@ const ApneaTableScreen: React.FC = () => {
     );
 };
 
+const ParamRow: React.FC<{
+    title: string;
+    description?: string;
+    value: number;
+    limits: { min: number; max: number };
+    onChange: (value: number) => void;
+}> = ({ title, description, value, limits, onChange }) => (
+    <ListRow title={title} description={description}>
+        <Stepper
+            value={value}
+            min={limits.min}
+            max={limits.max}
+            step={TABLE_LIMITS.increment}
+            format={v => formatClock(v * 1000)}
+            onChange={onChange}
+            accessibilityLabel={title}
+        />
+    </ListRow>
+);
+
 const Total: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <View style={styles.total}>
         <ThemedText size="tiny" weight="strong" color="muted" caps>
@@ -336,8 +414,9 @@ const styles = StyleSheet.create({
     scroll: {
         paddingBottom: spacing.xl,
     },
-    gutter: {
-        marginHorizontal: gutter,
+    headerButton: {
+        marginVertical: -8,
+        marginRight: -spacing.sm,
     },
     totals: {
         flexDirection: 'row',
@@ -350,12 +429,6 @@ const styles = StyleSheet.create({
     },
     totalValue: {
         marginTop: 2,
-    },
-    roundsCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: spacing.sm,
     },
     nameInput: {
         marginHorizontal: gutter,
