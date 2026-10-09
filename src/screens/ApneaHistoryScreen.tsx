@@ -12,7 +12,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useApneaData } from '../hooks/useApneaData';
 import { gutter, shapes, spacing } from '../theme';
 import { personalBest } from '../utils/apnea';
-import { deleteApneaRecord } from '../utils/storage';
+import { deleteApneaRecord } from '../storage';
 import { ERRORS } from '../constants/strings';
 
 type Filter = 'all' | 'tables' | 'max' | 'breathing';
@@ -32,7 +32,7 @@ const matches = (record: ApneaRecord, filter: Filter) =>
 
 const ApneaHistoryScreen: React.FC = () => {
     const { colors } = useTheme().theme;
-    const { records, loaded, reload } = useApneaData();
+    const { records, loaded } = useApneaData();
     const [filter, setFilter] = useState<Filter>('all');
     const [selected, setSelected] = useState<ApneaRecord | null>(null);
     const [error, setError] = useState(false);
@@ -42,9 +42,7 @@ const ApneaHistoryScreen: React.FC = () => {
 
     const remove = async (record: ApneaRecord) => {
         setSelected(null);
-        if (await deleteApneaRecord(record.id)) {
-            reload();
-        } else {
+        if (!(await deleteApneaRecord(record.id))) {
             setError(true);
         }
     };

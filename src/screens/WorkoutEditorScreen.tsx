@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { Exercise, ExerciseMode, RootStackNavigation, RootStackParamList, Workout } from '../types/types';
 import BackButton from '../components/BackButton';
+import TextField from '../components/TextField';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -15,11 +16,11 @@ import Stepper from '../components/Stepper';
 import { ThemedText } from '../components/ThemedText';
 import { animateLayout } from '../components/Motion';
 import { useTheme } from '../context/ThemeContext';
-import { gutter, shapes, spacing } from '../theme';
+import { gutter, spacing } from '../theme';
 import { formatSeconds } from '../utils/apnea';
 import { newId } from '../utils/dates';
 import { describeExercise, describeWorkout, LIMITS, newExercise } from '../utils/workout';
-import { deleteWorkout, getWorkouts, saveWorkout } from '../utils/storage';
+import { deleteWorkout, getWorkouts, saveWorkout } from '../storage';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 
@@ -136,24 +137,7 @@ const WorkoutEditorScreen: React.FC = () => {
             }>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 <SectionHeader title="Name" />
-                <TextInput
-                    value={name}
-                    onChangeText={text => setName(text.slice(0, MAX_NAME))}
-                    placeholder="e.g. Upper body"
-                    placeholderTextColor={theme.colors.muted}
-                    selectionColor={theme.colors.accent}
-                    style={[
-                        styles.input,
-                        styles.gutter,
-                        {
-                            color: theme.colors.text,
-                            borderColor: theme.colors.border,
-                            backgroundColor: theme.colors.card,
-                        },
-                    ]}
-                    maxLength={MAX_NAME}
-                    returnKeyType="done"
-                />
+                <TextField value={name} onChangeText={setName} placeholder="e.g. Upper body" maxLength={MAX_NAME} />
 
                 <SectionHeader title="Exercises" />
                 {exercises.map((exercise, index) => (
@@ -238,7 +222,6 @@ const ExerciseDialog: React.FC<{
     onSave: (exercise: Exercise) => void;
     onDelete: (id: string) => void;
 }> = ({ exercise, isNew, onClose, onSave, onDelete }) => {
-    const { theme } = useTheme();
     const [draft, setDraft] = useState<Exercise | null>(exercise);
 
     // Fresh copy every time the dialog opens.
@@ -270,22 +253,14 @@ const ExerciseDialog: React.FC<{
             actions={actions}>
             {draft && (
                 <View>
-                    <TextInput
+                    <TextField
                         value={draft.name}
-                        onChangeText={text => change({ name: text.slice(0, MAX_NAME) })}
+                        onChangeText={text => change({ name: text })}
                         placeholder="e.g. Push-ups"
-                        placeholderTextColor={theme.colors.muted}
-                        selectionColor={theme.colors.accent}
-                        style={[
-                            styles.input,
-                            {
-                                color: theme.colors.text,
-                                borderColor: theme.colors.border,
-                                backgroundColor: theme.colors.background,
-                            },
-                        ]}
                         maxLength={MAX_NAME}
                         autoFocus={isNew}
+                        inset={false}
+                        surface="background"
                     />
                     <Segmented
                         options={MODES}
@@ -355,16 +330,6 @@ const styles = StyleSheet.create({
     },
     flex: {
         flex: 1,
-    },
-    gutter: {
-        marginHorizontal: gutter,
-    },
-    input: {
-        height: 48,
-        borderWidth: 1,
-        borderRadius: shapes.borderRadius.medium,
-        paddingHorizontal: spacing.md,
-        fontSize: 15,
     },
     exerciseRow: {
         flexDirection: 'row',

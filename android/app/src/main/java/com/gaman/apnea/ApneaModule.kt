@@ -1,13 +1,10 @@
 package com.gaman.apnea
 
 import android.view.WindowManager
-import com.facebook.react.ReactPackage
-import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
-import com.facebook.react.uimanager.ViewManager
 import org.json.JSONObject
 
 /**
@@ -78,9 +75,3 @@ class ApneaModule(private val ctx: ReactApplicationContext) : ReactContextBaseJa
     }
 }
 
-class ApneaPackage : ReactPackage {
-    override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> =
-        listOf(ApneaModule(reactContext))
-
-    override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> = emptyList()
-}

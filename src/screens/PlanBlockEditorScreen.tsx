@@ -1,22 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { DayPlan, Habit, PlanBlock, RootStackNavigation, RootStackParamList } from '../types/types';
 import BackButton from '../components/BackButton';
+import TextField from '../components/TextField';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Chip from '../components/Chip';
+import ChipGroup from '../components/ChipGroup';
 import Dialog, { confirmActions } from '../components/Dialog';
 import ErrorPopup from '../components/ErrorPopup';
 import Icon, { IconName } from '../components/Icon';
 import IconButton from '../components/IconButton';
+import IconPicker from '../components/IconPicker';
 import { ListGroup, ListRow, Toggle } from '../components/ListGroup';
 import SectionHeader from '../components/SectionHeader';
 import TimeInput from '../components/TimeInput';
 import { ThemedText } from '../components/ThemedText';
 import { useTheme } from '../context/ThemeContext';
-import { gutter, shapes, spacing } from '../theme';
+import { gutter, spacing } from '../theme';
 import { fromDateKey } from '../utils/dates';
 import {
     DAY_MINUTES,
@@ -30,7 +33,7 @@ import {
 import { isScheduled } from '../utils/habits';
 import { ensureReminderPermission } from '../utils/habitReminders';
 import { loadDayPlan, removeBlock, upsertBlock } from '../utils/planService';
-import { getHabits } from '../utils/storage';
+import { getHabits } from '../storage';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 
@@ -209,6 +212,8 @@ const PlanBlockEditorScreen: React.FC = () => {
             ...(habitId ? { habitId } : {}),
             ...(repeat ? {} : { once: true }),
             ...(existing?.done && !habitId ? { done: true } : {}),
+            // Kept while the times are untouched, so tomorrow still returns to the usual time.
+            ...(existing?.shift && start === existing.start && end === existing.end ? { shift: existing.shift } : {}),
         };
         await ensureReminderPermission();
         if (await upsertBlock(date, block)) {
@@ -246,24 +251,13 @@ const PlanBlockEditorScreen: React.FC = () => {
             }>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 <SectionHeader title="What" />
-                <TextInput
+                <TextField
                     value={title}
-                    onChangeText={text => setTitle(text.slice(0, MAX_TITLE))}
+                    onChangeText={setTitle}
                     placeholder="e.g. Lunch, Deep work, Gym"
-                    placeholderTextColor={theme.colors.muted}
-                    selectionColor={theme.colors.accent}
-                    style={[
-                        styles.titleInput,
-                        {
-                            color: theme.colors.text,
-                            borderColor: theme.colors.border,
-                            backgroundColor: theme.colors.card,
-                        },
-                    ]}
                     maxLength={MAX_TITLE}
-                    returnKeyType="done"
                 />
-                <View style={styles.chips}>
+                <ChipGroup>
                     {SUGGESTIONS.map(s => (
                         <Chip
                             key={s.title}
@@ -273,7 +267,7 @@ const PlanBlockEditorScreen: React.FC = () => {
                             onPress={() => pickSuggestion(s)}
                         />
                     ))}
-                </View>
+                </ChipGroup>
 
                 <SectionHeader title="When" />
                 <Card>
@@ -302,7 +296,7 @@ const PlanBlockEditorScreen: React.FC = () => {
                             : ' '}
                     </ThemedText>
                 </Card>
-                <View style={styles.chips}>
+                <ChipGroup>
                     {LENGTHS.map(length => (
                         <Chip
                             key={length}
@@ -311,7 +305,7 @@ const PlanBlockEditorScreen: React.FC = () => {
                             onPress={() => setLength(length)}
                         />
                     ))}
-                </View>
+                </ChipGroup>
                 {clashes.length > 0 && (
                     <ThemedText size="small" color="warning" style={styles.note}>
                         Overlaps {clashes.map(b => `${b.title} (${blockTimes(b)})`).join(', ')}.
@@ -321,7 +315,7 @@ const PlanBlockEditorScreen: React.FC = () => {
                 {dueHabits.length > 0 && (
                     <>
                         <SectionHeader title="Linked habit" />
-                        <View style={styles.chips}>
+                        <ChipGroup>
                             <Chip label="None" selected={!habitId} onPress={() => pickHabit(null)} />
                             {dueHabits.map(habit => (
                                 <Chip
@@ -332,7 +326,7 @@ const PlanBlockEditorScreen: React.FC = () => {
                                     onPress={() => pickHabit(habit)}
                                 />
                             ))}
-                        </View>
+                        </ChipGroup>
                         <ThemedText size="small" color="muted" style={styles.note}>
                             {linked
                                 ? `Checking this block off also checks off “${linked.title}”, and the block only appears on the days the habit is due.`
@@ -342,35 +336,7 @@ const PlanBlockEditorScreen: React.FC = () => {
                 )}
 
                 <SectionHeader title="Icon" />
-                <Card style={styles.iconGrid}>
-                    {PLAN_ICONS.map(name => {
-                        const selected = name === icon;
-                        return (
-                            <Pressable
-                                key={name}
-                                onPress={() => {
-                                    haptics.tap();
-                                    setIcon(name);
-                                }}
-                                accessibilityRole="radio"
-                                accessibilityState={{ selected }}
-                                accessibilityLabel={name}
-                                style={[
-                                    styles.iconCell,
-                                    selected && {
-                                        backgroundColor: theme.colors.accentSoft,
-                                        borderColor: theme.colors.accent,
-                                    },
-                                ]}>
-                                <Icon
-                                    name={name}
-                                    size={20}
-                                    tint={selected ? theme.colors.accent : theme.colors.muted}
-                                />
-                            </Pressable>
-                        );
-                    })}
-                </Card>
+                <IconPicker icons={PLAN_ICONS} value={icon} onChange={setIcon} />
 
                 <SectionHeader title="Following days" />
                 <ListGroup>
@@ -421,20 +387,6 @@ const styles = StyleSheet.create({
     scroll: {
         paddingBottom: spacing.xl,
     },
-    titleInput: {
-        marginHorizontal: gutter,
-        height: 48,
-        borderWidth: 1,
-        borderRadius: shapes.borderRadius.medium,
-        paddingHorizontal: spacing.md,
-        fontSize: 15,
-    },
-    chips: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginHorizontal: gutter,
-        marginTop: spacing.sm,
-    },
     times: {
         flexDirection: 'row',
         alignItems: 'flex-end',
@@ -450,22 +402,6 @@ const styles = StyleSheet.create({
     note: {
         marginHorizontal: gutter + 2,
         marginTop: spacing.xs,
-    },
-    iconGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        marginTop: 0,
-        padding: spacing.sm,
-    },
-    iconCell: {
-        width: '12.5%',
-        aspectRatio: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: shapes.borderRadius.medium,
-        borderWidth: 1,
-        borderColor: 'transparent',
     },
     problem: {
         marginTop: spacing.lg,

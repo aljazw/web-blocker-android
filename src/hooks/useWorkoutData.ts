@@ -1,49 +1,41 @@
-import { useCallback, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 import { Workout, WorkoutCues, WorkoutRecord, WorkoutSession } from '../types/types';
-import { getWorkoutCues, getWorkoutRecords, getWorkouts, getWorkoutSession, setWorkoutCues } from '../utils/storage';
-import { logger } from '../utils/logger';
+import {
+    STORAGE_KEYS,
+    getWorkoutCues,
+    getWorkoutRecords,
+    getWorkouts,
+    getWorkoutSession,
+    setWorkoutCues,
+} from '../storage';
+import { useFocusData } from './useFocusData';
 
-/** Workouts, history, the session in progress and cue settings, reloaded on focus. */
+const load = () => Promise.all([getWorkouts(), getWorkoutRecords(), getWorkoutSession(), getWorkoutCues()]);
+const EMPTY: [Workout[], WorkoutRecord[], WorkoutSession | null, WorkoutCues] = [
+    [],
+    [],
+    null,
+    { sound: true, vibration: true },
+];
+const WATCH = [
+    STORAGE_KEYS.workouts,
+    STORAGE_KEYS.workoutRecords,
+    STORAGE_KEYS.workoutSession,
+    STORAGE_KEYS.workoutCues,
+];
+
+/** Workouts, history, the session in progress and cue settings, always current. */
 export const useWorkoutData = () => {
-    const [workouts, setWorkouts] = useState<Workout[]>([]);
-    const [records, setRecords] = useState<WorkoutRecord[]>([]);
-    const [session, setSession] = useState<WorkoutSession | null>(null);
-    const [cues, setCues] = useState<WorkoutCues>({ sound: true, vibration: true });
-    const [loaded, setLoaded] = useState(false);
-
-    const reload = useCallback(async () => {
-        try {
-            const [w, r, s, c] = await Promise.all([
-                getWorkouts(),
-                getWorkoutRecords(),
-                getWorkoutSession(),
-                getWorkoutCues(),
-            ]);
-            setWorkouts(w);
-            setRecords(r);
-            setSession(s);
-            setCues(c);
-        } catch (error) {
-            logger.warn('Could not load workouts', error);
-        } finally {
-            setLoaded(true);
-        }
-    }, []);
-
-    useFocusEffect(
-        useCallback(() => {
-            reload();
-        }, [reload]),
-    );
+    const { data, setData, loaded, reload } = useFocusData(load, EMPTY, { watch: WATCH });
+    const [workouts, records, session, cues] = data;
 
     const changeCues = useCallback(
-        async (change: Partial<WorkoutCues>) => {
+        (change: Partial<WorkoutCues>) => {
             const next = { ...cues, ...change };
-            setCues(next);
+            setData(([w, r, s]) => [w, r, s, next]);
             return setWorkoutCues(next);
         },
-        [cues],
+        [cues, setData],
     );
 
     return { workouts, records, session, cues, loaded, reload, changeCues };

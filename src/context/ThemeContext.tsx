@@ -3,7 +3,7 @@ import { darkTheme } from '../theme/dark';
 import { lightTheme } from '../theme/light';
 import { Theme } from '../theme/types';
 import { AccentName, DEFAULT_ACCENT, isAccentName, withAccent } from '../theme/accents';
-import { getAccentPreference, getThemePreference, setAccentPreference, setThemePreference } from '../utils/storage';
+import { getAccentPreference, getThemePreference, setAccentPreference, setThemePreference } from '../storage';
 import { logger } from '../utils/logger';
 
 type ThemeContextType = {

@@ -1,17 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { Habit, HabitLink, RootStackNavigation, RootStackParamList } from '../types/types';
 import BackButton from '../components/BackButton';
+import TextField from '../components/TextField';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Chip from '../components/Chip';
+import ChipGroup from '../components/ChipGroup';
 import DayPicker from '../components/DayPicker';
 import Dialog, { confirmActions } from '../components/Dialog';
 import ErrorPopup from '../components/ErrorPopup';
-import Icon, { IconName } from '../components/Icon';
+import { IconName } from '../components/Icon';
 import IconButton from '../components/IconButton';
+import IconPicker from '../components/IconPicker';
 import { ListGroup, ListRow, Toggle } from '../components/ListGroup';
 import SectionHeader from '../components/SectionHeader';
 import Segmented from '../components/Segmented';
@@ -20,16 +23,16 @@ import StatTile from '../components/StatTile';
 import TimeInput from '../components/TimeInput';
 import { ThemedText } from '../components/ThemedText';
 import { FadeIn, animateLayout } from '../components/Motion';
-import { useTheme } from '../context/ThemeContext';
 import { persistHabit, removeHabit } from '../hooks/useHabits';
-import { gutter, shapes, spacing } from '../theme';
+import { gutter, spacing } from '../theme';
 import { bestStreak, currentStreak, newHabitId, toDateKey } from '../utils/habits';
 import { describeHabitDays } from '../utils/habitText';
 import { ensureReminderPermission } from '../utils/habitReminders';
-import { getHabits } from '../utils/storage';
+import { getHabits } from '../storage';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 import { DEFAULT_HABIT_ICON, HABIT_ICONS } from '../constants/habitIcons';
+import { DAY_PRESETS, EVERY_DAY, sameDays } from '../constants/days';
 
 const SUGGESTIONS: { icon: IconName; title: string; link?: HabitLink }[] = [
     { icon: 'Dumbbell', title: 'Workout', link: 'workout' },
@@ -54,20 +57,12 @@ const LINK_DESCRIPTION: Record<HabitLink | 'none', string> = {
     apnea: 'Checked off when you finish any apnea session that day.',
 };
 
-const EVERY_DAY = [true, true, true, true, true, true, true];
-const DAY_PRESETS = [
-    { label: 'Every day', days: EVERY_DAY },
-    { label: 'Weekdays', days: [true, true, true, true, true, false, false] },
-    { label: 'Weekends', days: [false, false, false, false, false, true, true] },
-];
 
 const MAX_TITLE = 60;
-const sameDays = (a: boolean[], b: boolean[]) => a.every((v, i) => v === b[i]);
 
 type Dialog = { kind: 'delete' } | { kind: 'notificationsOff' } | { kind: 'error' };
 
 const HabitEditorScreen: React.FC = () => {
-    const { theme } = useTheme();
     const navigation = useNavigation<RootStackNavigation>();
     const { params } = useRoute<RouteProp<RootStackParamList, 'HabitEditor'>>();
     const habitId = params?.habitId;
@@ -188,26 +183,15 @@ const HabitEditorScreen: React.FC = () => {
                 )}
 
                 <SectionHeader title="Name" />
-                <TextInput
+                <TextField
                     value={title}
-                    onChangeText={text => setTitle(text.slice(0, MAX_TITLE))}
+                    onChangeText={setTitle}
                     placeholder="e.g. Workout 10 min"
-                    placeholderTextColor={theme.colors.muted}
-                    selectionColor={theme.colors.accent}
-                    style={[
-                        styles.titleInput,
-                        {
-                            color: theme.colors.text,
-                            borderColor: theme.colors.border,
-                            backgroundColor: theme.colors.card,
-                        },
-                    ]}
                     maxLength={MAX_TITLE}
-                    returnKeyType="done"
                 />
 
                 {!existing && (
-                    <View style={styles.chips}>
+                    <ChipGroup>
                         {SUGGESTIONS.map(s => (
                             <Chip
                                 key={s.title}
@@ -221,42 +205,14 @@ const HabitEditorScreen: React.FC = () => {
                                 }}
                             />
                         ))}
-                    </View>
+                    </ChipGroup>
                 )}
 
                 <SectionHeader title="Icon" />
-                <Card style={styles.iconGrid}>
-                    {HABIT_ICONS.map(name => {
-                        const selected = name === icon;
-                        return (
-                            <Pressable
-                                key={name}
-                                onPress={() => {
-                                    haptics.tap();
-                                    setIcon(name);
-                                }}
-                                accessibilityRole="radio"
-                                accessibilityState={{ selected }}
-                                accessibilityLabel={name}
-                                style={[
-                                    styles.iconCell,
-                                    selected && {
-                                        backgroundColor: theme.colors.accentSoft,
-                                        borderColor: theme.colors.accent,
-                                    },
-                                ]}>
-                                <Icon
-                                    name={name}
-                                    size={20}
-                                    tint={selected ? theme.colors.accent : theme.colors.muted}
-                                />
-                            </Pressable>
-                        );
-                    })}
-                </Card>
+                <IconPicker icons={HABIT_ICONS} value={icon} onChange={setIcon} />
 
                 <SectionHeader title="Days" />
-                <View style={styles.chips}>
+                <ChipGroup>
                     {DAY_PRESETS.map(preset => (
                         <Chip
                             key={preset.label}
@@ -265,7 +221,7 @@ const HabitEditorScreen: React.FC = () => {
                             onPress={() => setDays(preset.days)}
                         />
                     ))}
-                </View>
+                </ChipGroup>
                 <Card>
                     <DayPicker value={days} onChange={setDays} />
                     <ThemedText size="small" color="muted" align="center" style={styles.cardFoot}>
@@ -343,36 +299,6 @@ const HabitEditorScreen: React.FC = () => {
 const styles = StyleSheet.create({
     scroll: {
         paddingBottom: spacing.xl,
-    },
-    titleInput: {
-        marginHorizontal: gutter,
-        height: 48,
-        borderWidth: 1,
-        borderRadius: shapes.borderRadius.medium,
-        paddingHorizontal: spacing.md,
-        fontSize: 15,
-    },
-    chips: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginHorizontal: gutter,
-        marginTop: spacing.sm,
-    },
-    iconGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        marginTop: 0,
-        padding: spacing.sm,
-    },
-    iconCell: {
-        width: '12.5%',
-        aspectRatio: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: shapes.borderRadius.medium,
-        borderWidth: 1,
-        borderColor: 'transparent',
     },
     cardFoot: {
         marginTop: spacing.sm,

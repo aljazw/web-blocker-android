@@ -9,7 +9,9 @@ import {
     motivationFor,
     overlapping,
     parseMinutes,
+    planHistory,
     planMoment,
+    shiftRemaining,
     starterPlan,
     unplannedHabits,
     visibleBlocks,
@@ -155,6 +157,41 @@ describe('unplannedHabits', () => {
         const plan: DayPlan = { date: SAT, blocks: [block('r', 0, 30, { habitId: 'read' })] };
         const habits = [habit('read'), habit('walk'), habit('weekday', { days: WEEKDAYS })];
         expect(unplannedHabits(plan, habits).map(h => h.id)).toEqual(['walk']);
+    });
+});
+
+describe('shiftRemaining', () => {
+    it('moves only blocks that have not started, for today only', () => {
+        const plan: DayPlan = {
+            date: SAT,
+            blocks: [block('past', 420, 450), block('next', 600, 660), block('late', 1400, 1430)],
+        };
+        const shifted = shiftRemaining(plan, 500, 30);
+        expect(shifted.blocks.map(b => [b.id, b.start, b.end])).toEqual([
+            ['past', 420, 450],
+            ['next', 630, 690],
+            ['late', 1410, 1440], // never past midnight
+        ]);
+        // Tomorrow's copy goes back to the usual times.
+        expect(copyPlan(shifted, '2026-10-11').blocks.map(b => [b.id, b.start, b.end, b.shift])).toEqual([
+            ['past', 420, 450, undefined],
+            ['next', 600, 660, undefined],
+            ['late', 1400, 1430, undefined],
+        ]);
+    });
+});
+
+describe('planHistory', () => {
+    it('scores each day of the last week', () => {
+        const plans: DayPlan[] = [
+            { date: '2026-10-09', blocks: [block('a', 0, 30, { done: true }), block('b', 30, 60)] },
+            { date: SAT, blocks: [block('c', 0, 30, { done: true })] },
+        ];
+        const days = planHistory(plans, [], new Date(2026, 9, 10, 12));
+        expect(days).toHaveLength(7);
+        expect(days[5]).toMatchObject({ date: '2026-10-09', label: 'F', total: 2, done: 1 });
+        expect(days[6]).toMatchObject({ date: SAT, label: 'S', total: 1, done: 1 });
+        expect(days[0]).toMatchObject({ total: 0, done: 0 });
     });
 });
 

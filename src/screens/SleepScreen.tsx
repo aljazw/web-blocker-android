@@ -17,7 +17,7 @@ import { usePassphrase } from '../context/PassphraseContext';
 import { gutter, spacing } from '../theme';
 import { SleepSchedule } from '../types/types';
 import { DEFAULT_SLEEP_SCHEDULE, isSleepWindow, isValidTime, sleepDuration } from '../utils/sleep';
-import { getSleepDismissedUntil, getSleepSchedule, setSleepSchedule } from '../utils/storage';
+import { getSleepDismissedUntil, getSleepSchedule, setSleepSchedule } from '../storage';
 import { logger } from '../utils/logger';
 import { ERRORS } from '../constants/strings';
 

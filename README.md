@@ -23,6 +23,8 @@
 -   **Your whole day in time windows:** meals, workouts, work and habits on one timeline, with the free time between blocks shown (tap it to fill it).
 -   **Edit, don't rebuild:** each new day starts as a copy of the last one. One-off blocks (an appointment) stay on their day. Tomorrow can be planned in the evening.
 -   **Built from your habits:** a starter day fits between your wake-up and bedtime and slots in today's habits. Habit blocks only appear on days the habit is due, and checking one off checks off the habit.
+-   **Running late:** shift the rest of today's blocks by 10 minutes to an hour. Tomorrow keeps the usual times.
+-   **Last 7 days:** how much of each day's plan you actually followed.
 -   **Staying on track:** a "Now" card with time left and what's next, a notification as each block starts, an evening "plan tomorrow" reminder, and occasional in-app check-ins ("Now: Deep work", "Did you finish Lunch?").
 
 ### Habits
@@ -128,11 +130,13 @@ A debug build loads JavaScript from Metro and is signed with a throwaway key. Fo
 ```
 src/
 ├── screens/      Overview, Routine (day plan, block editor, habits), Workout (editor, session), Apnea (tables, session, history, settings), Block, Schedule, Sleep, Settings
-├── components/   Design system: Card, ListGroup, Dialog, Button, StatTile, ProgressRing, Stepper, …
+├── components/   Design system: Card, ListGroup, Dialog, Button, TextField, IconPicker, EmptyState, StatTile, …
 ├── theme/        Light/dark palettes, accent colors, spacing & radius tokens
 ├── context/      Theme (dark mode + accent) and passphrase state
-├── hooks/        Screen logic: block list, habits, apnea data and live session, protection status
-├── utils/        Pure logic (schedules, streaks, apnea tables and stats), storage, native bridges
+├── navigation/   Native stack + tabs (hidden screens frozen, tabs preloaded after launch)
+├── storage/      One module per domain over a cached native store; writes notify open screens
+├── hooks/        Screen data via useFocusData (loads once, refreshes on focus and on data changes)
+├── utils/        Pure logic (plans, schedules, streaks, apnea tables and stats), native bridges
 └── constants/    UI strings, safety copy, habit icons and quick-add suggestions
 
 android/app/src/main/java/com/gaman/
@@ -142,7 +146,7 @@ android/app/src/main/java/com/gaman/
 ├── BootReceiver.kt                Restarts layers after reboot or update
 ├── apnea/                         Session timeline, cue player and foreground service
 ├── sleep/                         Sleep schedule and the sleep page (video + passphrase)
-└── modules/ + *Module.kt          React Native bridges
+└── modules/ + *Module.kt          React Native bridges, all registered in modules/GamanPackage.kt
 ```
 
 ## Built with Claude Code

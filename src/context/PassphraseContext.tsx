@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { getPassphrasePreference, setPassphrasePreference } from '../utils/storage';
+import { getPassphrasePreference, setPassphrasePreference } from '../storage';
 import { logger } from '../utils/logger';
 
 type PassphraseContextType = {

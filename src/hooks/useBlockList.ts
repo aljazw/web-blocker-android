@@ -1,66 +1,44 @@
-import { useCallback, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { BlockEntry } from '../types/types';
+import { useCallback, useMemo } from 'react';
+import { BlockEntry, BlockedAppData, BlockedWebsitesData } from '../types/types';
 import {
+    STORAGE_KEYS,
     deleteBlockedApp,
     deleteBlockedWebsite,
     getBlockedApps,
     getBlockedWebsites,
     hideBlockedApp,
     hideBlockedWebsite,
-} from '../utils/storage';
+} from '../storage';
+import { useFocusData } from './useFocusData';
 
-/**
- * The combined block list (websites + apps). Reloads every time the screen
- * gains focus, so changes made on other screens always show up.
- */
+const load = () => Promise.all([getBlockedWebsites(), getBlockedApps()]);
+const EMPTY: [BlockedWebsitesData[], BlockedAppData[]] = [[], []];
+const WATCH = [STORAGE_KEYS.websites, STORAGE_KEYS.apps];
+
+/** The combined block list (websites + apps), current with changes from any screen. */
 export const useBlockList = () => {
-    const [entries, setEntries] = useState<BlockEntry[]>([]);
-    const [loadFailed, setLoadFailed] = useState(false);
+    const { data, loaded, failed: loadFailed, reload } = useFocusData(load, EMPTY, { watch: WATCH });
+    const [sites, apps] = data;
 
-    const reload = useCallback(async () => {
-        try {
-            const [sites, apps] = await Promise.all([getBlockedWebsites(), getBlockedApps()]);
-            setEntries([
-                ...sites.map(site => ({
-                    ...site,
-                    kind: 'site' as const,
-                    key: site.websiteUrl,
-                    label: site.websiteUrl,
-                })),
-                ...apps.map(app => ({ ...app, kind: 'app' as const, key: app.packageName, label: app.appName })),
-            ]);
-            setLoadFailed(false);
-        } catch {
-            setLoadFailed(true);
-        }
-    }, []);
-
-    useFocusEffect(
-        useCallback(() => {
-            reload();
-        }, [reload]),
+    const entries = useMemo<BlockEntry[]>(
+        () => [
+            ...sites.map(site => ({ ...site, kind: 'site' as const, key: site.websiteUrl, label: site.websiteUrl })),
+            ...apps.map(app => ({ ...app, kind: 'app' as const, key: app.packageName, label: app.appName })),
+        ],
+        [sites, apps],
     );
 
     /** Removes the block. Resolves false if saving failed. */
     const remove = useCallback(
-        async (entry: BlockEntry) => {
-            const ok = entry.kind === 'app' ? await deleteBlockedApp(entry.key) : await deleteBlockedWebsite(entry.key);
-            await reload();
-            return ok;
-        },
-        [reload],
+        (entry: BlockEntry) => (entry.kind === 'app' ? deleteBlockedApp(entry.key) : deleteBlockedWebsite(entry.key)),
+        [],
     );
 
     /** Hides the block from the list (it keeps blocking). Resolves false if saving failed. */
     const hide = useCallback(
-        async (entry: BlockEntry) => {
-            const ok = entry.kind === 'app' ? await hideBlockedApp(entry.key) : await hideBlockedWebsite(entry.key);
-            await reload();
-            return ok;
-        },
-        [reload],
+        (entry: BlockEntry) => (entry.kind === 'app' ? hideBlockedApp(entry.key) : hideBlockedWebsite(entry.key)),
+        [],
     );
 
-    return { entries, loadFailed, reload, remove, hide };
+    return { entries, loaded, loadFailed, reload, remove, hide };
 };

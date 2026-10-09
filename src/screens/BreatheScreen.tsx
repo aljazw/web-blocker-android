@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { ApneaRecord, RootStackNavigation } from '../types/types';
 import ApneaRecordRow from '../components/ApneaRecordRow';
+import ApneaSessionBanner from '../components/ApneaSessionBanner';
 import BarChart from '../components/BarChart';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
@@ -11,7 +12,6 @@ import Dialog, { confirmActions } from '../components/Dialog';
 import DurationInput from '../components/DurationInput';
 import ErrorPopup from '../components/ErrorPopup';
 import IconButton from '../components/IconButton';
-import IconTile from '../components/IconTile';
 import { ListGroup, ListRow } from '../components/ListGroup';
 import RecordDetailDialog from '../components/RecordDetailDialog';
 import SafetyRules from '../components/SafetyRules';
@@ -24,7 +24,7 @@ import { FadeIn } from '../components/Motion';
 import Icon from '../components/Icon';
 import { useTheme } from '../context/ThemeContext';
 import { useApneaData } from '../hooks/useApneaData';
-import { useApneaSession, useStartSession } from '../hooks/useApneaSession';
+import { useStartSession } from '../hooks/useApneaSession';
 import { gutter, spacing } from '../theme';
 import {
     BREATHING_EXERCISES,
@@ -35,13 +35,12 @@ import {
     generateTable,
     maxHoldHistory,
     maxTestPhases,
-    PHASE_LABEL,
     personalBest,
     tableDuration,
     trainingStats,
 } from '../utils/apnea';
 import { shortDate, newId } from '../utils/dates';
-import { addApneaRecord, deleteApneaRecord } from '../utils/storage';
+import { addApneaRecord, deleteApneaRecord } from '../storage';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 import { APNEA_SAFETY } from '../constants/apnea';
@@ -63,8 +62,7 @@ const EXERCISE_MINUTES = [
 const BreatheScreen: React.FC = () => {
     const { theme } = useTheme();
     const navigation = useNavigation<RootStackNavigation>();
-    const { records, tables, settings, loaded, reload, changeSettings } = useApneaData();
-    const { state: session } = useApneaSession(1000);
+    const { records, tables, settings, loaded, changeSettings } = useApneaData();
     const startSession = useStartSession();
     const [dialog, setDialog] = useState<Dialog | null>(null);
     const close = () => setDialog(null);
@@ -73,11 +71,19 @@ const BreatheScreen: React.FC = () => {
     const history = useMemo(() => maxHoldHistory(records), [records]);
     const stats = useMemo(() => trainingStats(records), [records]);
     const recent = useMemo(() => [...records].reverse().slice(0, RECENT_COUNT), [records]);
-    const sessionLive = session?.status === 'running' || session?.status === 'paused';
 
-    // The safety briefing must be acknowledged once before any training.
-    const needsSafety = loaded && !settings.safetyAccepted;
-    const guard = (action: () => void) => (needsSafety ? setDialog({ kind: 'safety' }) : action());
+    // The safety briefing must be acknowledged once before any training. Until
+    // settings have loaded we can't tell, so a tap that early does nothing.
+    const guard = (action: () => void) => {
+        if (!loaded) {
+            return;
+        }
+        if (settings.safetyAccepted) {
+            action();
+        } else {
+            setDialog({ kind: 'safety' });
+        }
+    };
 
     const startMaxTest = () =>
         guard(() =>
@@ -88,9 +94,7 @@ const BreatheScreen: React.FC = () => {
 
     const deleteRecord = async (record: ApneaRecord) => {
         close();
-        if (await deleteApneaRecord(record.id)) {
-            reload();
-        } else {
+        if (!(await deleteApneaRecord(record.id))) {
             setDialog({ kind: 'error' });
         }
     };
@@ -105,8 +109,6 @@ const BreatheScreen: React.FC = () => {
         return `${rounds.length} rounds · ${formatMinutes(tableDuration(rounds))} · ${holdText}`;
     };
 
-    const currentPhase = session && sessionLive ? session.phases[session.index] : undefined;
-
     return (
         <BaseScreen
             title="Apnea"
@@ -120,21 +122,7 @@ const BreatheScreen: React.FC = () => {
                 />
             }>
             <ScrollView contentContainerStyle={styles.scroll}>
-                {sessionLive && currentPhase && (
-                    <Card onPress={() => navigation.navigate('ApneaSession')} highlight={theme.colors.accent}>
-                        <View style={styles.row}>
-                            <IconTile icon={session.status === 'paused' ? 'Pause' : 'Play'} tone="accent" />
-                            <View style={styles.flex}>
-                                <ThemedText weight="strong">{session.title} in progress</ThemedText>
-                                <ThemedText size="small" color="muted">
-                                    {session.status === 'paused' ? 'Paused' : PHASE_LABEL[currentPhase.type]} · round{' '}
-                                    {currentPhase.round}
-                                </ThemedText>
-                            </View>
-                            <Icon name="Next" size={18} tint={theme.colors.muted} />
-                        </View>
-                    </Card>
-                )}
+                <ApneaSessionBanner />
 
                 {/* ---- Personal best ---- */}
                 <FadeIn>
@@ -323,7 +311,6 @@ const BreatheScreen: React.FC = () => {
                     }
                     haptics.success();
                     close();
-                    reload();
                 }}
             />
 
@@ -424,11 +411,6 @@ const styles = StyleSheet.create({
     },
     flex: {
         flex: 1,
-    },
-    row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm + 2,
     },
     pbRow: {
         flexDirection: 'row',

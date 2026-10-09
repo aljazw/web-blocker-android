@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { CustomTable, RootStackNavigation, RootStackParamList, TableParams, TableRound } from '../types/types';
 import BackButton from '../components/BackButton';
+import TextField from '../components/TextField';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -31,7 +32,7 @@ import {
     tablePhases,
 } from '../utils/apnea';
 import { newId } from '../utils/dates';
-import { deleteCustomTable, saveCustomTable } from '../utils/storage';
+import { deleteCustomTable, saveCustomTable } from '../storage';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 import { TABLE_INFO } from '../constants/apnea';
@@ -177,20 +178,11 @@ const ApneaTableScreen: React.FC = () => {
                 {isCustom ? (
                     <>
                         <SectionHeader title="Name" />
-                        <TextInput
+                        <TextField
                             value={name}
-                            onChangeText={text => setName(text.slice(0, MAX_NAME))}
+                            onChangeText={setName}
                             placeholder="Custom table"
-                            placeholderTextColor={theme.colors.muted}
-                            selectionColor={theme.colors.accent}
-                            style={[
-                                styles.nameInput,
-                                {
-                                    color: theme.colors.text,
-                                    borderColor: theme.colors.border,
-                                    backgroundColor: theme.colors.card,
-                                },
-                            ]}
+                            maxLength={MAX_NAME}
                         />
                     </>
                 ) : (
@@ -429,14 +421,6 @@ const styles = StyleSheet.create({
     },
     totalValue: {
         marginTop: 2,
-    },
-    nameInput: {
-        marginHorizontal: gutter,
-        height: 48,
-        borderWidth: 1,
-        borderRadius: shapes.borderRadius.medium,
-        paddingHorizontal: spacing.md,
-        fontSize: 15,
     },
     table: {
         marginHorizontal: gutter,

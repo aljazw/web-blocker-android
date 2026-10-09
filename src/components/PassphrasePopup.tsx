@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import BlurModal from './BlurModal';
+import ModalPanel from './ModalPanel';
 import { ThemedText } from './ThemedText';
 import Button from './Button';
 import { shapes, spacing } from '../theme';
@@ -48,7 +48,7 @@ const PassphrasePopup: React.FC<PassphrasePopupProps> = ({ visible, onClose, onC
     };
 
     return (
-        <BlurModal visible={visible} onClose={onClose}>
+        <ModalPanel visible={visible} onClose={onClose}>
             <ThemedText weight="bold" size="large">
                 Type to confirm
             </ThemedText>
@@ -108,7 +108,7 @@ const PassphrasePopup: React.FC<PassphrasePopupProps> = ({ visible, onClose, onC
                     style={[styles.flex, styles.gap]}
                 />
             </View>
-        </BlurModal>
+        </ModalPanel>
     );
 };
 

@@ -1,22 +1,22 @@
 import { ActivityIndicator, FlatList, StyleSheet, View, Pressable, ScrollView } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import SearchBar from '../components/SearchBar';
 import Icon from '../components/Icon';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { RootStackNavigation } from '../types/types';
 import ItemContainer from '../components/ItemContainer';
 import Favicon from '../components/Favicon';
 import Dialog from '../components/Dialog';
 import IconTile from '../components/IconTile';
 import Chip from '../components/Chip';
+import ChipGroup from '../components/ChipGroup';
 import SectionHeader from '../components/SectionHeader';
 import { toBlockableUrl } from '../utils/urlHelpers';
 import { gutter, shapes, spacing } from '../theme/tokens';
 import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
 import ErrorPopup from '../components/ErrorPopup';
-import { getBlockedWebsites, isWebsiteBlocked } from '../utils/storage';
 import { useTheme } from '../context/ThemeContext';
 import { ERRORS } from '../constants/strings';
 import { SITE_SUGGESTIONS } from '../constants/suggestions';
@@ -24,7 +24,7 @@ import { FadeIn, stagger } from '../components/Motion';
 import Segmented from '../components/Segmented';
 import AppIcon from '../components/AppIcon';
 import Badge from '../components/Badge';
-import { getBlockedApps } from '../utils/storage';
+import { useBlockList } from '../hooks/useBlockList';
 import { getLaunchableApps, InstalledApp } from '../utils/installedApps';
 
 const BlockScreen: React.FC = () => {
@@ -32,43 +32,32 @@ const BlockScreen: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [websiteUrl, setWebsiteUrl] = useState<string>('');
     const [mode, setMode] = useState<'sites' | 'apps'>('sites');
-    const [blocked, setBlocked] = useState<Set<string>>(new Set());
-    const [blockedApps, setBlockedApps] = useState<Set<string>>(new Set());
     const [alreadyBlockedUrl, setAlreadyBlockedUrl] = useState<string | null>(null);
-    const [loadError, setLoadError] = useState(false);
-
     const navigation = useNavigation<RootStackNavigation>();
 
-    // Know which suggestions are already on the list each time the tab opens.
-    useFocusEffect(
-        useCallback(() => {
-            getBlockedWebsites()
-                .then(list => setBlocked(new Set(list.map(w => w.websiteUrl))))
-                .catch(() => setBlocked(new Set()));
-            getBlockedApps()
-                .then(list => setBlockedApps(new Set(list.map(a => a.packageName))))
-                .catch(() => setBlockedApps(new Set()));
-        }, []),
-    );
+    // Which suggestions and apps are already on the list.
+    const { entries, loadFailed } = useBlockList();
+    const blocked = useMemo(() => new Set(entries.filter(e => e.kind === 'site').map(e => e.key)), [entries]);
+    const blockedApps = useMemo(() => new Set(entries.filter(e => e.kind === 'app').map(e => e.key)), [entries]);
+    const [dismissedError, setDismissedError] = useState(false);
 
-    const goToAppSchedule = (app: InstalledApp) => {
-        if (blockedApps.has(app.packageName)) {
-            setAlreadyBlockedUrl(app.label);
-            return;
-        }
-        navigation.navigate('Schedule', { app: { packageName: app.packageName, appName: app.label } });
-    };
-
-    const goToSchedule = async (url: string) => {
-        try {
-            if (await isWebsiteBlocked(url)) {
-                setAlreadyBlockedUrl(url);
+    const goToAppSchedule = useCallback(
+        (app: InstalledApp) => {
+            if (blockedApps.has(app.packageName)) {
+                setAlreadyBlockedUrl(app.label);
                 return;
             }
-            navigation.navigate('Schedule', { websiteUrl: url });
-        } catch {
-            setLoadError(true);
+            navigation.navigate('Schedule', { app: { packageName: app.packageName, appName: app.label } });
+        },
+        [blockedApps, navigation],
+    );
+
+    const goToSchedule = (url: string) => {
+        if (blocked.has(url)) {
+            setAlreadyBlockedUrl(url);
+            return;
         }
+        navigation.navigate('Schedule', { websiteUrl: url });
     };
 
     // Validated locally: instant, offline, and never blocks you from adding a
@@ -148,7 +137,7 @@ const BlockScreen: React.FC = () => {
                     {SITE_SUGGESTIONS.map((group, index) => (
                         <FadeIn key={group.category} delay={stagger(index, 70)}>
                             <SectionHeader title={group.category} />
-                            <View style={styles.chips}>
+                            <ChipGroup>
                                 {group.sites.map(site => {
                                     const isBlocked = blocked.has(site);
                                     return (
@@ -162,7 +151,7 @@ const BlockScreen: React.FC = () => {
                                         />
                                     );
                                 })}
-                            </View>
+                            </ChipGroup>
                         </FadeIn>
                     ))}
 
@@ -187,7 +176,11 @@ const BlockScreen: React.FC = () => {
                 title="Already blocked"
                 message={`${alreadyBlockedUrl ?? ''} is already on your block list.`}
             />
-            <ErrorPopup {...ERRORS.dataLoadError} visible={loadError} onClose={() => setLoadError(false)} />
+            <ErrorPopup
+                {...ERRORS.dataLoadError}
+                visible={loadFailed && !dismissedError}
+                onClose={() => setDismissedError(true)}
+            />
         </BaseScreen>
     );
 };
@@ -197,6 +190,9 @@ interface AppPickerProps {
     onPick: (app: InstalledApp) => void;
 }
 
+/** ItemContainer: 10 margin + 2 × 14 padding + 36 icon + 2 border. Fixed so the list can skip measuring. */
+const APP_ROW_HEIGHT = 76;
+
 /** Searchable list of the apps installed on the phone. */
 const AppPicker: React.FC<AppPickerProps> = ({ blocked, onPick }) => {
     const { theme } = useTheme();
@@ -204,12 +200,20 @@ const AppPicker: React.FC<AppPickerProps> = ({ blocked, onPick }) => {
     const [query, setQuery] = useState('');
 
     useEffect(() => {
-        getLaunchableApps().then(setApps);
+        let alive = true;
+        getLaunchableApps().then(list => alive && setApps(list));
+        return () => {
+            alive = false;
+        };
     }, []);
 
     const q = query.trim().toLowerCase();
-    const filtered = (apps ?? []).filter(
-        app => !q || app.label.toLowerCase().includes(q) || app.packageName.toLowerCase().includes(q),
+    const filtered = useMemo(
+        () =>
+            (apps ?? []).filter(
+                app => !q || app.label.toLowerCase().includes(q) || app.packageName.toLowerCase().includes(q),
+            ),
+        [apps, q],
     );
 
     return (
@@ -225,45 +229,54 @@ const AppPicker: React.FC<AppPickerProps> = ({ blocked, onPick }) => {
                     keyExtractor={app => app.packageName}
                     keyboardShouldPersistTaps="handled"
                     contentContainerStyle={styles.scroll}
-                    initialNumToRender={14}
+                    initialNumToRender={12}
+                    maxToRenderPerBatch={10}
+                    windowSize={7}
+                    removeClippedSubviews
+                    getItemLayout={(_, index) => ({ length: APP_ROW_HEIGHT, offset: APP_ROW_HEIGHT * index, index })}
                     ListEmptyComponent={
                         <ThemedText size="small" color="muted" align="center" style={styles.loading}>
                             {q ? `No apps match “${query}”` : 'No apps found'}
                         </ThemedText>
                     }
-                    renderItem={({ item }) => {
-                        const isBlocked = blocked.has(item.packageName);
-                        return (
-                            <Pressable onPress={() => onPick(item)}>
-                                {({ pressed }) => (
-                                    <ItemContainer style={pressed && { backgroundColor: theme.colors.elevated }}>
-                                        <AppIcon packageName={item.packageName} size={36} style={styles.appIcon} />
-                                        <View style={styles.flex}>
-                                            <ThemedText weight="medium" numberOfLines={1}>
-                                                {item.label}
-                                            </ThemedText>
-                                            <ThemedText size="tiny" color="muted" numberOfLines={1}>
-                                                {item.packageName}
-                                            </ThemedText>
-                                        </View>
-                                        {isBlocked ? (
-                                            <Badge label="Blocked" tone="accent" />
-                                        ) : (
-                                            <View
-                                                style={[styles.addBadge, { backgroundColor: theme.colors.accentSoft }]}>
-                                                <Icon name="Plus" size={14} tint={theme.colors.accent} />
-                                            </View>
-                                        )}
-                                    </ItemContainer>
-                                )}
-                            </Pressable>
-                        );
-                    }}
+                    renderItem={({ item }) => (
+                        <AppRow app={item} blocked={blocked.has(item.packageName)} onPick={onPick} />
+                    )}
                 />
             )}
         </View>
     );
 };
+
+const AppRow = memo(
+    ({ app, blocked, onPick }: { app: InstalledApp; blocked: boolean; onPick: (app: InstalledApp) => void }) => {
+        const { theme } = useTheme();
+        return (
+            <Pressable onPress={() => onPick(app)} style={styles.appRow}>
+                {({ pressed }) => (
+                    <ItemContainer style={pressed && { backgroundColor: theme.colors.elevated }}>
+                        <AppIcon packageName={app.packageName} size={36} style={styles.appIcon} />
+                        <View style={styles.flex}>
+                            <ThemedText weight="medium" numberOfLines={1}>
+                                {app.label}
+                            </ThemedText>
+                            <ThemedText size="tiny" color="muted" numberOfLines={1}>
+                                {app.packageName}
+                            </ThemedText>
+                        </View>
+                        {blocked ? (
+                            <Badge label="Blocked" tone="accent" />
+                        ) : (
+                            <View style={[styles.addBadge, { backgroundColor: theme.colors.accentSoft }]}>
+                                <Icon name="Plus" size={14} tint={theme.colors.accent} />
+                            </View>
+                        )}
+                    </ItemContainer>
+                )}
+            </Pressable>
+        );
+    },
+);
 
 const Tip: React.FC<{ n: number; text: string }> = ({ n, text }) => {
     const { theme } = useTheme();
@@ -293,6 +306,10 @@ const styles = StyleSheet.create({
     loading: {
         marginTop: spacing.xl,
     },
+    appRow: {
+        height: APP_ROW_HEIGHT,
+        overflow: 'hidden',
+    },
     appIcon: {
         marginRight: spacing.sm + 2,
     },
@@ -320,12 +337,6 @@ const styles = StyleSheet.create({
     hint: {
         marginHorizontal: spacing.md + 4,
         marginTop: spacing.md,
-    },
-    chips: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginHorizontal: gutter,
-        marginTop: spacing.xs,
     },
     tips: {
         marginHorizontal: gutter,

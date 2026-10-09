@@ -12,14 +12,7 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
 
-import com.gaman.modules.SharedStoragePackage
-import com.gaman.modules.AccessibilityStatusPackage
-import com.gaman.modules.IntentLauncherPackage
-import com.gaman.modules.DeviceAdminPackage
-import com.gaman.modules.InstalledAppsPackage
-import com.gaman.apnea.ApneaPackage
-
-
+import com.gaman.modules.GamanPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -27,17 +20,8 @@ class MainApplication : Application(), ReactApplication {
       object : DefaultReactNativeHost(this) {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
-              // Packages that cannot be autolinked yet can be added manually here, for example:
-              // add(MyReactNativePackage())
-              add(SharedStoragePackage())
-              add(AccessibilityStatusPackage())
-              add(IntentLauncherPackage())
-              add(DeviceAdminPackage())
-              add(VpnControlPackage())
-              add(OverlayPackage())
-              add(WatchdogPackage())
-              add(InstalledAppsPackage())
-              add(ApneaPackage())
+              // All of Gaman's own native modules.
+              add(GamanPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

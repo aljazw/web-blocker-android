@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import BlurModal from './BlurModal';
+import ModalPanel from './ModalPanel';
 import Button, { ButtonVariant } from './Button';
 import IconTile from './IconTile';
 import { IconName } from './Icon';
@@ -40,7 +40,7 @@ const Dialog: React.FC<DialogProps> = ({
     const buttons = actions ?? [{ label: 'OK', onPress: onClose, variant: 'secondary' as const }];
 
     return (
-        <BlurModal visible={visible} onClose={onClose} dismissable={dismissable}>
+        <ModalPanel visible={visible} onClose={onClose} dismissable={dismissable}>
             {icon && <IconTile icon={icon} tone={tone} size={40} style={styles.icon} />}
             <ThemedText size="large" weight="bold">
                 {title}
@@ -67,7 +67,7 @@ const Dialog: React.FC<DialogProps> = ({
                     />
                 ))}
             </View>
-        </BlurModal>
+        </ModalPanel>
     );
 };
 

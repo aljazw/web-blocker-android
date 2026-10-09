@@ -1,20 +1,23 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { Habit, PlanBlock, PlanPrefs, RootStackNavigation } from '../types/types';
+import { DayPlan, Habit, PlanBlock, PlanPrefs, RootStackNavigation } from '../types/types';
 import Button from '../components/Button';
-import Card from '../components/Card';
 import Chip from '../components/Chip';
+import ChipGroup from '../components/ChipGroup';
 import Dialog, { confirmActions } from '../components/Dialog';
+import EmptyState from '../components/EmptyState';
 import ErrorPopup from '../components/ErrorPopup';
-import IconTile from '../components/IconTile';
 import { ListGroup, ListRow, Toggle } from '../components/ListGroup';
+import PlanHistory from '../components/PlanHistory';
 import PlanNowCard from '../components/PlanNowCard';
+import Segmented from '../components/Segmented';
 import PlanTimeline from '../components/PlanTimeline';
 import SectionHeader from '../components/SectionHeader';
 import { ThemedText } from '../components/ThemedText';
 import { FadeIn, animateLayout } from '../components/Motion';
 import { useDayPlan } from '../hooks/useDayPlan';
+import { useFocusData } from '../hooks/useFocusData';
 import { gutter, spacing } from '../theme';
 import { addDays, toDateKey } from '../utils/dates';
 import {
@@ -26,18 +29,38 @@ import {
     formatDuration,
     isBlockDone,
     minutesNow,
+    planHistory,
+    shiftRemaining,
     starterPlan,
     unplannedHabits,
+    upcomingBlocks,
     visibleBlocks,
 } from '../utils/dayPlan';
 import { ensureReminderPermission } from '../utils/habitReminders';
-import { syncPlanReminders } from '../utils/planService';
-import { DEFAULT_PLAN_PREFS, getPlanPrefs, getSleepSchedule, setPlanPrefs } from '../utils/storage';
+import {
+    DEFAULT_PLAN_PREFS,
+    STORAGE_KEYS,
+    getDayPlans,
+    getPlanPrefs,
+    getSleepSchedule,
+    setPlanPrefs,
+} from '../storage';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 
 type Day = 'today' | 'tomorrow';
-type Popup = { kind: 'dayComplete'; count: number } | { kind: 'clear' } | { kind: 'error' };
+type Popup = { kind: 'dayComplete'; count: number } | { kind: 'shift' } | { kind: 'clear' } | { kind: 'error' };
+
+const NO_PLANS: DayPlan[] = [];
+const PLANS_KEY = [STORAGE_KEYS.dayPlans];
+const PREFS_KEY = [STORAGE_KEYS.planPrefs];
+
+const SHIFTS = [
+    { value: '10', label: '10 min' },
+    { value: '15', label: '15 min' },
+    { value: '30', label: '30 min' },
+    { value: '60', label: '1 h' },
+];
 
 interface DayPlanViewProps {
     habits: Habit[];
@@ -50,12 +73,14 @@ const DayPlanView: React.FC<DayPlanViewProps> = ({ habits, onToggleHabit }) => {
     const navigation = useNavigation<RootStackNavigation>();
     const [day, setDay] = useState<Day>('today');
     const [now, setNow] = useState(new Date());
-    const [prefs, setPrefs] = useState<PlanPrefs>(DEFAULT_PLAN_PREFS);
     const [popup, setPopup] = useState<Popup | null>(null);
 
     const todayKey = toDateKey(now);
     const dateKey = day === 'today' ? todayKey : toDateKey(addDays(now, 1));
     const { plan, loaded, commit, setBlockDone, addBlocks } = useDayPlan(dateKey);
+    const { data: allPlans } = useFocusData(getDayPlans, NO_PLANS, { watch: PLANS_KEY });
+    const { data: prefs, setData: setPrefs } = useFocusData(getPlanPrefs, DEFAULT_PLAN_PREFS, { watch: PREFS_KEY });
+    const history = useMemo(() => planHistory(allPlans, habits, now), [allPlans, habits, now]);
 
     // Keep "now" fresh: the current block, its progress and the day rolling over.
     useEffect(() => {
@@ -65,7 +90,6 @@ const DayPlanView: React.FC<DayPlanViewProps> = ({ habits, onToggleHabit }) => {
     useFocusEffect(
         useCallback(() => {
             setNow(new Date());
-            getPlanPrefs().then(setPrefs);
         }, []),
     );
 
@@ -141,10 +165,18 @@ const DayPlanView: React.FC<DayPlanViewProps> = ({ habits, onToggleHabit }) => {
         }
         const next = { ...prefs, ...change };
         setPrefs(next);
-        if (await setPlanPrefs(next)) {
-            syncPlanReminders();
-        } else {
+        if (!(await setPlanPrefs(next))) {
             setPrefs(prefs);
+            fail();
+        }
+    };
+
+    const shiftRest = async (minutes: number) => {
+        setPopup(null);
+        animateLayout();
+        if (await commit(shiftRemaining(plan, minutesNow(new Date()), minutes))) {
+            haptics.success();
+        } else {
             fail();
         }
     };
@@ -171,6 +203,17 @@ const DayPlanView: React.FC<DayPlanViewProps> = ({ habits, onToggleHabit }) => {
                 {isToday && blocks.length > 0 && (
                     <FadeIn>
                         <PlanNowCard blocks={blocks} habits={habits} dateKey={dateKey} now={nowMin} onToggle={toggle} />
+                        {upcomingBlocks(blocks, nowMin).length > 0 && (
+                            <Button
+                                label="Running late? Shift the rest"
+                                icon="Time"
+                                iconLeading
+                                variant="ghost"
+                                compact
+                                onPress={() => setPopup({ kind: 'shift' })}
+                                style={styles.shift}
+                            />
+                        )}
                     </FadeIn>
                 )}
                 {!isToday && blocks.length > 0 && (
@@ -180,33 +223,20 @@ const DayPlanView: React.FC<DayPlanViewProps> = ({ habits, onToggleHabit }) => {
                 )}
 
                 {loaded && blocks.length === 0 ? (
-                    <FadeIn delay={40}>
-                        <Card style={styles.empty}>
-                            <IconTile icon="Plan" tone="accent" size={44} />
-                            <ThemedText size="large" weight="bold" style={styles.emptyTitle}>
-                                Plan {isToday ? 'your day' : 'tomorrow'}
-                            </ThemedText>
-                            <ThemedText color="muted" style={styles.emptyText}>
-                                Give every part of the day a time window: meals, workouts, work and your habits. You
-                                build it once. After that, each new day starts as a copy and you only adjust what
-                                changes.
-                            </ThemedText>
-                            <Button
-                                label="Start from a typical day"
-                                icon="Sparkles"
-                                iconLeading
-                                onPress={applyStarter}
-                            />
-                            <Button
-                                label="Add blocks myself"
-                                variant="secondary"
-                                icon="Plus"
-                                iconLeading
-                                onPress={addBlock}
-                                style={styles.emptySecond}
-                            />
-                        </Card>
-                    </FadeIn>
+                    <EmptyState
+                        icon="Plan"
+                        title={isToday ? 'Plan your day' : 'Plan tomorrow'}
+                        text="Give every part of the day a time window: meals, workouts, work and your habits. You build it once. After that, each new day starts as a copy and you only adjust what changes.">
+                        <Button label="Start from a typical day" icon="Sparkles" iconLeading onPress={applyStarter} />
+                        <Button
+                            label="Add blocks myself"
+                            variant="secondary"
+                            icon="Plus"
+                            iconLeading
+                            onPress={addBlock}
+                            style={styles.emptySecond}
+                        />
+                    </EmptyState>
                 ) : blocks.length > 0 ? (
                     <>
                         <SectionHeader
@@ -238,7 +268,7 @@ const DayPlanView: React.FC<DayPlanViewProps> = ({ habits, onToggleHabit }) => {
                 {loaded && suggestions.length > 0 && (
                     <>
                         <SectionHeader title="Habits not in the plan" />
-                        <View style={styles.chips}>
+                        <ChipGroup>
                             {suggestions.map(habit => (
                                 <Chip
                                     key={habit.id}
@@ -247,12 +277,14 @@ const DayPlanView: React.FC<DayPlanViewProps> = ({ habits, onToggleHabit }) => {
                                     onPress={() => addHabit(habit)}
                                 />
                             ))}
-                        </View>
+                        </ChipGroup>
                         <ThemedText size="tiny" color="muted" style={styles.chipsHint}>
                             Tap to add it to the plan. Checking the block off also checks off the habit.
                         </ThemedText>
                     </>
                 )}
+
+                {isToday && <PlanHistory days={history} />}
 
                 {blocks.length > 0 && (
                     <>
@@ -302,6 +334,12 @@ const DayPlanView: React.FC<DayPlanViewProps> = ({ habits, onToggleHabit }) => {
                     },
                 ]}
             />
+            <ShiftDialog
+                visible={popup?.kind === 'shift'}
+                count={upcomingBlocks(blocks, nowMin).length}
+                onClose={() => setPopup(null)}
+                onShift={shiftRest}
+            />
             <Dialog
                 visible={popup?.kind === 'clear'}
                 onClose={() => setPopup(null)}
@@ -316,7 +354,37 @@ const DayPlanView: React.FC<DayPlanViewProps> = ({ habits, onToggleHabit }) => {
     );
 };
 
+const ShiftDialog: React.FC<{
+    visible: boolean;
+    count: number;
+    onClose: () => void;
+    onShift: (minutes: number) => void;
+}> = ({ visible, count, onClose, onShift }) => {
+    const [minutes, setMinutes] = useState('15');
+    return (
+        <Dialog
+            visible={visible}
+            onClose={onClose}
+            icon="Time"
+            title="Shift the rest of today"
+            message={`The ${count} block${
+                count === 1 ? '' : 's'
+            } still ahead move later by the same amount. Only today changes: tomorrow keeps the usual times.`}
+            actions={confirmActions(onClose, 'Shift', () => onShift(Number(minutes)))}>
+            <Segmented options={SHIFTS} value={minutes} onChange={setMinutes} style={styles.shiftPicker} />
+        </Dialog>
+    );
+};
+
 const styles = StyleSheet.create({
+    shift: {
+        alignSelf: 'flex-start',
+        marginHorizontal: gutter - spacing.sm,
+        marginTop: spacing.xs,
+    },
+    shiftPicker: {
+        marginTop: spacing.md,
+    },
     scroll: {
         paddingBottom: spacing.xl,
     },
@@ -330,28 +398,12 @@ const styles = StyleSheet.create({
         marginHorizontal: gutter + 2,
         marginTop: spacing.xs,
     },
-    empty: {
-        padding: spacing.lg,
-    },
-    emptyTitle: {
-        marginTop: spacing.md,
-    },
-    emptyText: {
-        marginTop: spacing.xs,
-        marginBottom: spacing.lg,
-    },
     emptySecond: {
         marginTop: spacing.sm,
     },
     headerButton: {
         marginVertical: -8,
         marginRight: -spacing.sm,
-    },
-    chips: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginHorizontal: gutter,
-        marginTop: spacing.xs,
     },
     chipsHint: {
         marginHorizontal: gutter + 2,

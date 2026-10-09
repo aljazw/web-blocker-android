@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useRef } from 'react';
 import { Habit } from '../types/types';
-import { deleteHabit, getHabits, saveHabit, updateHabit } from '../utils/storage';
+import { STORAGE_KEYS, deleteHabit, getHabits, saveHabit, updateHabit } from '../storage';
 import { toggleCompletion } from '../utils/habits';
 import { cancelHabitReminders, dismissTodaysReminder, syncHabitReminders } from '../utils/habitReminders';
-import { onPlanChanged, syncPlanReminders } from '../utils/planService';
+import { useFocusData } from './useFocusData';
 
 export type ToggleResult =
     | { status: 'saved'; habit: Habit }
@@ -13,60 +12,50 @@ export type ToggleResult =
     /** Saving failed; the screen was rolled back. */
     | { status: 'failed' };
 
-/** All habits, reloaded whenever the screen gains focus. */
+const NONE: Habit[] = [];
+const WATCH = [STORAGE_KEYS.habits];
+
+/** All habits; stays current with changes made anywhere (other screens, pop-ups, finished sessions). */
 export const useHabits = () => {
-    const [habits, setHabits] = useState<Habit[]>([]);
-    const [loaded, setLoaded] = useState(false);
-    const [loadFailed, setLoadFailed] = useState(false);
+    const {
+        data: habits,
+        setData: setHabits,
+        loaded,
+        failed: loadFailed,
+        reload,
+    } = useFocusData(getHabits, NONE, { watch: WATCH });
     /** Habits with a check-in save in flight; extra taps on them are ignored. */
     const pending = useRef(new Set<string>());
-
-    const reload = useCallback(async () => {
-        try {
-            setHabits(await getHabits());
-            setLoadFailed(false);
-        } catch {
-            setLoadFailed(true);
-        } finally {
-            setLoaded(true);
-        }
-    }, []);
-
-    useFocusEffect(
-        useCallback(() => {
-            reload();
-        }, [reload]),
-    );
-    // A pop-up may check off a habit through its plan block.
-    useEffect(() => onPlanChanged(reload), [reload]);
 
     /**
      * Checks today's box (or unchecks it). Updates the screen immediately and
      * rolls back if saving fails.
      */
-    const toggleToday = useCallback(async (habit: Habit): Promise<ToggleResult> => {
-        if (pending.current.has(habit.id)) {
-            return { status: 'busy' };
-        }
-        pending.current.add(habit.id);
+    const toggleToday = useCallback(
+        async (habit: Habit): Promise<ToggleResult> => {
+            if (pending.current.has(habit.id)) {
+                return { status: 'busy' };
+            }
+            pending.current.add(habit.id);
 
-        const updated = toggleCompletion(habit);
-        setHabits(prev => prev.map(h => (h.id === habit.id ? updated : h)));
+            const updated = toggleCompletion(habit);
+            setHabits(prev => prev.map(h => (h.id === habit.id ? updated : h)));
 
-        // Write exactly the state the user now sees, so screen and storage can't disagree.
-        const ok = await updateHabit(habit.id, stored => ({ ...stored, completions: updated.completions })).finally(
-            () => pending.current.delete(habit.id),
-        );
-        if (!ok) {
-            setHabits(prev => prev.map(h => (h.id === habit.id ? habit : h)));
-            return { status: 'failed' };
-        }
-        if (updated.completions.length > habit.completions.length) {
-            dismissTodaysReminder(updated);
-        }
-        syncPlanReminders(); // a linked plan block is now done (or not)
-        return { status: 'saved', habit: updated };
-    }, []);
+            // Write exactly the state the user now sees, so screen and storage can't disagree.
+            const ok = await updateHabit(habit.id, stored => ({ ...stored, completions: updated.completions })).finally(
+                () => pending.current.delete(habit.id),
+            );
+            if (!ok) {
+                setHabits(prev => prev.map(h => (h.id === habit.id ? habit : h)));
+                return { status: 'failed' };
+            }
+            if (updated.completions.length > habit.completions.length) {
+                dismissTodaysReminder(updated);
+            }
+            return { status: 'saved', habit: updated };
+        },
+        [setHabits],
+    );
 
     return { habits, loaded, loadFailed, reload, toggleToday };
 };
@@ -76,7 +65,6 @@ export const persistHabit = async (habit: Habit): Promise<boolean> => {
     const ok = await saveHabit(habit);
     if (ok) {
         await syncHabitReminders(habit);
-        syncPlanReminders();
     }
     return ok;
 };
@@ -86,7 +74,6 @@ export const removeHabit = async (habitId: string): Promise<boolean> => {
     const ok = await deleteHabit(habitId);
     if (ok) {
         await cancelHabitReminders(habitId);
-        syncPlanReminders();
     }
     return ok;
 };

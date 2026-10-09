@@ -1,6 +1,6 @@
 import { WorkoutRecord, WorkoutSession } from '../types/types';
 import { recordFromSession } from './workout';
-import { addWorkoutRecord, setWorkoutSession } from './storage';
+import { addWorkoutRecord, setWorkoutSession } from '../storage';
 import { completeLinkedHabits } from './habitLinks';
 import { logger } from './logger';
 

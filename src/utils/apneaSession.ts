@@ -2,7 +2,7 @@ import { NativeModules } from 'react-native';
 import { ApneaKind, ApneaRecord, ApneaSettings } from '../types/types';
 import { isApneaKind, recordFromSession, SessionPhase, SessionState, SessionStatus } from './apnea';
 import { newId } from './dates';
-import { addApneaRecord } from './storage';
+import { addApneaRecord } from '../storage';
 import { completeLinkedHabits } from './habitLinks';
 import { logger } from './logger';
 

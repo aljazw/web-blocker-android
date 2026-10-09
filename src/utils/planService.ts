@@ -16,14 +16,16 @@ import {
     visibleBlocks,
 } from './dayPlan';
 import {
+    STORAGE_KEYS,
     getDayPlans,
+    onStorageChange,
     getHabits,
     getPlanPrefs,
     getSleepSchedule,
     saveDayPlan,
     updateDayPlan,
     updateHabit,
-} from './storage';
+} from '../storage';
 import { logger } from './logger';
 
 export interface LoadedPlan {
@@ -43,7 +45,7 @@ export const loadDayPlan = async (dateKey: string): Promise<LoadedPlan> => {
     const plans = await getDayPlans();
     const own = plans.find(p => p.date === dateKey);
     if (own) {
-        return { plan: { ...own, blocks: sortBlocks(own.blocks) }, stored: true };
+        return { plan: own, stored: true }; // saved sorted, and the same object while unchanged
     }
     const previous = plans.filter(p => p.date < dateKey).pop();
     const plan = previous ? copyPlan(previous, dateKey) : { date: dateKey, blocks: [] };
@@ -53,51 +55,23 @@ export const loadDayPlan = async (dateKey: string): Promise<LoadedPlan> => {
     return { plan, stored: false };
 };
 
-// ---- Change events -------------------------------------------------------------
-
-type Listener = () => void;
-const listeners = new Set<Listener>();
-
-/** Called after the plan (or a habit) changes outside the screen showing it, e.g. from a pop-up. */
-export const onPlanChanged = (listener: Listener): (() => void) => {
-    listeners.add(listener);
-    return () => {
-        listeners.delete(listener);
-    };
-};
-
-export const notifyPlanChanged = () => listeners.forEach(listener => listener());
-
-/** Saves the plan and refreshes the block reminders. */
-export const persistDayPlan = async (plan: DayPlan): Promise<boolean> => {
-    const ok = await saveDayPlan({ ...plan, blocks: sortBlocks(plan.blocks) });
-    if (ok) {
-        syncPlanReminders();
-    }
-    return ok;
-};
+/** Saves the plan (sorted by time); reminders follow through watchPlanReminders. */
+export const persistDayPlan = (plan: DayPlan): Promise<boolean> =>
+    saveDayPlan({ ...plan, blocks: sortBlocks(plan.blocks) });
 
 /** Checks a block off on `dateKey`: its linked habit, or the block itself. */
 export const completeBlock = async (dateKey: string, block: PlanBlock): Promise<boolean> => {
-    let ok: boolean;
-    if (block.habitId) {
-        const habitId = block.habitId;
-        ok = await updateHabit(habitId, habit => markDone(habit, fromDateKey(dateKey)));
-        if (ok) {
-            const habit = (await getHabits()).find(h => h.id === habitId);
-            if (habit) {
-                dismissTodaysReminder(habit);
-            }
-        }
-    } else {
-        ok = await updateDayPlan(dateKey, plan => ({
+    const { habitId } = block;
+    if (!habitId) {
+        return updateDayPlan(dateKey, plan => ({
             ...plan,
             blocks: plan.blocks.map(b => (b.id === block.id ? { ...b, done: true } : b)),
         }));
     }
-    if (ok) {
-        syncPlanReminders();
-        notifyPlanChanged();
+    const ok = await updateHabit(habitId, habit => markDone(habit, fromDateKey(dateKey)));
+    const habit = ok ? (await getHabits()).find(h => h.id === habitId) : undefined;
+    if (habit) {
+        dismissTodaysReminder(habit);
     }
     return ok;
 };
@@ -135,6 +109,37 @@ const notification = (id: string, title: string, body: string) => ({
         pressAction: { id: 'default' },
     },
 });
+
+/** Everything the reminders are built from. */
+const REMINDER_INPUTS: string[] = [
+    STORAGE_KEYS.dayPlans,
+    STORAGE_KEYS.habits,
+    STORAGE_KEYS.planPrefs,
+    STORAGE_KEYS.sleepSchedule,
+];
+
+/**
+ * Keeps plan notifications in step with the data: any change to plans,
+ * habits, plan settings or sleep time reschedules them (once per burst of
+ * writes). Call once at startup; returns a function that stops watching.
+ */
+export const watchPlanReminders = (): (() => void) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = onStorageChange(key => {
+        if (REMINDER_INPUTS.includes(key) && !timer) {
+            timer = setTimeout(() => {
+                timer = null;
+                syncPlanReminders();
+            }, 300);
+        }
+    });
+    return () => {
+        unsubscribe();
+        if (timer) {
+            clearTimeout(timer);
+        }
+    };
+};
 
 let syncing: Promise<void> | null = null;
 let again = false;

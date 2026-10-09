@@ -1,5 +1,4 @@
 import { StyleSheet, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Navigation from './src/navigation/Navigation';
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -8,7 +7,7 @@ import { PassphraseProvider } from './src/context/PassphraseContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { useAppInitializer } from './src/hooks/useAppInitializer';
 import { darkTheme } from './src/theme/dark';
-import { setUserHasSeenWelcome } from './src/utils/storage';
+import { setUserHasSeenWelcome } from './src/storage';
 import { openAccessibilitySettings } from './src/utils/accessibility';
 import { logger } from './src/utils/logger';
 
@@ -32,7 +31,7 @@ function App(): React.JSX.Element {
     }
 
     return (
-        <GestureHandlerRootView style={styles.root}>
+        <>
             <ThemeProvider>
                 <PassphraseProvider>
                     <SafeAreaProvider>
@@ -46,14 +45,11 @@ function App(): React.JSX.Element {
                     </SafeAreaProvider>
                 </PassphraseProvider>
             </ThemeProvider>
-        </GestureHandlerRootView>
+        </>
     );
 }
 
 const styles = StyleSheet.create({
-    root: {
-        flex: 1,
-    },
     splash: {
         flex: 1,
         backgroundColor: darkTheme.colors.background,

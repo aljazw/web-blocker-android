@@ -3,18 +3,13 @@ import {
     Animated,
     Easing,
     LayoutAnimation,
-    Platform,
     Pressable,
     PressableProps,
     StyleProp,
-    UIManager,
+    StyleSheet,
     ViewStyle,
 } from 'react-native';
 import { ThemedText } from './ThemedText';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 /** Smoothly animate the next layout change (items appearing, removing, expanding). */
 export const animateLayout = () =>
@@ -101,21 +96,42 @@ interface AnimatedNumberProps extends Omit<ThemedTextProps, 'children'> {
     duration?: number;
 }
 
-/** Counts up (or down) to `value` whenever it changes. */
+/**
+ * Shows `value`, counting to it when it changes. The first render shows the
+ * value as is: counting up on every mount re-rendered whole screens for half
+ * a second each time a tab opened.
+ */
 export const AnimatedNumber: React.FC<AnimatedNumberProps> = ({ value, duration = 450, ...textProps }) => {
-    const anim = useRef(new Animated.Value(0)).current;
-    const [display, setDisplay] = useState(0);
+    const [display, setDisplay] = useState(value);
+    const shown = useRef(value);
 
     useEffect(() => {
-        const id = anim.addListener(({ value: v }) => setDisplay(Math.round(v)));
+        const from = shown.current;
+        if (from === value) {
+            return;
+        }
+        const anim = new Animated.Value(from);
+        anim.addListener(({ value: v }) => {
+            const next = Math.round(v);
+            if (next !== shown.current) {
+                shown.current = next;
+                setDisplay(next);
+            }
+        });
         Animated.timing(anim, {
             toValue: value,
             duration,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: false,
-        }).start();
-        return () => anim.removeListener(id);
-    }, [anim, value, duration]);
+        }).start(() => {
+            shown.current = value;
+            setDisplay(value);
+        });
+        return () => {
+            anim.stopAnimation();
+            anim.removeAllListeners();
+        };
+    }, [value, duration]);
 
     return <ThemedText {...textProps}>{display}</ThemedText>;
 };
@@ -126,28 +142,25 @@ interface AnimatedBarProps {
     style?: StyleProp<ViewStyle>;
 }
 
-/** A progress fill that animates its width to `fraction` (0–1). */
+/** A progress fill that animates to `fraction` (0–1), scaled on the UI thread. */
 export const AnimatedBar: React.FC<AnimatedBarProps> = ({ fraction, color, style }) => {
-    const width = useRef(new Animated.Value(0)).current;
+    const scale = useRef(new Animated.Value(fraction)).current;
 
     useEffect(() => {
-        Animated.timing(width, {
+        Animated.timing(scale, {
             toValue: fraction,
             duration: 450,
             easing: Easing.out(Easing.cubic),
-            useNativeDriver: false,
+            useNativeDriver: true,
         }).start();
-    }, [width, fraction]);
+    }, [scale, fraction]);
 
-    return (
-        <Animated.View
-            style={[
-                style,
-                {
-                    backgroundColor: color,
-                    width: width.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-                },
-            ]}
-        />
-    );
+    return <Animated.View style={[style, styles.fill, { backgroundColor: color, transform: [{ scaleX: scale }] }]} />;
 };
+
+const styles = StyleSheet.create({
+    fill: {
+        width: '100%',
+        transformOrigin: 'left',
+    },
+});

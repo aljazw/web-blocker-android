@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import notifee from '@notifee/react-native';
-import { hasUserSeenWelcome, isNotificationScheduled, setNotificationScheduled } from '../utils/storage';
+import { hasUserSeenWelcome, isNotificationScheduled, setNotificationScheduled } from '../storage';
 import { checkAccessibilityEnabled } from '../utils/accessibility';
 import { scheduleDailyNotification } from '../utils/notificationService';
 import { logger } from '../utils/logger';

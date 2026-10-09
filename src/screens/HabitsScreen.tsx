@@ -6,10 +6,10 @@ import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Dialog from '../components/Dialog';
+import EmptyState from '../components/EmptyState';
 import ErrorPopup from '../components/ErrorPopup';
 import HabitCard from '../components/HabitCard';
 import IconButton from '../components/IconButton';
-import IconTile from '../components/IconTile';
 import ProgressBar from '../components/ProgressBar';
 import Segmented from '../components/Segmented';
 import SectionHeader from '../components/SectionHeader';
@@ -164,19 +164,12 @@ const HabitsScreen: React.FC = () => {
                     )}
 
                     {loaded && habits.length === 0 ? (
-                        <FadeIn delay={60}>
-                            <Card style={styles.empty}>
-                                <IconTile icon="Habits" tone="accent" size={44} />
-                                <ThemedText size="large" weight="bold" style={styles.emptyTitle}>
-                                    Build a daily routine
-                                </ThemedText>
-                                <ThemedText color="muted" style={styles.emptyText}>
-                                    Track small, repeatable actions such as a 10-minute workout or reading. Choose the
-                                    days each habit is due and check it off to build a streak.
-                                </ThemedText>
-                                <Button label="Create a habit" icon="Plus" iconLeading onPress={() => openEditor()} />
-                            </Card>
-                        </FadeIn>
+                        <EmptyState
+                            icon="Habits"
+                            title="Build a daily routine"
+                            text="Track small, repeatable actions such as a 10-minute workout or reading. Choose the days each habit is due and check it off to build a streak.">
+                            <Button label="Create a habit" icon="Plus" iconLeading onPress={() => openEditor()} />
+                        </EmptyState>
                     ) : (
                         <>
                             {due.length > 0 && <SectionHeader title="Due today" />}
@@ -239,17 +232,6 @@ const styles = StyleSheet.create({
     },
     progress: {
         marginTop: spacing.md,
-    },
-    empty: {
-        marginTop: spacing.md,
-        padding: spacing.lg,
-    },
-    emptyTitle: {
-        marginTop: spacing.md,
-    },
-    emptyText: {
-        marginTop: spacing.xs,
-        marginBottom: spacing.lg,
     },
 });
 

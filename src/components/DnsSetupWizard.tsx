@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet } from 'react-native';
-import BlurModal from './BlurModal';
+import ModalPanel from './ModalPanel';
 import { ThemedText } from './ThemedText';
 import { spacing } from '../theme';
 import Button from './Button';
@@ -44,7 +44,7 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
     };
 
     return (
-        <BlurModal visible={visible} onClose={finish}>
+        <ModalPanel visible={visible} onClose={finish}>
             <ThemedText size="tiny" weight="strong" color="muted" caps style={styles.counter}>
                 Step {step + 1} of {TOTAL_STEPS}
             </ThemedText>
@@ -120,7 +120,7 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
                     <BackButton onPress={() => setStep(2)} />
                 </>
             )}
-        </BlurModal>
+        </ModalPanel>
     );
 };
 

@@ -51,6 +51,8 @@ export interface PlanBlock {
     once?: boolean;
     /** Checked off. Linked blocks follow their habit instead. */
     done?: boolean;
+    /** Minutes this block was pushed back today ("running late"); the next day's copy undoes it. */
+    shift?: number;
 }
 
 export interface DayPlan {

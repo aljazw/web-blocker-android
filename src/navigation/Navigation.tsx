@@ -1,6 +1,6 @@
-import { useCallback, useRef } from 'react';
-import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { useCallback, useMemo, useRef } from 'react';
+import { DarkTheme, DefaultTheme, NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomTabNavigator from './BottomTabNavigator';
 import ScheduleScreen from '../screens/ScheduleScreen';
 import HabitEditorScreen from '../screens/HabitEditorScreen';
@@ -18,9 +18,9 @@ import { RootStackParamList } from '../types/types';
 import { useAppForeground } from '../hooks/useAppForeground';
 import { useTheme } from '../context/ThemeContext';
 import { apneaSession } from '../utils/apneaSession';
-import { getWorkoutSession } from '../utils/storage';
+import { getWorkoutSession } from '../storage';
 
-const Stack = createStackNavigator<RootStackParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 /** Screens where a plan pop-up would get in the way: training and editing. */
@@ -46,7 +46,22 @@ const openPlan = () => {
 };
 
 const Navigation: React.FC = () => {
-    const { theme } = useTheme();
+    const { theme, isDarkMode } = useTheme();
+    // Matches the app's colors, so no white flashes behind screen transitions.
+    const navTheme = useMemo(() => {
+        const base = isDarkMode ? DarkTheme : DefaultTheme;
+        return {
+            ...base,
+            colors: {
+                ...base.colors,
+                background: theme.colors.background,
+                card: theme.colors.card,
+                border: theme.colors.border,
+                text: theme.colors.text,
+                primary: theme.colors.accent,
+            },
+        };
+    }, [isDarkMode, theme]);
     const checking = useRef(false);
 
     /**
@@ -77,10 +92,17 @@ const Navigation: React.FC = () => {
     useAppForeground(resumeActiveSession);
 
     return (
-        <NavigationContainer ref={navigationRef} onReady={resumeActiveSession}>
+        <NavigationContainer ref={navigationRef} theme={navTheme} onReady={resumeActiveSession}>
             <Stack.Navigator
                 initialRouteName="BottomTabs"
-                screenOptions={{ headerShown: false, cardStyle: { backgroundColor: theme.colors.background } }}>
+                screenOptions={{
+                    headerShown: false,
+                    // Native transitions run on the UI thread, so they stay smooth while JS is busy.
+                    animation: 'slide_from_right',
+                    animationDuration: 250,
+                    freezeOnBlur: true,
+                    contentStyle: { backgroundColor: theme.colors.background },
+                }}>
                 <Stack.Screen name="BottomTabs" component={BottomTabNavigator} />
                 <Stack.Screen name="Schedule" component={ScheduleScreen} />
                 <Stack.Screen name="HabitEditor" component={HabitEditorScreen} />

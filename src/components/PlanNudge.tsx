@@ -14,8 +14,8 @@ import {
     planMoment,
     visibleBlocks,
 } from '../utils/dayPlan';
-import { completeBlock, loadDayPlan, syncPlanReminders } from '../utils/planService';
-import { getHabits, getPlanNudgeLog, getPlanPrefs, setPlanNudgeLog } from '../utils/storage';
+import { completeBlock, loadDayPlan, syncPlanReminders, watchPlanReminders } from '../utils/planService';
+import { getHabits, getPlanNudgeLog, getPlanPrefs, setPlanNudgeLog } from '../storage';
 import { haptics } from '../utils/haptics';
 import { logger } from '../utils/logger';
 import Dialog from './Dialog';
@@ -112,6 +112,7 @@ const PlanNudge: React.FC<PlanNudgeProps> = ({ canShow, onOpenPlan }) => {
         check();
     }, [check]);
     useAppForeground(onForeground);
+    useEffect(watchPlanReminders, []);
     useEffect(() => {
         const first = setTimeout(onForeground, 1500);
         const id = setInterval(check, CHECK_EVERY);

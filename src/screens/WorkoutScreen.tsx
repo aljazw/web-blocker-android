@@ -22,7 +22,7 @@ import { gutter, spacing } from '../theme';
 import { formatClock } from '../utils/apnea';
 import { newId, shortDate, startOfWeek } from '../utils/dates';
 import { currentExercise, describeWorkout, recordsSince, startSession, STARTER_WORKOUTS } from '../utils/workout';
-import { deleteWorkoutRecord, saveWorkout, setWorkoutSession } from '../utils/storage';
+import { deleteWorkoutRecord, saveWorkout, setWorkoutSession } from '../storage';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 
@@ -36,7 +36,7 @@ const describeRecord = (r: WorkoutRecord) =>
 const WorkoutScreen: React.FC = () => {
     const { theme } = useTheme();
     const navigation = useNavigation<RootStackNavigation>();
-    const { workouts, records, session, cues, loaded, reload, changeCues } = useWorkoutData();
+    const { workouts, records, session, cues, loaded, changeCues } = useWorkoutData();
     const [dialog, setDialog] = useState<Dialog | null>(null);
     const close = () => setDialog(null);
 
@@ -71,14 +71,11 @@ const WorkoutScreen: React.FC = () => {
                 break;
             }
         }
-        reload();
     };
 
     const deleteRecord = async (record: WorkoutRecord) => {
         close();
-        if (await deleteWorkoutRecord(record.id)) {
-            reload();
-        } else {
+        if (!(await deleteWorkoutRecord(record.id))) {
             setDialog({ kind: 'error' });
         }
     };

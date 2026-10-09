@@ -27,7 +27,7 @@ import {
     SessionState,
 } from '../utils/apnea';
 import { apneaSession, collectFinishedSession } from '../utils/apneaSession';
-import { getApneaRecords } from '../utils/storage';
+import { getApneaRecords } from '../storage';
 import { haptics } from '../utils/haptics';
 import { logger } from '../utils/logger';
 

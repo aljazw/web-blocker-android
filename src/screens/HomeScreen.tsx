@@ -8,6 +8,7 @@ import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Dialog, { confirmActions } from '../components/Dialog';
+import EmptyState from '../components/EmptyState';
 import ErrorPopup from '../components/ErrorPopup';
 import Favicon from '../components/Favicon';
 import IconButton from '../components/IconButton';
@@ -27,6 +28,7 @@ import { useBlockList } from '../hooks/useBlockList';
 import { useHabits } from '../hooks/useHabits';
 import { useApneaData } from '../hooks/useApneaData';
 import { useDayPlan } from '../hooks/useDayPlan';
+import { usePreloadTabs } from '../navigation/usePreloadTabs';
 import { useAppForeground } from '../hooks/useAppForeground';
 import { gutter, spacing } from '../theme';
 import { checkAccessibilityEnabled, openAccessibilitySettings } from '../utils/accessibility';
@@ -64,9 +66,10 @@ const SEARCH_THRESHOLD = 5;
 const HomeScreen: React.FC = () => {
     const { theme } = useTheme();
     const navigation = useNavigation<RootStackNavigation>();
+    usePreloadTabs();
 
     const { isPassphraseEnabled } = usePassphrase();
-    const { entries, loadFailed, remove, hide } = useBlockList();
+    const { entries, loaded: listLoaded, loadFailed, remove, hide } = useBlockList();
     const { habits } = useHabits();
     const [now, setNow] = useState(new Date());
     const { plan, loaded: planLoaded } = useDayPlan(toDateKey(now));
@@ -227,20 +230,13 @@ const HomeScreen: React.FC = () => {
                     }
                 />
 
-                {visible.length === 0 ? (
-                    <FadeIn delay={60}>
-                        <Card style={styles.empty}>
-                            <IconTile icon="Ban" tone="accent" size={44} />
-                            <ThemedText size="large" weight="bold" style={styles.emptyTitle}>
-                                Nothing blocked yet
-                            </ThemedText>
-                            <ThemedText color="muted" style={styles.emptyText}>
-                                Add the websites and apps that take your time. Block them all day or only during the
-                                hours you choose.
-                            </ThemedText>
-                            <Button label="Add a block" icon="Plus" iconLeading onPress={goToAdd} />
-                        </Card>
-                    </FadeIn>
+                {!listLoaded ? null : visible.length === 0 ? (
+                    <EmptyState
+                        icon="Ban"
+                        title="Nothing blocked yet"
+                        text="Add the websites and apps that take your time. Block them all day or only during the hours you choose.">
+                        <Button label="Add a block" icon="Plus" iconLeading onPress={goToAdd} />
+                    </EmptyState>
                 ) : (
                     <>
                         {visible.length > SEARCH_THRESHOLD && (
@@ -399,16 +395,6 @@ const styles = StyleSheet.create({
     rowBadge: {
         alignSelf: 'center',
         marginRight: 2,
-    },
-    empty: {
-        padding: spacing.lg,
-    },
-    emptyTitle: {
-        marginTop: spacing.md,
-    },
-    emptyText: {
-        marginTop: spacing.xs,
-        marginBottom: spacing.lg,
     },
     noMatches: {
         marginTop: spacing.lg,

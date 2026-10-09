@@ -32,6 +32,8 @@ const BottomTabNavigator: React.FC = () => {
         <Tab.Navigator
             screenOptions={({ route }) => ({
                 headerShown: false,
+                // Hidden tabs stop re-rendering (timers, focus reloads) until they're shown again.
+                freezeOnBlur: true,
                 tabBarHideOnKeyboard: true,
                 tabBarLabel: TAB_LABELS[route.name],
                 tabBarActiveTintColor: theme.colors.accent,

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Image, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
-import { getAppIcon } from '../utils/installedApps';
+import { cachedAppIcon, getAppIcon } from '../utils/installedApps';
 import { useTheme } from '../context/ThemeContext';
 import Icon from './Icon';
 
@@ -13,9 +13,13 @@ interface AppIconProps {
 /** An installed app's launcher icon, with a neutral placeholder while loading or if it's uninstalled. */
 const AppIcon: React.FC<AppIconProps> = ({ packageName, size = 24, style }) => {
     const { theme } = useTheme();
-    const [uri, setUri] = useState<string | null>(null);
+    const [uri, setUri] = useState<string | null>(() => cachedAppIcon(packageName) ?? null);
 
     useEffect(() => {
+        if (cachedAppIcon(packageName) !== undefined) {
+            setUri(cachedAppIcon(packageName) ?? null);
+            return;
+        }
         let alive = true;
         getAppIcon(packageName).then(result => alive && setUri(result));
         return () => {
@@ -40,4 +44,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default AppIcon;
+export default memo(AppIcon);

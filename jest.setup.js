@@ -20,6 +20,5 @@ jest.mock('@notifee/react-native', () => ({
     TriggerType: { TIMESTAMP: 0, INTERVAL: 1 },
 }));
 
-jest.mock('@react-native-community/blur', () => ({ BlurView: 'BlurView' }));
 
 jest.mock('react-native-navigation-bar-color', () => jest.fn());

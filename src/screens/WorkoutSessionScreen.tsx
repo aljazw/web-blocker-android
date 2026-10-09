@@ -32,7 +32,7 @@ import {
     totalSets,
 } from '../utils/workout';
 import { FinishedWorkout, saveFinishedWorkout } from '../utils/workoutSession';
-import { getWorkoutCues, getWorkoutSession, setWorkoutSession } from '../utils/storage';
+import { getWorkoutCues, getWorkoutSession, setWorkoutSession } from '../storage';
 import { haptics } from '../utils/haptics';
 import { logger } from '../utils/logger';
 

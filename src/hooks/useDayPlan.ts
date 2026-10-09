@@ -1,60 +1,49 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useMemo } from 'react';
 import { DayPlan, PlanBlock } from '../types/types';
-import { loadDayPlan, onPlanChanged, persistDayPlan } from '../utils/planService';
+import { STORAGE_KEYS } from '../storage';
+import { loadDayPlan, persistDayPlan } from '../utils/planService';
+import { useFocusData } from './useFocusData';
 
-/** The plan for one day, reloaded when the screen gains focus or the day changes. */
+const WATCH = [STORAGE_KEYS.dayPlans];
+
+/** The plan for one day; stays current with changes made anywhere (editor, pop-ups). */
 export const useDayPlan = (dateKey: string) => {
-    const [plan, setPlan] = useState<DayPlan>({ date: dateKey, blocks: [] });
-    const [loaded, setLoaded] = useState(false);
-    const current = useRef(dateKey);
-    current.current = dateKey;
+    const load = useCallback(async () => (await loadDayPlan(dateKey)).plan, [dateKey]);
+    const empty = useMemo<DayPlan>(() => ({ date: dateKey, blocks: [] }), [dateKey]);
+    const { data, setData, loaded, reload } = useFocusData(load, empty, { watch: WATCH });
 
-    const reload = useCallback(async () => {
-        try {
-            const result = await loadDayPlan(dateKey);
-            // Switching days quickly: ignore a load that finished for the old day.
-            if (current.current === dateKey) {
-                setPlan(result.plan);
-            }
-        } finally {
-            setLoaded(true);
-        }
-    }, [dateKey]);
-
-    useEffect(() => {
-        setLoaded(false);
-        setPlan({ date: dateKey, blocks: [] });
-    }, [dateKey]);
-
-    useFocusEffect(
-        useCallback(() => {
-            reload();
-        }, [reload]),
-    );
-    useEffect(() => onPlanChanged(reload), [reload]);
+    // Right after switching days the previous day's plan is still in state; never show it.
+    const current = data.date === dateKey;
+    const plan = current ? data : empty;
 
     /** Shows `next` at once and saves it; rolls back and resolves false if saving fails. */
     const commit = useCallback(
         async (next: DayPlan): Promise<boolean> => {
             const before = plan;
-            setPlan(next);
+            setData(next);
             const ok = await persistDayPlan(next);
             if (!ok) {
-                setPlan(before);
+                setData(before);
             }
             return ok;
         },
-        [plan],
+        [plan, setData],
     );
 
     const setBlockDone = useCallback(
         (block: PlanBlock, done: boolean) =>
             commit({
                 ...plan,
-                blocks: plan.blocks.map(b =>
-                    b.id === block.id ? (done ? { ...b, done: true } : (({ done: _d, ...rest }) => rest)(b)) : b,
-                ),
+                blocks: plan.blocks.map(b => {
+                    if (b.id !== block.id) {
+                        return b;
+                    }
+                    const next: PlanBlock = { ...b, done: true };
+                    if (!done) {
+                        delete next.done;
+                    }
+                    return next;
+                }),
             }),
         [commit, plan],
     );
@@ -64,5 +53,5 @@ export const useDayPlan = (dateKey: string) => {
         [commit, plan],
     );
 
-    return { plan, loaded, reload, commit, setBlockDone, addBlocks };
+    return { plan, loaded: loaded && current, reload, commit, setBlockDone, addBlocks };
 };

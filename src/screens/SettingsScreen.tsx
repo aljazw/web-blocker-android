@@ -27,7 +27,7 @@ import { requestOverlay } from '../utils/overlay';
 import { testWatchdogWarning } from '../utils/watchdog';
 import { haptics } from '../utils/haptics';
 import { ERRORS, PASSPHRASE_PROTECTION, UNINSTALL_PREVENTION } from '../constants/strings';
-import { getSleepSchedule } from '../utils/storage';
+import { getSleepSchedule } from '../storage';
 import { RootStackNavigation, SleepSchedule } from '../types/types';
 
 /**

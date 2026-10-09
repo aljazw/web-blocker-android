@@ -12,7 +12,7 @@ import { ThemedText } from '../components/ThemedText';
 import { useApneaData } from '../hooks/useApneaData';
 import { gutter, spacing } from '../theme';
 import { apneaSession } from '../utils/apneaSession';
-import { clearApneaRecords } from '../utils/storage';
+import { clearApneaRecords } from '../storage';
 import { APNEA_SAFETY } from '../constants/apnea';
 import { ERRORS } from '../constants/strings';
 
@@ -26,15 +26,13 @@ const BREATHE_UP = [
 type Dialog = { kind: 'safety' } | { kind: 'clear' } | { kind: 'error' };
 
 const ApneaSettingsScreen: React.FC = () => {
-    const { settings, records, loaded, reload, changeSettings } = useApneaData();
+    const { settings, records, loaded, changeSettings } = useApneaData();
     const [dialog, setDialog] = useState<Dialog | null>(null);
     const close = () => setDialog(null);
 
     const clearHistory = async () => {
         close();
-        if (await clearApneaRecords()) {
-            reload();
-        } else {
+        if (!(await clearApneaRecords())) {
             setDialog({ kind: 'error' });
         }
     };

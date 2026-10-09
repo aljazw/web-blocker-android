@@ -4,7 +4,7 @@ import { checkAccessibilityEnabled } from '../utils/accessibility';
 import { DnsStats, getDnsStats, getUpstreamDns, isDnsBlockingRunning } from '../utils/dnsBlocking';
 import { canDrawOverlays } from '../utils/overlay';
 import { isWatchdogRunning } from '../utils/watchdog';
-import { getBlockedWebsites } from '../utils/storage';
+import { getBlockedWebsites } from '../storage';
 import { ALL_DAY, FULL_WEEK } from '../utils/schedule';
 import { useAppForeground } from './useAppForeground';
 

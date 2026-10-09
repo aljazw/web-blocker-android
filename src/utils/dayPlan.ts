@@ -1,7 +1,7 @@
 /** Pure logic for the day plan: times, copying a day forward, gaps and the current block. */
 import { DayPlan, Habit, PlanBlock, SleepSchedule } from '../types/types';
 import type { IconName } from '../components/Icon';
-import { fromDateKey, newId, toDateKey } from './dates';
+import { addDays, fromDateKey, newId, toDateKey, weekdayIndex } from './dates';
 import { isDoneOn, isScheduled } from './habits';
 
 export const DAY_MINUTES = 24 * 60;
@@ -160,13 +160,63 @@ export const planMoment = (blocks: PlanBlock[], now: number): PlanMoment => {
 // ---- Making a day's plan ----------------------------------------------------
 
 /**
- * The next day's plan, copied from `previous`: same blocks and times, nothing
- * checked off, one-off blocks left out.
+ * The next day's plan, copied from `previous`: same blocks at their usual
+ * times (a "running late" shift is undone), nothing checked off, one-off
+ * blocks left out.
  */
 export const copyPlan = (previous: DayPlan, dateKey: string): DayPlan => ({
     date: dateKey,
-    blocks: sortBlocks(previous.blocks.filter(b => !b.once).map(({ done: _done, ...block }) => block)),
+    blocks: sortBlocks(
+        previous.blocks
+            .filter(b => !b.once)
+            .map(({ done: _done, shift = 0, ...block }) => ({
+                ...block,
+                start: block.start - shift,
+                end: block.end - shift,
+            })),
+    ),
 });
+
+/**
+ * Running late: pushes every block that hasn't started by `now` back by
+ * `minutes`, for this day only. Blocks never move past midnight.
+ */
+export const shiftRemaining = (plan: DayPlan, now: number, minutes: number): DayPlan => ({
+    ...plan,
+    blocks: plan.blocks.map(b => {
+        const by = Math.min(minutes, DAY_MINUTES - b.end);
+        if (b.start < now || by <= 0) {
+            return b;
+        }
+        return { ...b, start: b.start + by, end: b.end + by, shift: (b.shift ?? 0) + by };
+    }),
+});
+
+/** Blocks that haven't started by `now`, i.e. what a shift would move. */
+export const upcomingBlocks = (blocks: PlanBlock[], now: number): PlanBlock[] => blocks.filter(b => b.start >= now);
+
+export interface DayScore {
+    date: string;
+    /** One-letter weekday. */
+    label: string;
+    total: number;
+    done: number;
+}
+
+/** How much of each day's plan got done, for the last `days` days ending today (oldest first). */
+export const planHistory = (plans: DayPlan[], habits: Habit[], today: Date, days = 7): DayScore[] =>
+    Array.from({ length: days }, (_, i) => {
+        const day = addDays(today, i - (days - 1));
+        const date = toDateKey(day);
+        const plan = plans.find(p => p.date === date);
+        const blocks = plan ? visibleBlocks(plan, habits) : [];
+        return {
+            date,
+            label: 'MTWTFSS'[weekdayIndex(day)],
+            total: blocks.length,
+            done: blocks.filter(b => isBlockDone(b, habits, date)).length,
+        };
+    });
 
 /** Habits due on the plan's day that have no block yet, for the "add from habits" row. */
 export const unplannedHabits = (plan: DayPlan, habits: Habit[]): Habit[] => {

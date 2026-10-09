@@ -1,8 +1,7 @@
 import { HabitLink } from '../types/types';
-import { getHabits, updateHabit } from './storage';
+import { getHabits, updateHabit } from '../storage';
 import { isDoneOn, isScheduled, markDone } from './habits';
 import { dismissTodaysReminder } from './habitReminders';
-import { syncPlanReminders } from './planService';
 
 /**
  * Checks off every habit linked to this kind of training that is due on `day`
@@ -16,9 +15,6 @@ export const completeLinkedHabits = async (link: HabitLink, day: Date): Promise<
             dismissTodaysReminder(habit);
             completed.push(habit.title);
         }
-    }
-    if (completed.length > 0) {
-        syncPlanReminders();
     }
     return completed;
 };

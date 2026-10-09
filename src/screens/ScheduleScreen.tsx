@@ -10,6 +10,7 @@ import Dialog, { confirmActions } from '../components/Dialog';
 import IconTile from '../components/IconTile';
 import { KeyValueRow } from '../components/ListGroup';
 import Chip from '../components/Chip';
+import ChipGroup from '../components/ChipGroup';
 import Segmented from '../components/Segmented';
 import DayPicker from '../components/DayPicker';
 import BackButton from '../components/BackButton';
@@ -18,12 +19,13 @@ import Favicon from '../components/Favicon';
 import SectionHeader from '../components/SectionHeader';
 import { gutter, spacing } from '../theme';
 import { ThemedText } from '../components/ThemedText';
-import { addBlockedApp, addBlockedWebsite } from '../utils/storage';
+import { addBlockedApp, addBlockedWebsite } from '../storage';
 import ErrorPopup from '../components/ErrorPopup';
 import { ALL_DAY, buildSchedule, describeDays } from '../utils/schedule';
 import { ERRORS } from '../constants/strings';
 import { FadeIn, animateLayout } from '../components/Motion';
 import { haptics } from '../utils/haptics';
+import { EVERY_DAY, WEEKDAYS, WEEKENDS, sameDays } from '../constants/days';
 
 type Preset = {
     label: string;
@@ -31,16 +33,13 @@ type Preset = {
     time: [string, string, string, string] | null; // startH, startM, endH, endM — null = all day
 };
 
-const EVERY_DAY = [true, true, true, true, true, true, true];
-const WEEKDAYS = [true, true, true, true, true, false, false];
-const WEEKEND = [false, false, false, false, false, true, true];
 
 const PRESETS: Preset[] = [
     { label: 'Always', days: EVERY_DAY, time: null },
     { label: 'Work hours', days: WEEKDAYS, time: ['09', '00', '17', '00'] },
     { label: 'Evenings', days: EVERY_DAY, time: ['18', '00', '23', '00'] },
     { label: 'Bedtime', days: EVERY_DAY, time: ['22', '00', '07', '00'] },
-    { label: 'Weekends', days: WEEKEND, time: null },
+    { label: 'Weekends', days: WEEKENDS, time: null },
 ];
 
 const ScheduleScreen: React.FC = () => {
@@ -77,8 +76,7 @@ const ScheduleScreen: React.FC = () => {
     };
 
     const isPresetActive = (preset: Preset) => {
-        const sameDays = preset.days.every((v, i) => v === selectedDays[i]);
-        if (!sameDays) {
+        if (!sameDays(preset.days, selectedDays)) {
             return false;
         }
         if (!preset.time) {
@@ -150,7 +148,7 @@ const ScheduleScreen: React.FC = () => {
 
                 <FadeIn delay={70}>
                     <SectionHeader title="Quick presets" />
-                    <View style={styles.chips}>
+                    <ChipGroup>
                         {PRESETS.map(preset => (
                             <Chip
                                 key={preset.label}
@@ -159,7 +157,7 @@ const ScheduleScreen: React.FC = () => {
                                 onPress={() => applyPreset(preset)}
                             />
                         ))}
-                    </View>
+                    </ChipGroup>
                 </FadeIn>
                 <FadeIn delay={140}>
                     <SectionHeader title="Days" />
@@ -252,12 +250,6 @@ const styles = StyleSheet.create({
     },
     leading: {
         marginRight: spacing.md - 4,
-    },
-    chips: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginHorizontal: gutter,
-        marginTop: spacing.xs,
     },
     cardFoot: {
         marginTop: spacing.sm,
