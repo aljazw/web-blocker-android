@@ -1,8 +1,8 @@
-# SiteLock
+# Gaman
 
-**SiteLock** is an Android focus and self-improvement app. It blocks the websites and apps that take your time, helps you build daily habits, and trains your breath-hold with freediving apnea tables. It's built with **React Native + TypeScript** and native **Kotlin** modules. Everything runs on your device: no accounts, no servers, no tracking.
+**Gaman** is an Android focus and self-improvement app. It blocks the websites and apps that take your time, puts your phone to bed at night, plans your day in time windows, helps you build daily habits, guides your workouts set by set, and trains your breath-hold with freediving apnea tables. It's built with **React Native + TypeScript** and native **Kotlin** modules. Everything runs on your device: no accounts, no servers, no tracking.
 
-> **Android only.** SiteLock relies on Android Accessibility Services, `VpnService`, foreground services and other Android-specific APIs.
+> **Android only.** Gaman relies on Android Accessibility Services, `VpnService`, foreground services and other Android-specific APIs.
 
 ## Features
 
@@ -18,12 +18,32 @@
 -   **Progress:** personal-best trend chart, weekly sessions and hold time, training streak, and full per-round history.
 -   **Safety first:** a one-time briefing (dry training only, no hyperventilation, never alone in water) before the first session.
 
+### Day plan
+
+-   **Your whole day in time windows:** meals, workouts, work and habits on one timeline, with the free time between blocks shown (tap it to fill it).
+-   **Edit, don't rebuild:** each new day starts as a copy of the last one. One-off blocks (an appointment) stay on their day. Tomorrow can be planned in the evening.
+-   **Built from your habits:** a starter day fits between your wake-up and bedtime and slots in today's habits. Habit blocks only appear on days the habit is due, and checking one off checks off the habit.
+-   **Staying on track:** a "Now" card with time left and what's next, a notification as each block starts, an evening "plan tomorrow" reminder, and occasional in-app check-ins ("Now: Deep work", "Did you finish Lunch?").
+
 ### Habits
 
 -   **Daily habits** with an icon and the weekdays they're due.
 -   **Streaks:** consecutive due days completed. Days off never break a streak, and today stays pending until it's over. Best streak and a 7-day completion rate are tracked too.
 -   **Reminders:** an optional notification at a time you choose, only on that habit's days.
--   **Automation:** a habit can complete itself when you finish an apnea session that day.
+-   **Automation:** a habit can complete itself when you reach the end of a workout or finish an apnea session that day.
+
+### Workouts
+
+-   **Plans:** list exercises with sets, then reps or a time per set, and the rest after each set. Two example workouts are one tap away.
+-   **Follow along:** one tap per finished set, so you never lose count. Timed exercises such as a plank get a 5-second lead-in and count down for you. Rests count down too, with *Skip rest* and *+15 s*.
+-   **Cues:** optional tones and vibration when a timed set or rest starts and ends, plus the last 3 seconds.
+-   **Never lost:** progress is saved after every step, so closing the app resumes the workout where you left off.
+-   **History:** weekly workouts, sets and time, plus recent sessions.
+
+### Sleep time
+
+-   **Bedtime to morning:** between the times you choose, every app opens a sleep page instead, Settings and Gaman included. Calls, the alarm clock, the home screen and the keyboard keep working.
+-   **Hard to undo:** turning it off for the night means watching a short video to the end (no skip), then typing a short sentence such as *Habits are everything*. It comes back the next evening.
 
 ### Blocking
 
@@ -35,10 +55,10 @@
 ### Making it stick
 
 -   **Watchdog:** a separate foreground service notices the moment the Accessibility Service is switched off and shows a full-screen prompt to turn it back on.
--   **Settings guard:** SiteLock's own Accessibility toggle is guarded while protection is active.
+-   **Settings guard:** Gaman's own Accessibility toggle is guarded while protection is active.
 -   **Restart after reboot:** protection layers restart after a reboot or an app update.
 -   **Passphrase protection:** removing blocks or weakening protection requires typing a long passphrase.
--   **Uninstall prevention:** SiteLock registers as a device admin so it can't be removed on impulse.
+-   **Uninstall prevention:** Gaman registers as a device admin so it can't be removed on impulse.
 -   **Hidden blocks:** a block can be hidden so it can't be removed from inside the app.
 
 ### App
@@ -63,7 +83,7 @@ npm start
 npm run android
 ```
 
-On first launch, follow the in-app steps to enable SiteLock under **Settings → Accessibility**. For the strongest protection, also open **Settings** in the app and:
+On first launch, follow the in-app steps to enable Gaman under **Settings → Accessibility**. For the strongest protection, also open **Settings** in the app and:
 
 1. Grant **Display over other apps**, so the watchdog can show its prompt.
 2. Turn on **DNS blocking** and follow the guided setup.
@@ -78,13 +98,13 @@ A debug build loads JavaScript from Metro and is signed with a throwaway key. Fo
 1. **Generate a signing key** (once):
 
     ```bash
-    keytool -genkey -v -keystore sitelock-release-key.jks -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000
+    keytool -genkey -v -keystore gaman-release-key.jks -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000
     ```
 
 2. Put the `.jks` file in `android/app/`, and create `android/keystore.properties`:
 
     ```
-    storeFile=sitelock-release-key.jks
+    storeFile=gaman-release-key.jks
     storePassword=yourStorePassword
     keyAlias=my-key-alias
     keyPassword=yourKeyPassword
@@ -107,7 +127,7 @@ A debug build loads JavaScript from Metro and is signed with a throwaway key. Fo
 
 ```
 src/
-├── screens/      Overview, Habits, Apnea (tables, session, history, settings), Block, Schedule, Settings
+├── screens/      Overview, Routine (day plan, block editor, habits), Workout (editor, session), Apnea (tables, session, history, settings), Block, Schedule, Sleep, Settings
 ├── components/   Design system: Card, ListGroup, Dialog, Button, StatTile, ProgressRing, Stepper, …
 ├── theme/        Light/dark palettes, accent colors, spacing & radius tokens
 ├── context/      Theme (dark mode + accent) and passphrase state
@@ -115,18 +135,19 @@ src/
 ├── utils/        Pure logic (schedules, streaks, apnea tables and stats), storage, native bridges
 └── constants/    UI strings, safety copy, habit icons and quick-add suggestions
 
-android/app/src/main/java/com/sitelock/
-├── BlockAccessibilityService.kt   URL detection and settings guard
+android/app/src/main/java/com/gaman/
+├── BlockAccessibilityService.kt   URL and app blocking, sleep time and settings guard
 ├── DnsVpnService.kt               On-device DNS filter
 ├── WatchdogService.kt             Re-enable prompt when protection is turned off
 ├── BootReceiver.kt                Restarts layers after reboot or update
 ├── apnea/                         Session timeline, cue player and foreground service
+├── sleep/                         Sleep schedule and the sleep page (video + passphrase)
 └── modules/ + *Module.kt          React Native bridges
 ```
 
 ## Built with Claude Code
 
-SiteLock started as a hand-written learning project. From February 2025 to September 2026 I built the core myself: the React Native UI, the Accessibility-based blocker, schedules, the passphrase, dark mode and device-admin uninstall prevention. That work runs through commit `091096d`.
+Gaman (originally called SiteLock) started as a hand-written learning project. From February 2025 to September 2026 I built the core myself: the React Native UI, the Accessibility-based blocker, schedules, the passphrase, dark mode and device-admin uninstall prevention. That work runs through commit `091096d`.
 
 After that, I continued development with [Claude Code](https://claude.com/claude-code):
 

@@ -1,9 +1,10 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Habit } from '../types/types';
 import { deleteHabit, getHabits, saveHabit, updateHabit } from '../utils/storage';
 import { toggleCompletion } from '../utils/habits';
 import { cancelHabitReminders, dismissTodaysReminder, syncHabitReminders } from '../utils/habitReminders';
+import { onPlanChanged, syncPlanReminders } from '../utils/planService';
 
 export type ToggleResult =
     | { status: 'saved'; habit: Habit }
@@ -36,6 +37,8 @@ export const useHabits = () => {
             reload();
         }, [reload]),
     );
+    // A pop-up may check off a habit through its plan block.
+    useEffect(() => onPlanChanged(reload), [reload]);
 
     /**
      * Checks today's box (or unchecks it). Updates the screen immediately and
@@ -61,6 +64,7 @@ export const useHabits = () => {
         if (updated.completions.length > habit.completions.length) {
             dismissTodaysReminder(updated);
         }
+        syncPlanReminders(); // a linked plan block is now done (or not)
         return { status: 'saved', habit: updated };
     }, []);
 
@@ -72,6 +76,7 @@ export const persistHabit = async (habit: Habit): Promise<boolean> => {
     const ok = await saveHabit(habit);
     if (ok) {
         await syncHabitReminders(habit);
+        syncPlanReminders();
     }
     return ok;
 };
@@ -81,6 +86,7 @@ export const removeHabit = async (habitId: string): Promise<boolean> => {
     const ok = await deleteHabit(habitId);
     if (ok) {
         await cancelHabitReminders(habitId);
+        syncPlanReminders();
     }
     return ok;
 };

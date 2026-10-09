@@ -37,7 +37,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
                     <View
                         style={[styles.logo, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
                         <Image
-                            source={require('../assets/icons/ic_sitelock.png')}
+                            source={require('../assets/icons/ic_gaman.png')}
                             style={styles.image}
                             resizeMode="contain"
                         />

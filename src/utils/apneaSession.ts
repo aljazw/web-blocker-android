@@ -2,9 +2,8 @@ import { NativeModules } from 'react-native';
 import { ApneaKind, ApneaRecord, ApneaSettings } from '../types/types';
 import { isApneaKind, recordFromSession, SessionPhase, SessionState, SessionStatus } from './apnea';
 import { newId } from './dates';
-import { addApneaRecord, getHabits, updateHabit } from './storage';
-import { isDoneOn, isScheduled, markDone } from './habits';
-import { dismissTodaysReminder } from './habitReminders';
+import { addApneaRecord } from './storage';
+import { completeLinkedHabits } from './habitLinks';
 import { logger } from './logger';
 
 /**
@@ -135,18 +134,8 @@ export const collectFinishedSession = async (): Promise<ApneaRecord | null> => {
         logger.warn('Could not save session record');
         return null;
     }
-    await completeLinkedHabits(new Date(record.startedAt)).catch(error =>
+    await completeLinkedHabits('apnea', new Date(record.startedAt)).catch(error =>
         logger.warn('Could not complete linked habits', error),
     );
     return record;
-};
-
-/** Checks off habits linked to apnea training that are due on the session's day. */
-const completeLinkedHabits = async (day: Date) => {
-    const linked = (await getHabits()).filter(h => h.link === 'apnea' && isScheduled(h, day) && !isDoneOn(h, day));
-    for (const habit of linked) {
-        if (await updateHabit(habit.id, stored => markDone(stored, day))) {
-            dismissTodaysReminder(habit);
-        }
-    }
 };

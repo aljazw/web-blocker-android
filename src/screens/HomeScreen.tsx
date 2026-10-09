@@ -14,6 +14,7 @@ import IconButton from '../components/IconButton';
 import IconTile from '../components/IconTile';
 import { ListGroup } from '../components/ListGroup';
 import PassphrasePopup from '../components/PassphrasePopup';
+import PlanNowCard from '../components/PlanNowCard';
 import SearchBar from '../components/SearchBar';
 import SectionHeader from '../components/SectionHeader';
 import StatRow from '../components/StatRow';
@@ -25,12 +26,15 @@ import { useTheme } from '../context/ThemeContext';
 import { useBlockList } from '../hooks/useBlockList';
 import { useHabits } from '../hooks/useHabits';
 import { useApneaData } from '../hooks/useApneaData';
+import { useDayPlan } from '../hooks/useDayPlan';
 import { useAppForeground } from '../hooks/useAppForeground';
 import { gutter, spacing } from '../theme';
 import { checkAccessibilityEnabled, openAccessibilitySettings } from '../utils/accessibility';
 import { describeSchedule, isBlockActiveNow } from '../utils/schedule';
 import { currentStreak, isDoneOn, isScheduled } from '../utils/habits';
 import { formatClock, personalBest } from '../utils/apnea';
+import { toDateKey } from '../utils/dates';
+import { minutesNow, visibleBlocks } from '../utils/dayPlan';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 
@@ -64,10 +68,11 @@ const HomeScreen: React.FC = () => {
     const { isPassphraseEnabled } = usePassphrase();
     const { entries, loadFailed, remove, hide } = useBlockList();
     const { habits } = useHabits();
+    const [now, setNow] = useState(new Date());
+    const { plan, loaded: planLoaded } = useDayPlan(toDateKey(now));
     // Finished sessions are left for the session screen, which shows their summary.
     const { records } = useApneaData({ collect: false });
     const [protectionOn, setProtectionOn] = useState<boolean | null>(null);
-    const [now, setNow] = useState(new Date());
     const [query, setQuery] = useState('');
     const [dialog, setDialog] = useState<Dialog | null>(null);
 
@@ -120,11 +125,21 @@ const HomeScreen: React.FC = () => {
     const best = useMemo(() => personalBest(records), [records]);
 
     const goToAdd = () => navigation.navigate('BottomTabs', { screen: 'Block' });
+    const goToPlan = () => navigation.navigate('BottomTabs', { screen: 'Habits', params: { view: 'plan' } });
+    const planBlocks = visibleBlocks(plan, habits);
 
     return (
         <BaseScreen
             title={greeting(now)}
-            subtitle={now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}>
+            subtitle={now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+            headerRight={
+                <IconButton
+                    icon="Settings"
+                    variant="outline"
+                    accessibilityLabel="Settings"
+                    onPress={() => navigation.navigate('Settings')}
+                />
+            }>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 {/* ---- Protection status ---- */}
                 <FadeIn>
@@ -160,6 +175,29 @@ const HomeScreen: React.FC = () => {
                             />
                         )}
                     </Card>
+
+                    {planBlocks.length > 0 ? (
+                        <PlanNowCard
+                            blocks={planBlocks}
+                            habits={habits}
+                            dateKey={plan.date}
+                            now={minutesNow(now)}
+                            onPress={goToPlan}
+                        />
+                    ) : (
+                        planLoaded && (
+                            <Card onPress={goToPlan} accessibilityLabel="Plan your day" style={styles.planRow}>
+                                <IconTile icon="Plan" tone="accent" size={40} />
+                                <View style={styles.statusText}>
+                                    <ThemedText weight="strong">Plan your day</ThemedText>
+                                    <ThemedText size="small" color="muted">
+                                        Meals, workouts, work and habits, each in its own time window
+                                    </ThemedText>
+                                </View>
+                                <IconTile icon="Next" size={28} />
+                            </Card>
+                        )
+                    )}
 
                     <StatRow>
                         <StatTile
@@ -331,6 +369,10 @@ const styles = StyleSheet.create({
     statusText: {
         flex: 1,
         marginHorizontal: spacing.sm + 2,
+    },
+    planRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     statusButton: {
         marginTop: spacing.md,

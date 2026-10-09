@@ -5,7 +5,7 @@ import HomeScreen from '../screens/HomeScreen';
 import HabitsScreen from '../screens/HabitsScreen';
 import BreatheScreen from '../screens/BreatheScreen';
 import BlockScreen from '../screens/BlockScreen';
-import SettingsScreen from '../screens/SettingsScreen';
+import WorkoutScreen from '../screens/WorkoutScreen';
 import { useTheme } from '../context/ThemeContext';
 import { TabParamList } from '../types/types';
 
@@ -13,10 +13,10 @@ const Tab = createBottomTabNavigator<TabParamList>();
 
 const TAB_LABELS: Record<keyof TabParamList, string> = {
     Home: 'Overview',
-    Habits: 'Habits',
+    Habits: 'Routine',
+    Workout: 'Workout',
     Breathe: 'Apnea',
     Block: 'Block',
-    Settings: 'Settings',
 };
 
 /** Defined outside the navigator so React keeps a stable component identity. */
@@ -49,9 +49,9 @@ const BottomTabNavigator: React.FC = () => {
             })}>
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Habits" component={HabitsScreen} />
+            <Tab.Screen name="Workout" component={WorkoutScreen} />
             <Tab.Screen name="Breathe" component={BreatheScreen} />
             <Tab.Screen name="Block" component={BlockScreen} />
-            <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
     );
 };

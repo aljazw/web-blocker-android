@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import BackButton from '../components/BackButton';
 import BaseScreen from '../components/BaseScreen';
 import { ACCENTS, AccentName, gutter, shapes, spacing } from '../theme';
 import { ThemedText } from '../components/ThemedText';
@@ -145,7 +146,7 @@ const SettingsScreen: React.FC = () => {
     const health = !status.accessibility ? 'At risk' : layersOn === layers.length ? 'Strong' : 'Good';
 
     return (
-        <BaseScreen title="Settings" subtitle="Protection, security and appearance">
+        <BaseScreen title="Settings" subtitle="Protection, security and appearance" headerLeft={<BackButton />}>
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* ---- Live protection status ---- */}
                 <FadeIn>

@@ -3,10 +3,11 @@ import type { IconName } from '../components/Icon';
 
 export type TabParamList = {
     Home: undefined;
-    Habits: undefined;
+    /** Opens on the day plan or the habit list. */
+    Habits: { view?: RoutineView } | undefined;
+    Workout: undefined;
     Breathe: undefined;
     Block: undefined;
-    Settings: undefined;
 };
 
 export type RootStackParamList = {
@@ -23,7 +24,47 @@ export type RootStackParamList = {
     ApneaHistory: undefined;
     ApneaSettings: undefined;
     Sleep: undefined;
+    Settings: undefined;
+    /** No workoutId = create a new workout. */
+    WorkoutEditor: { workoutId?: string } | undefined;
+    /** The live (or just finished) workout. */
+    WorkoutSession: undefined;
+    /** No blockId = add a block, optionally prefilled (times in minutes after midnight). */
+    PlanBlockEditor: { date: string; blockId?: string; start?: number; end?: number; habitId?: string };
 };
+
+export type RoutineView = 'plan' | 'habits';
+
+// ---- Day plan ---------------------------------------------------------------
+
+/** One time window of the day plan, e.g. "Lunch 12:30–13:15". */
+export interface PlanBlock {
+    id: string;
+    title: string;
+    icon: IconName;
+    /** Minutes after midnight; start < end <= 1440. */
+    start: number;
+    end: number;
+    /** Linked habit: checking the block checks off the habit (and the other way round). */
+    habitId?: string;
+    /** Only for this day; left out when the next day's plan is copied from this one. */
+    once?: boolean;
+    /** Checked off. Linked blocks follow their habit instead. */
+    done?: boolean;
+}
+
+export interface DayPlan {
+    /** Local date "YYYY-MM-DD". */
+    date: string;
+    blocks: PlanBlock[];
+}
+
+export interface PlanPrefs {
+    /** A notification when each block starts, plus an evening "plan tomorrow" reminder. */
+    reminders: boolean;
+    /** Occasional in-app pop-ups about the current block. */
+    nudges: boolean;
+}
 
 /** Nightly sleep time; times are "HH:mm". Mirrors SleepSchedule.kt. */
 export interface SleepSchedule {
@@ -72,7 +113,76 @@ export interface Habit {
     /** Local dates "YYYY-MM-DD" the habit was checked off. */
     completions: string[];
     /** Checked off automatically when a session of this kind is finished. */
-    link?: 'apnea';
+    link?: HabitLink;
+}
+
+export type HabitLink = 'apnea' | 'workout';
+
+// ---- Workouts ---------------------------------------------------------------
+
+/** Counted in reps (tap when a set is done) or timed (a countdown, e.g. a plank). */
+export type ExerciseMode = 'reps' | 'time';
+
+export interface Exercise {
+    id: string;
+    name: string;
+    mode: ExerciseMode;
+    sets: number;
+    /** Target reps per set; used when mode is "reps". */
+    reps: number;
+    /** Seconds per set; used when mode is "time". */
+    seconds: number;
+    /** Rest after each set, in seconds (0 = none). */
+    rest: number;
+}
+
+export interface Workout {
+    id: string;
+    name: string;
+    exercises: Exercise[];
+}
+
+/**
+ * ready: waiting for the user (tap "Done" for reps, "Start" for a timed set).
+ * work:  a timed set is counting down; phaseStartedAt may lie in the future (get-ready lead-in).
+ * rest:  resting after a set.
+ * done:  finished or ended early.
+ */
+export type WorkoutPhase = 'ready' | 'work' | 'rest' | 'done';
+
+/** The workout in progress. Wall-clock millis, so it survives the app closing. */
+export interface WorkoutSession {
+    id: string;
+    workoutId: string;
+    title: string;
+    /** Snapshot taken at the start, so editing the workout can't break a running session. */
+    exercises: Exercise[];
+    exercise: number;
+    set: number;
+    phase: WorkoutPhase;
+    phaseStartedAt: number;
+    startedAt: number;
+    endedAt: number;
+    setsDone: number;
+    /** Ended with "End workout" before the last set. */
+    endedEarly: boolean;
+}
+
+export interface WorkoutRecord {
+    id: string;
+    workoutId: string;
+    title: string;
+    startedAt: number;
+    endedAt: number;
+    setsDone: number;
+    setsTotal: number;
+    /** Reached the end (skipped sets allowed) rather than ended early; this checks off linked habits. */
+    completed: boolean;
+}
+
+export interface WorkoutCues {
+    sound: boolean;
+    vibration: boolean;
 }
 
 // ---- Apnea training ---------------------------------------------------------

@@ -84,7 +84,7 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.sitelock"
+    namespace "com.gaman"
     defaultConfig {
         applicationId "com.sitelock"
         minSdkVersion rootProject.ext.minSdkVersion

@@ -65,7 +65,7 @@ export const syncHabitReminders = async (habit: Habit): Promise<void> => {
                               body: 'Time to keep your streak going. Tap to check it off.',
                               android: {
                                   channelId: CHANNEL_ID,
-                                  smallIcon: 'ic_stat_sitelock',
+                                  smallIcon: 'ic_stat_gaman',
                                   pressAction: { id: 'default' },
                               },
                           },

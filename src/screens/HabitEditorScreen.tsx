@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import { Habit, RootStackNavigation, RootStackParamList } from '../types/types';
+import { Habit, HabitLink, RootStackNavigation, RootStackParamList } from '../types/types';
 import BackButton from '../components/BackButton';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
@@ -14,6 +14,7 @@ import Icon, { IconName } from '../components/Icon';
 import IconButton from '../components/IconButton';
 import { ListGroup, ListRow, Toggle } from '../components/ListGroup';
 import SectionHeader from '../components/SectionHeader';
+import Segmented from '../components/Segmented';
 import StatRow from '../components/StatRow';
 import StatTile from '../components/StatTile';
 import TimeInput from '../components/TimeInput';
@@ -30,16 +31,28 @@ import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 import { DEFAULT_HABIT_ICON, HABIT_ICONS } from '../constants/habitIcons';
 
-const SUGGESTIONS: { icon: IconName; title: string }[] = [
-    { icon: 'Dumbbell', title: 'Workout 10 min' },
+const SUGGESTIONS: { icon: IconName; title: string; link?: HabitLink }[] = [
+    { icon: 'Dumbbell', title: 'Workout', link: 'workout' },
     { icon: 'Book', title: 'Read 10 pages' },
-    { icon: 'Waves', title: 'Apnea training' },
+    { icon: 'Waves', title: 'Apnea training', link: 'apnea' },
     { icon: 'Brain', title: 'Meditate 5 min' },
     { icon: 'Droplet', title: 'Drink 2 L of water' },
     { icon: 'Footprints', title: 'Walk 8,000 steps' },
     { icon: 'PhoneOff', title: 'No phone first hour' },
     { icon: 'Bed', title: 'In bed by 23:00' },
 ];
+
+const LINKS: { value: HabitLink | 'none'; label: string }[] = [
+    { value: 'none', label: 'Manual' },
+    { value: 'workout', label: 'Workout' },
+    { value: 'apnea', label: 'Apnea' },
+];
+
+const LINK_DESCRIPTION: Record<HabitLink | 'none', string> = {
+    none: 'You check it off yourself.',
+    workout: 'Checked off when you reach the end of any workout that day.',
+    apnea: 'Checked off when you finish any apnea session that day.',
+};
 
 const EVERY_DAY = [true, true, true, true, true, true, true];
 const DAY_PRESETS = [
@@ -64,7 +77,7 @@ const HabitEditorScreen: React.FC = () => {
     const [icon, setIcon] = useState<IconName>(DEFAULT_HABIT_ICON);
     const [days, setDays] = useState<boolean[]>(EVERY_DAY);
     const [reminderOn, setReminderOn] = useState(false);
-    const [linkApnea, setLinkApnea] = useState(false);
+    const [link, setLink] = useState<HabitLink | 'none'>('none');
     const [hour, setHour] = useState('08');
     const [minute, setMinute] = useState('00');
     const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -85,7 +98,7 @@ const HabitEditorScreen: React.FC = () => {
                 setTitle(habit.title);
                 setIcon(habit.icon);
                 setDays(habit.days);
-                setLinkApnea(habit.link === 'apnea');
+                setLink(habit.link ?? 'none');
                 if (habit.reminder) {
                     const [h, m] = habit.reminder.split(':');
                     setReminderOn(true);
@@ -121,7 +134,7 @@ const HabitEditorScreen: React.FC = () => {
             icon,
             days,
             reminder,
-            ...(linkApnea ? { link: 'apnea' as const } : {}),
+            ...(link !== 'none' ? { link } : {}),
         };
 
         const granted = reminder ? await ensureReminderPermission() : true;
@@ -204,7 +217,7 @@ const HabitEditorScreen: React.FC = () => {
                                 onPress={() => {
                                     setTitle(s.title);
                                     setIcon(s.icon);
-                                    setLinkApnea(s.icon === 'Waves');
+                                    setLink(s.link ?? 'none');
                                 }}
                             />
                         ))}
@@ -261,14 +274,12 @@ const HabitEditorScreen: React.FC = () => {
                 </Card>
 
                 <SectionHeader title="Automation" />
-                <ListGroup>
-                    <ListRow
-                        icon="Waves"
-                        title="Complete with apnea training"
-                        description="Checked off when you finish any apnea session that day">
-                        <Toggle value={linkApnea} onValueChange={setLinkApnea} />
-                    </ListRow>
-                </ListGroup>
+                <View style={styles.linkPicker}>
+                    <Segmented options={LINKS} value={link} onChange={setLink} />
+                    <ThemedText size="small" color="muted" style={styles.linkHint}>
+                        {LINK_DESCRIPTION[link]}
+                    </ThemedText>
+                </View>
 
                 <SectionHeader title="Reminder" />
                 <ListGroup>
@@ -371,6 +382,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
         width: '62%',
+    },
+    linkPicker: {
+        marginHorizontal: gutter,
+    },
+    linkHint: {
+        marginTop: spacing.sm,
+        marginHorizontal: 2,
     },
     problem: {
         marginTop: spacing.lg,

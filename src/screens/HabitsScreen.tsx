@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { Habit, RootStackNavigation } from '../types/types';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { Habit, RootStackNavigation, RoutineView, TabParamList } from '../types/types';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -11,6 +11,7 @@ import HabitCard from '../components/HabitCard';
 import IconButton from '../components/IconButton';
 import IconTile from '../components/IconTile';
 import ProgressBar from '../components/ProgressBar';
+import Segmented from '../components/Segmented';
 import SectionHeader from '../components/SectionHeader';
 import StatRow from '../components/StatRow';
 import StatTile from '../components/StatTile';
@@ -18,7 +19,8 @@ import { ThemedText } from '../components/ThemedText';
 import { FadeIn, animateLayout, stagger } from '../components/Motion';
 import { useTheme } from '../context/ThemeContext';
 import { useHabits } from '../hooks/useHabits';
-import { spacing } from '../theme';
+import { gutter, spacing } from '../theme';
+import DayPlanView from './DayPlanView';
 import { completionRate, currentStreak, isDoneOn, isScheduled, milestoneFor } from '../utils/habits';
 import { milestoneMessage } from '../utils/habitText';
 import { haptics } from '../utils/haptics';
@@ -29,11 +31,26 @@ type Moment = { kind: 'milestone'; habit: Habit; days: number } | { kind: 'error
 const todayLabel = (date: Date) =>
     date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
+const VIEWS: { value: RoutineView; label: string }[] = [
+    { value: 'plan', label: 'Day plan' },
+    { value: 'habits', label: 'Habits' },
+];
+
+/** The routine tab: the day plan, and the habits it's built from. */
 const HabitsScreen: React.FC = () => {
     const { theme } = useTheme();
     const navigation = useNavigation<RootStackNavigation>();
+    const route = useRoute<RouteProp<TabParamList, 'Habits'>>();
     const { habits, loaded, toggleToday } = useHabits();
     const [moment, setMoment] = useState<Moment | null>(null);
+    const [view, setView] = useState<RoutineView>(route.params?.view ?? 'plan');
+
+    // Opened from elsewhere (a pop-up, the overview) with a view in mind.
+    useEffect(() => {
+        if (route.params?.view) {
+            setView(route.params.view);
+        }
+    }, [route.params]);
 
     const today = new Date();
     const due = habits.filter(h => isScheduled(h, today));
@@ -68,6 +85,18 @@ const HabitsScreen: React.FC = () => {
         }
     };
 
+    /** For plan blocks linked to a habit; the plan does its own feedback. */
+    const togglePlanHabit = async (habit: Habit) => {
+        const result = await toggleToday(habit);
+        if (result.status === 'saved' && result.habit.completions.length > habit.completions.length) {
+            const milestone = milestoneFor(currentStreak(result.habit, today));
+            if (milestone) {
+                setMoment({ kind: 'milestone', habit: result.habit, days: milestone });
+            }
+        }
+        return result.status !== 'failed';
+    };
+
     const summary =
         habits.length === 0
             ? 'No habits yet'
@@ -79,91 +108,103 @@ const HabitsScreen: React.FC = () => {
 
     return (
         <BaseScreen
-            title="Habits"
+            title={view === 'plan' ? 'Day plan' : 'Habits'}
             subtitle={todayLabel(today)}
             headerRight={
-                <IconButton icon="Plus" variant="filled" accessibilityLabel="New habit" onPress={() => openEditor()} />
+                view === 'habits' ? (
+                    <IconButton
+                        icon="Plus"
+                        variant="filled"
+                        accessibilityLabel="New habit"
+                        onPress={() => openEditor()}
+                    />
+                ) : undefined
             }>
-            <ScrollView contentContainerStyle={styles.scroll}>
-                {habits.length > 0 && (
-                    <FadeIn>
-                        <Card>
-                            <ThemedText size="tiny" weight="strong" color="muted" caps>
-                                Today
-                            </ThemedText>
-                            <View style={styles.progressRow}>
-                                <ThemedText size="display" weight="bold" tabular>
-                                    {doneCount}
-                                    <ThemedText size="large" color="muted" weight="medium">
-                                        {' '}
-                                        / {due.length}
+            <Segmented options={VIEWS} value={view} onChange={setView} style={styles.views} />
+            {view === 'plan' ? (
+                <DayPlanView habits={habits} onToggleHabit={togglePlanHabit} />
+            ) : (
+                <ScrollView contentContainerStyle={styles.scroll}>
+                    {habits.length > 0 && (
+                        <FadeIn>
+                            <Card>
+                                <ThemedText size="tiny" weight="strong" color="muted" caps>
+                                    Today
+                                </ThemedText>
+                                <View style={styles.progressRow}>
+                                    <ThemedText size="display" weight="bold" tabular>
+                                        {doneCount}
+                                        <ThemedText size="large" color="muted" weight="medium">
+                                            {' '}
+                                            / {due.length}
+                                        </ThemedText>
                                     </ThemedText>
-                                </ThemedText>
-                                <ThemedText
-                                    size="small"
-                                    weight="medium"
-                                    color={allDone ? 'primaryGreen' : 'muted'}
-                                    style={styles.summary}>
-                                    {summary}
-                                </ThemedText>
-                            </View>
-                            {due.length > 0 && (
-                                <ProgressBar
-                                    fraction={doneCount / due.length}
-                                    color={allDone ? theme.colors.primaryGreen : theme.colors.accent}
-                                    style={styles.progress}
-                                />
-                            )}
-                        </Card>
-                        <StatRow>
-                            <StatTile label="Best streak" value={topStreak} suffix=" d" />
-                            <StatTile label="7-day rate" value={Math.round((weekRate ?? 0) * 100)} suffix="%" />
-                            <StatTile label="Check-ins" value={totalCheckIns} />
-                        </StatRow>
-                    </FadeIn>
-                )}
+                                    <ThemedText
+                                        size="small"
+                                        weight="medium"
+                                        color={allDone ? 'primaryGreen' : 'muted'}
+                                        style={styles.summary}>
+                                        {summary}
+                                    </ThemedText>
+                                </View>
+                                {due.length > 0 && (
+                                    <ProgressBar
+                                        fraction={doneCount / due.length}
+                                        color={allDone ? theme.colors.primaryGreen : theme.colors.accent}
+                                        style={styles.progress}
+                                    />
+                                )}
+                            </Card>
+                            <StatRow>
+                                <StatTile label="Best streak" value={topStreak} suffix=" d" />
+                                <StatTile label="7-day rate" value={Math.round((weekRate ?? 0) * 100)} suffix="%" />
+                                <StatTile label="Check-ins" value={totalCheckIns} />
+                            </StatRow>
+                        </FadeIn>
+                    )}
 
-                {loaded && habits.length === 0 ? (
-                    <FadeIn delay={60}>
-                        <Card style={styles.empty}>
-                            <IconTile icon="Habits" tone="accent" size={44} />
-                            <ThemedText size="large" weight="bold" style={styles.emptyTitle}>
-                                Build a daily routine
-                            </ThemedText>
-                            <ThemedText color="muted" style={styles.emptyText}>
-                                Track small, repeatable actions such as a 10-minute workout or reading. Choose the days
-                                each habit is due and check it off to build a streak.
-                            </ThemedText>
-                            <Button label="Create a habit" icon="Plus" iconLeading onPress={() => openEditor()} />
-                        </Card>
-                    </FadeIn>
-                ) : (
-                    <>
-                        {due.length > 0 && <SectionHeader title="Due today" />}
-                        {due.map((habit, i) => (
-                            <FadeIn key={habit.id} delay={60 + stagger(i)}>
-                                <HabitCard
-                                    habit={habit}
-                                    dueToday
-                                    onToggle={() => onToggle(habit)}
-                                    onOpen={() => openEditor(habit.id)}
-                                />
-                            </FadeIn>
-                        ))}
-                        {notDue.length > 0 && <SectionHeader title="Other days" />}
-                        {notDue.map((habit, i) => (
-                            <FadeIn key={habit.id} delay={80 + stagger(due.length + i)}>
-                                <HabitCard
-                                    habit={habit}
-                                    dueToday={false}
-                                    onToggle={() => undefined}
-                                    onOpen={() => openEditor(habit.id)}
-                                />
-                            </FadeIn>
-                        ))}
-                    </>
-                )}
-            </ScrollView>
+                    {loaded && habits.length === 0 ? (
+                        <FadeIn delay={60}>
+                            <Card style={styles.empty}>
+                                <IconTile icon="Habits" tone="accent" size={44} />
+                                <ThemedText size="large" weight="bold" style={styles.emptyTitle}>
+                                    Build a daily routine
+                                </ThemedText>
+                                <ThemedText color="muted" style={styles.emptyText}>
+                                    Track small, repeatable actions such as a 10-minute workout or reading. Choose the
+                                    days each habit is due and check it off to build a streak.
+                                </ThemedText>
+                                <Button label="Create a habit" icon="Plus" iconLeading onPress={() => openEditor()} />
+                            </Card>
+                        </FadeIn>
+                    ) : (
+                        <>
+                            {due.length > 0 && <SectionHeader title="Due today" />}
+                            {due.map((habit, i) => (
+                                <FadeIn key={habit.id} delay={60 + stagger(i)}>
+                                    <HabitCard
+                                        habit={habit}
+                                        dueToday
+                                        onToggle={() => onToggle(habit)}
+                                        onOpen={() => openEditor(habit.id)}
+                                    />
+                                </FadeIn>
+                            ))}
+                            {notDue.length > 0 && <SectionHeader title="Other days" />}
+                            {notDue.map((habit, i) => (
+                                <FadeIn key={habit.id} delay={80 + stagger(due.length + i)}>
+                                    <HabitCard
+                                        habit={habit}
+                                        dueToday={false}
+                                        onToggle={() => undefined}
+                                        onOpen={() => openEditor(habit.id)}
+                                    />
+                                </FadeIn>
+                            ))}
+                        </>
+                    )}
+                </ScrollView>
+            )}
 
             <Dialog
                 visible={moment?.kind === 'milestone'}
@@ -180,6 +221,10 @@ const HabitsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+    views: {
+        marginHorizontal: gutter,
+        marginBottom: spacing.xs,
+    },
     scroll: {
         paddingBottom: spacing.xl,
     },

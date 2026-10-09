@@ -5,12 +5,21 @@ import {
     BlockedAppData,
     BlockedWebsitesData,
     CustomTable,
+    DayPlan,
+    Exercise,
     Habit,
+    PlanBlock,
+    PlanPrefs,
     SleepSchedule,
     TableParams,
     TableRound,
+    Workout,
+    WorkoutCues,
+    WorkoutRecord,
+    WorkoutSession,
 } from '../types/types';
-import { habitIconFrom } from '../constants/habitIcons';
+import { DEFAULT_HABIT_ICON, habitIconFrom } from '../constants/habitIcons';
+import { isIconName } from '../components/Icon';
 import { DEFAULT_TABLE_PARAMS, isApneaKind, normalizeParams } from './apnea';
 import { DEFAULT_SLEEP_SCHEDULE, isValidTime } from './sleep';
 
@@ -18,7 +27,7 @@ const { SharedStorage } = NativeModules;
 
 /**
  * Keys shared with the native side (BlockAccessibilityService, DnsVpnService,
- * SiteLockScreen read the same "BlockedPrefs" SharedPreferences).
+ * GamanScreen read the same "BlockedPrefs" SharedPreferences).
  */
 const KEYS = {
     websites: '@blocked_websites',
@@ -32,8 +41,15 @@ const KEYS = {
     darkMode: '@is_dark_mode',
     passphrase: '@is_passphrase',
     accent: '@accent_color',
+    workouts: '@workouts',
+    workoutRecords: '@workout_records',
+    workoutSession: '@workout_session',
+    workoutCues: '@workout_cues',
     sleepSchedule: '@sleep_schedule',
     sleepDismissedUntil: '@sleep_dismissed_until',
+    dayPlans: '@day_plans',
+    planPrefs: '@plan_prefs',
+    planNudges: '@plan_nudges',
 } as const;
 
 // ---- Low-level helpers ------------------------------------------------------
@@ -199,7 +215,7 @@ const toHabit = (v: any): Habit | null => {
                   ...new Set<string>(v.completions.filter((k: unknown) => typeof k === 'string' && DATE_KEY.test(k))),
               ].sort()
             : [],
-        ...(v.link === 'apnea' ? { link: 'apnea' as const } : {}),
+        ...(v.link === 'apnea' || v.link === 'workout' ? { link: v.link } : {}),
     };
 };
 
@@ -332,6 +348,106 @@ export const updateApneaSettings = (change: Partial<ApneaSettings>): Promise<Apn
         }
     });
 
+// ---- Workouts -----------------------------------------------------------------
+
+const MAX_WORKOUT_RECORDS = 1000;
+const WORKOUT_PHASES = ['ready', 'work', 'rest', 'done'];
+
+const clampInt = (v: unknown, min: number, max: number, fallback: number) =>
+    isNumber(v) ? Math.min(max, Math.max(min, Math.round(v))) : fallback;
+
+const toExercise = (v: any): Exercise | null =>
+    v && isString(v.id) && isString(v.name)
+        ? {
+              id: v.id,
+              name: v.name,
+              mode: v.mode === 'time' ? 'time' : 'reps',
+              sets: clampInt(v.sets, 1, 10, 3),
+              reps: clampInt(v.reps, 1, 200, 10),
+              seconds: clampInt(v.seconds, 5, 900, 45),
+              rest: clampInt(v.rest, 0, 600, 60),
+          }
+        : null;
+
+const toExercises = (v: unknown): Exercise[] =>
+    Array.isArray(v) ? v.map(toExercise).filter((e): e is Exercise => e !== null) : [];
+
+const toWorkout = (v: any): Workout | null =>
+    v && isString(v.id) && isString(v.name) ? { id: v.id, name: v.name, exercises: toExercises(v.exercises) } : null;
+
+const toWorkoutRecord = (v: any): WorkoutRecord | null =>
+    v && isString(v.id) && isNumber(v.startedAt) && isNumber(v.setsDone) && isNumber(v.setsTotal)
+        ? {
+              id: v.id,
+              workoutId: isString(v.workoutId) ? v.workoutId : '',
+              title: isString(v.title) ? v.title : 'Workout',
+              startedAt: v.startedAt,
+              endedAt: isNumber(v.endedAt) ? v.endedAt : v.startedAt,
+              setsDone: v.setsDone,
+              setsTotal: v.setsTotal,
+              completed: v.completed === true,
+          }
+        : null;
+
+export const getWorkouts = (): Promise<Workout[]> => readList(KEYS.workouts, toWorkout);
+
+/** Inserts the workout, or replaces the one with the same id. */
+export const saveWorkout = (workout: Workout): Promise<boolean> =>
+    updateList(KEYS.workouts, toWorkout, list =>
+        list.some(w => w.id === workout.id) ? list.map(w => (w.id === workout.id ? workout : w)) : [...list, workout],
+    );
+
+export const deleteWorkout = (id: string): Promise<boolean> =>
+    updateList(KEYS.workouts, toWorkout, list => list.filter(w => w.id !== id));
+
+export const getWorkoutRecords = (): Promise<WorkoutRecord[]> => readList(KEYS.workoutRecords, toWorkoutRecord);
+
+/** Adds a record; one with the same id is ignored, so a workout can never be saved twice. */
+export const addWorkoutRecord = (record: WorkoutRecord): Promise<boolean> =>
+    updateList(KEYS.workoutRecords, toWorkoutRecord, list =>
+        list.some(r => r.id === record.id)
+            ? list
+            : [...list, record].sort((a, b) => a.startedAt - b.startedAt).slice(-MAX_WORKOUT_RECORDS),
+    );
+
+export const deleteWorkoutRecord = (id: string): Promise<boolean> =>
+    updateList(KEYS.workoutRecords, toWorkoutRecord, list => list.filter(r => r.id !== id));
+
+/** The workout in progress, or null. */
+export const getWorkoutSession = async (): Promise<WorkoutSession | null> => {
+    const v: any = parseJson(await SharedStorage.getItem(KEYS.workoutSession));
+    const exercises = toExercises(v?.exercises);
+    if (!v || !isString(v.id) || !exercises.length || !WORKOUT_PHASES.includes(v.phase)) {
+        return null;
+    }
+    const exercise = clampInt(v.exercise, 0, exercises.length - 1, 0);
+    return {
+        id: v.id,
+        workoutId: isString(v.workoutId) ? v.workoutId : '',
+        title: isString(v.title) ? v.title : 'Workout',
+        exercises,
+        exercise,
+        set: clampInt(v.set, 0, exercises[exercise].sets - 1, 0),
+        phase: v.phase,
+        phaseStartedAt: isNumber(v.phaseStartedAt) ? v.phaseStartedAt : Date.now(),
+        startedAt: isNumber(v.startedAt) ? v.startedAt : Date.now(),
+        endedAt: isNumber(v.endedAt) ? v.endedAt : 0,
+        setsDone: clampInt(v.setsDone, 0, 10000, 0),
+        endedEarly: v.endedEarly === true,
+    };
+};
+
+/** Saves the workout in progress; null clears it. */
+export const setWorkoutSession = async (session: WorkoutSession | null): Promise<boolean> =>
+    session ? writeJson(KEYS.workoutSession, session) : (await SharedStorage.setItem(KEYS.workoutSession, '')) === true;
+
+export const getWorkoutCues = async (): Promise<WorkoutCues> => {
+    const v: any = parseJson(await SharedStorage.getItem(KEYS.workoutCues)) ?? {};
+    return { sound: v.sound !== false, vibration: v.vibration !== false };
+};
+
+export const setWorkoutCues = (cues: WorkoutCues): Promise<boolean> => writeJson(KEYS.workoutCues, cues);
+
 // ---- Sleep time -------------------------------------------------------------
 
 export const getSleepSchedule = async (): Promise<SleepSchedule> => {
@@ -363,6 +479,81 @@ export const getSleepDismissedUntil = async (): Promise<number> => {
     const value = Number(await SharedStorage.getItem(KEYS.sleepDismissedUntil));
     return Number.isFinite(value) ? value : 0;
 };
+
+// ---- Day plan ---------------------------------------------------------------
+
+/** Only recent days are kept; a new day is always copied from the latest one. */
+const MAX_DAY_PLANS = 60;
+
+const toPlanBlock = (v: any): PlanBlock | null => {
+    if (!v || !isString(v.id) || !isString(v.title) || !isNumber(v.start) || !isNumber(v.end)) {
+        return null;
+    }
+    const start = clampInt(v.start, 0, 1435, 0);
+    const end = clampInt(v.end, start + 5, 1440, start + 30);
+    return {
+        id: v.id,
+        title: v.title,
+        icon: isIconName(v.icon) ? v.icon : DEFAULT_HABIT_ICON,
+        start,
+        end,
+        ...(isString(v.habitId) ? { habitId: v.habitId } : {}),
+        ...(v.once === true ? { once: true } : {}),
+        ...(v.done === true ? { done: true } : {}),
+    };
+};
+
+const toDayPlan = (v: any): DayPlan | null =>
+    v && typeof v.date === 'string' && DATE_KEY.test(v.date) && Array.isArray(v.blocks)
+        ? {
+              date: v.date,
+              blocks: v.blocks.map(toPlanBlock).filter((b: PlanBlock | null): b is PlanBlock => b !== null),
+          }
+        : null;
+
+/** Stored plans, oldest first. */
+export const getDayPlans = async (): Promise<DayPlan[]> =>
+    (await readList(KEYS.dayPlans, toDayPlan)).sort((a, b) => a.date.localeCompare(b.date));
+
+/** Inserts the day's plan, or replaces the stored one for the same date. */
+export const saveDayPlan = (plan: DayPlan): Promise<boolean> =>
+    updateList(KEYS.dayPlans, toDayPlan, list =>
+        [...list.filter(p => p.date !== plan.date), plan]
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .slice(-MAX_DAY_PLANS),
+    );
+
+/** Applies `change` to the stored plan for `date` (inside the write queue); no-op if there is none. */
+export const updateDayPlan = (date: string, change: (plan: DayPlan) => DayPlan): Promise<boolean> =>
+    updateList(KEYS.dayPlans, toDayPlan, list => list.map(p => (p.date === date ? change(p) : p)));
+
+export const DEFAULT_PLAN_PREFS: PlanPrefs = { reminders: true, nudges: true };
+
+export const getPlanPrefs = async (): Promise<PlanPrefs> => {
+    const v: any = parseJson(await SharedStorage.getItem(KEYS.planPrefs)) ?? {};
+    return { reminders: v.reminders !== false, nudges: v.nudges !== false };
+};
+
+export const setPlanPrefs = (prefs: PlanPrefs): Promise<boolean> => writeJson(KEYS.planPrefs, prefs);
+
+/** Which in-app pop-ups were already shown today, so each one appears at most once. */
+export interface PlanNudgeLog {
+    date: string;
+    shown: string[];
+    /** Epoch millis of the last pop-up. */
+    lastAt: number;
+}
+
+export const getPlanNudgeLog = async (): Promise<PlanNudgeLog> => {
+    const v: any = parseJson(await SharedStorage.getItem(KEYS.planNudges)) ?? {};
+    return {
+        date: typeof v.date === 'string' ? v.date : '',
+        shown: Array.isArray(v.shown) ? v.shown.filter(isString) : [],
+        lastAt: isNumber(v.lastAt) ? v.lastAt : 0,
+    };
+};
+
+export const setPlanNudgeLog = (log: PlanNudgeLog): Promise<boolean> => writeJson(KEYS.planNudges, log);
 
 // ---- Preferences ------------------------------------------------------------
 
