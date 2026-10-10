@@ -24,6 +24,7 @@ export type RootStackParamList = {
     ApneaHistory: undefined;
     ApneaSettings: undefined;
     Sleep: undefined;
+    Vacation: undefined;
     Settings: undefined;
     /** No workoutId = create a new workout. */
     WorkoutEditor: { workoutId?: string } | undefined;
@@ -73,6 +74,12 @@ export interface SleepSchedule {
     enabled: boolean;
     bedtime: string;
     wake: string;
+}
+
+/** Vacation mode: no blocks apply from start to end, both "YYYY-MM-DD" and included. Mirrors Vacation.kt. */
+export interface Vacation {
+    start: string;
+    end: string;
 }
 
 export interface BlockedWebsitesData {

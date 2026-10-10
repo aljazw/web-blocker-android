@@ -70,6 +70,7 @@ class BlockAccessibilityService : AccessibilityService() {
     private var lastAppBlockTime: Long = 0
     private var lastSleepTime: Long = 0
     private var sleepSchedule: SleepSchedule? = null
+    private var vacation: Vacation? = null
 
     /** Packages that stay usable during sleep time; rebuilt now and then since defaults can change. */
     private var sleepAllowed: Set<String> = emptySet()
@@ -124,6 +125,7 @@ class BlockAccessibilityService : AccessibilityService() {
             KEY_BLOCKED -> loadBlockedList()
             KEY_BLOCKED_APPS -> loadBlockedApps()
             SleepSchedule.KEY_SCHEDULE -> sleepSchedule = SleepSchedule.load(sharedPref)
+            Vacation.KEY -> vacation = Vacation.load(sharedPref)
         }
     }
 
@@ -134,6 +136,7 @@ class BlockAccessibilityService : AccessibilityService() {
         loadBlockedList()
         loadBlockedApps()
         sleepSchedule = SleepSchedule.load(sharedPref)
+        vacation = Vacation.load(sharedPref)
 
         // Start the independent watchdog. From this moment, if the user ever
         // disables this service, the watchdog (a separate foreground service
@@ -145,16 +148,9 @@ class BlockAccessibilityService : AccessibilityService() {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        // Called the moment the user switches our service OFF — a reliable signal
-        // on every OEM/language (no UI-text parsing). Launch the re-enable warning
-        // screen directly from here (the same screen the in-app Test uses). We do
-        // NOT send the user home anymore — that was closing the warning before it
-        // could show.
-        // Fire the alert from here: a full-screen-intent notification that Android
-        // does NOT block from the background, plus a best-effort direct launch.
-        try {
-            WatchdogService.fireAlert(applicationContext)
-        } catch (_: Exception) { }
+        // Android also unbinds us on shutdown, on app updates and whenever it
+        // restarts our process, so this is NOT proof the user switched us off.
+        // The watchdog checks the real setting and alerts only on a true disable.
         WatchdogService.ensureRunning(applicationContext)
         return super.onUnbind(intent)
     }
@@ -251,6 +247,13 @@ class BlockAccessibilityService : AccessibilityService() {
 
     private fun handleEvent(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString() ?: return
+
+        // On vacation nothing is blocked; only the settings guard keeps running,
+        // so the blocks are still in place when the vacation ends.
+        if (vacation?.isActive() == true) {
+            if (isSettingsPackage(packageName)) handleSettingsGuard()
+            return
+        }
 
         // Sleep time covers everything (Settings included) except the essentials.
         if (shouldCoverForSleep(packageName, event)) {

@@ -54,6 +54,17 @@ export const UNBLOCK_MESSAGES = [
     'I set this block when I was thinking clearly and I am overriding that decision now knowing exactly what I am doing',
 ];
 
+/**
+ * Typed to start vacation mode. Deliberately long: pausing every block for days
+ * should take a minute of honest typing, not a reflex.
+ */
+export const VACATION_MESSAGES = [
+    'I am pausing all of my blocks because I am really going on a break and not because an urge is talking. When this vacation ends I will come back to the habits and the focus I built, and I will not stretch these days into weeks.',
+    'These blocks exist because the person I want to become asked for them. I am setting them aside only for a real rest, I have chosen the exact days, and I promise myself that I will not use this time as an excuse to quit for good.',
+    'A vacation is meant to give me rest and new energy, not to undo months of work in a few careless days. I will enjoy this time without guilt, I will keep my phone in its place, and I will be glad when the blocks return.',
+    'Before I turn off every block I have stopped and checked my reason. This is a planned break with a clear first and last day, it is not a moment of weakness, and when it is over I will welcome my limits back without a fight.',
+];
+
 export const ACCESSIBILITY_NOTIFICATION_TEXT = `Gaman needs its Accessibility service to block sites and apps.
 
 1. Tap to open Accessibility settings.

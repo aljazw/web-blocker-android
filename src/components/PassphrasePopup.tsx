@@ -11,18 +11,28 @@ interface PassphrasePopupProps {
     visible: boolean;
     onClose: () => void;
     onConfirm: () => void;
+    /** Phrases to pick from; defaults to the unblock phrases. */
+    phrases?: readonly string[];
+    /** Replaces the default explanation under the title. */
+    message?: string;
 }
 
-const randomPhrase = () => UNBLOCK_MESSAGES[Math.floor(Math.random() * UNBLOCK_MESSAGES.length)];
+const pick = (phrases: readonly string[]) => phrases[Math.floor(Math.random() * phrases.length)];
 
 /** Collapse runs of spaces and trim, so a stray double space never blocks a correct entry. */
 const normalize = (text: string) => text.replace(/\s+/g, ' ').trim();
 
 export const passphraseMatches = (expected: string, typed: string) => normalize(expected) === normalize(typed);
 
-const PassphrasePopup: React.FC<PassphrasePopupProps> = ({ visible, onClose, onConfirm }) => {
+const PassphrasePopup: React.FC<PassphrasePopupProps> = ({
+    visible,
+    onClose,
+    onConfirm,
+    phrases = UNBLOCK_MESSAGES,
+    message = 'Passphrase protection is on. Type the text below exactly to continue.',
+}) => {
     const { theme } = useTheme();
-    const [phrase, setPhrase] = useState(randomPhrase);
+    const [phrase, setPhrase] = useState(() => pick(phrases));
     const [input, setInput] = useState('');
     const [showError, setShowError] = useState(false);
     const [focused, setFocused] = useState(false);
@@ -30,11 +40,11 @@ const PassphrasePopup: React.FC<PassphrasePopupProps> = ({ visible, onClose, onC
     // Fresh phrase and empty input every time the popup opens.
     useEffect(() => {
         if (visible) {
-            setPhrase(randomPhrase());
+            setPhrase(pick(phrases));
             setInput('');
             setShowError(false);
         }
-    }, [visible]);
+    }, [visible, phrases]);
 
     const isMatch = passphraseMatches(phrase, input);
 
@@ -53,7 +63,7 @@ const PassphrasePopup: React.FC<PassphrasePopupProps> = ({ visible, onClose, onC
                 Type to confirm
             </ThemedText>
             <ThemedText size="small" color="muted" style={styles.subtitle}>
-                Passphrase protection is on. Type the text below exactly to continue.
+                {message}
             </ThemedText>
 
             <View style={[styles.phraseBox, { backgroundColor: theme.colors.elevated }]}>

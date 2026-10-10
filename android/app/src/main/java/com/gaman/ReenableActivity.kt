@@ -14,8 +14,19 @@ import android.view.WindowManager
  */
 class ReenableActivity : Activity() {
 
+    /** Opened by the in-app "Test" button, so it stays up even though protection is on. */
+    private var isTest = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Opened from an old notification after protection came back on: nothing to warn about.
+        isTest = intent?.getBooleanExtra(EXTRA_TEST, false) == true
+        if (!isTest && AccessibilityUtils.isServiceEnabled(this)) {
+            WatchdogService.clearAlert(this)
+            finish()
+            return
+        }
+        current = java.lang.ref.WeakReference(this)
 
         showWhenLockedAndTurnScreenOn()
 
@@ -32,6 +43,27 @@ class ReenableActivity : Activity() {
                 onPrimary = { openAccessibilitySettings() },
             ),
         )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!isTest && AccessibilityUtils.isServiceEnabled(this)) finish()
+    }
+
+    override fun onDestroy() {
+        if (current?.get() === this) current = null
+        super.onDestroy()
+    }
+
+    companion object {
+        const val EXTRA_TEST = "test"
+        private var current: java.lang.ref.WeakReference<ReenableActivity>? = null
+
+        /** Closes the warning once protection is back on. */
+        fun dismissIfShowing() {
+            val activity = current?.get() ?: return
+            activity.runOnUiThread { activity.finish() }
+        }
     }
 
     private fun openAccessibilitySettings() {

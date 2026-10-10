@@ -47,6 +47,8 @@ class WatchdogService : Service() {
 
     @Volatile private var wasEnabled = true
     @Volatile private var lastAlertAt = 0L
+    /** When the service was first seen off in the current stretch, or 0 while it's on. */
+    @Volatile private var offSince = 0L
 
     private val poll = object : Runnable {
         override fun run() {
@@ -108,14 +110,22 @@ class WatchdogService : Service() {
     @Synchronized
     private fun checkState() {
         val enabled = AccessibilityUtils.isServiceEnabled(this)
+        val now = System.currentTimeMillis()
         if (!enabled) {
-            // Keep nagging while it stays off: re-fire the alert every minute.
-            val now = System.currentTimeMillis()
-            if (now - lastAlertAt >= RE_ALERT_MS) {
+            // Only alert once it has stayed off for a few seconds, and never while
+            // the phone is still locked after a reboot: the settings can briefly
+            // read "off" while Android is still starting its services.
+            if (offSince == 0L) offSince = now
+            if (now - offSince >= OFF_GRACE_MS &&
+                AccessibilityUtils.isUserUnlocked(this) &&
+                now - lastAlertAt >= RE_ALERT_MS
+            ) {
+                // Keep nagging while it stays off: re-fire the alert every minute.
                 lastAlertAt = now
                 fireAlert(this)
             }
         } else {
+            offSince = 0L
             if (lastAlertAt != 0L) {
                 lastAlertAt = 0L
                 onProtectionRestored()
@@ -126,6 +136,7 @@ class WatchdogService : Service() {
 
     private fun onProtectionRestored() {
         notificationManager().cancel(ALERT_NOTIF_ID)
+        ReenableActivity.dismissIfShowing()
     }
 
     // ---- foreground + notifications -------------------------------------
@@ -191,6 +202,8 @@ class WatchdogService : Service() {
         private const val GUARD_NOTIF_ID = 1004
         private const val POLL_INTERVAL_MS = 1000L
         private const val RE_ALERT_MS = 60_000L // re-pop the warning every minute while off
+        /** How long the service must stay off before we call it a real disable. */
+        private const val OFF_GRACE_MS = 5_000L
 
         /** Live state for the status panel. */
         val isRunning = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -204,8 +217,8 @@ class WatchdogService : Service() {
         }
 
         /**
-         * Fire the "protection was turned off" alert from ANY context (e.g. the
-         * accessibility service's onUnbind, which reliably fires on disable).
+         * Fire the "protection was turned off" alert. Only the watchdog calls this,
+         * after confirming the service really stayed off.
          * Posts a high-priority full-screen-intent notification — the one path
          * Android does NOT block from the background — and also attempts a direct
          * launch. Works even when a background activity-start is blocked.

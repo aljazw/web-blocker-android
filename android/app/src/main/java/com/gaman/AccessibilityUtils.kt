@@ -2,6 +2,8 @@ package com.gaman
 
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
+import android.os.UserManager
 import android.provider.Settings
 import android.text.TextUtils
 
@@ -22,18 +24,11 @@ object AccessibilityUtils {
     fun isServiceEnabled(context: Context): Boolean {
         val expected = serviceComponent(context)
 
-        // Fast path: the global on/off flag. If accessibility is entirely off,
-        // our service can't be running.
-        val accessibilityOn = try {
-            Settings.Secure.getInt(
-                context.contentResolver,
-                Settings.Secure.ACCESSIBILITY_ENABLED
-            )
-        } catch (e: Settings.SettingNotFoundException) {
-            0
-        }
-        if (accessibilityOn == 0) return false
-
+        // Deliberately NOT checking Settings.Secure.ACCESSIBILITY_ENABLED: Android
+        // rewrites that flag from "is any service bound right now", so it reads 0
+        // for a while after every boot (and whenever the system rebinds us) even
+        // though the user never touched the switch. The list below is the
+        // user's actual choice.
         val enabled = Settings.Secure.getString(
             context.contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
@@ -50,5 +45,12 @@ object AccessibilityUtils {
             if (cn == expected) return true
         }
         return false
+    }
+
+    /** False while the phone is still locked after a reboot (services aren't bound yet). */
+    fun isUserUnlocked(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return true
+        val um = context.getSystemService(Context.USER_SERVICE) as? UserManager ?: return true
+        return um.isUserUnlocked
     }
 }

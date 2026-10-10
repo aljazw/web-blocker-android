@@ -62,11 +62,13 @@ class DnsVpnService : VpnService() {
     private val running = AtomicBoolean(false)
 
     @Volatile private var blockedDomains: Set<String> = emptySet()
+    @Volatile private var vacation: Vacation? = null
     @Volatile private var forwardUpstream: String? = null
     private lateinit var prefs: SharedPreferences
 
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == PREF_BLOCKED || key == PREF_DNS_ENABLED) reloadBlockedDomains()
+        if (key == Vacation.KEY) vacation = Vacation.load(prefs)
     }
 
     override fun onCreate() {
@@ -74,6 +76,7 @@ class DnsVpnService : VpnService() {
         prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         reloadBlockedDomains()
+        vacation = Vacation.load(prefs)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -426,7 +429,7 @@ class DnsVpnService : VpnService() {
             .substringBefore('/')
 
     private fun isBlocked(host: String): Boolean =
-        blockedDomains.any { host == it || host.endsWith(".$it") }
+        vacation?.isActive() != true && blockedDomains.any { host == it || host.endsWith(".$it") }
 
     // ---- foreground ------------------------------------------------------
 

@@ -1,7 +1,7 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { BlockEntry, RootStackNavigation } from '../types/types';
+import { BlockEntry, RootStackNavigation, Vacation } from '../types/types';
 import AppIcon from '../components/AppIcon';
 import Badge from '../components/Badge';
 import BaseScreen from '../components/BaseScreen';
@@ -35,10 +35,12 @@ import { checkAccessibilityEnabled, openAccessibilitySettings } from '../utils/a
 import { describeSchedule, isBlockActiveNow } from '../utils/schedule';
 import { currentStreak, isDoneOn, isScheduled } from '../utils/habits';
 import { formatClock, personalBest } from '../utils/apnea';
-import { toDateKey } from '../utils/dates';
 import { minutesNow, visibleBlocks } from '../utils/dayPlan';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
+import { getVacation } from '../storage';
+import { isOnVacation, vacationRangeLabel } from '../utils/vacation';
+import { fromDateKey, shortDate, toDateKey } from '../utils/dates';
 
 /** One dialog at a time. */
 type Dialog =
@@ -76,6 +78,7 @@ const HomeScreen: React.FC = () => {
     // Finished sessions are left for the session screen, which shows their summary.
     const { records } = useApneaData({ collect: false });
     const [protectionOn, setProtectionOn] = useState<boolean | null>(null);
+    const [vacation, setVacation] = useState<Vacation | null>(null);
     const [query, setQuery] = useState('');
     const [dialog, setDialog] = useState<Dialog | null>(null);
 
@@ -83,6 +86,9 @@ const HomeScreen: React.FC = () => {
 
     const refreshProtection = useCallback(() => {
         checkAccessibilityEnabled().then(setProtectionOn);
+        getVacation()
+            .then(setVacation)
+            .catch(() => setVacation(null));
         setNow(new Date());
     }, []);
     useFocusEffect(refreshProtection);
@@ -116,7 +122,11 @@ const HomeScreen: React.FC = () => {
         isPassphraseEnabled ? setDialog({ kind: 'passphrase', entry }) : apply(remove, entry);
 
     const visible = useMemo(() => entries.filter(w => w.visible), [entries]);
-    const activeCount = useMemo(() => entries.filter(w => isBlockActiveNow(w, now)).length, [entries, now]);
+    const onVacation = isOnVacation(vacation, now);
+    const activeCount = useMemo(
+        () => (onVacation ? 0 : entries.filter(w => isBlockActiveNow(w, now)).length),
+        [entries, now, onVacation],
+    );
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
         return q ? visible.filter(w => w.label.toLowerCase().includes(q)) : visible;
@@ -146,38 +156,54 @@ const HomeScreen: React.FC = () => {
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 {/* ---- Protection status ---- */}
                 <FadeIn>
-                    <Card highlight={protectionOn === false ? theme.colors.primaryRed : undefined}>
-                        <View style={styles.statusTop}>
-                            <IconTile
-                                icon={protectionOn === false ? 'ShieldOff' : 'Shield'}
-                                tone={protectionOn === false ? 'danger' : 'accent'}
-                                size={40}
-                            />
-                            <View style={styles.statusText}>
-                                <ThemedText weight="strong">
-                                    {protectionOn === false ? 'Protection is off' : 'Protection is on'}
-                                </ThemedText>
-                                <ThemedText size="small" color="muted" tabular>
-                                    {activeCount} of {entries.length} block{entries.length === 1 ? '' : 's'} active now
-                                </ThemedText>
+                    {onVacation && vacation ? (
+                        <Card onPress={() => navigation.navigate('Vacation')} accessibilityLabel="Vacation mode">
+                            <View style={styles.statusTop}>
+                                <IconTile icon="Vacation" tone="success" size={40} />
+                                <View style={styles.statusText}>
+                                    <ThemedText weight="strong">On vacation</ThemedText>
+                                    <ThemedText size="small" color="muted" tabular>
+                                        Blocks are paused until {shortDate(fromDateKey(vacation.end), now)}
+                                    </ThemedText>
+                                </View>
+                                <Badge label={vacationRangeLabel(vacation, now)} tone="success" />
                             </View>
-                            {protectionOn !== null && (
-                                <Badge
-                                    label={protectionOn ? 'Active' : 'Off'}
-                                    tone={protectionOn ? 'success' : 'danger'}
-                                    dot
+                        </Card>
+                    ) : (
+                        <Card highlight={protectionOn === false ? theme.colors.primaryRed : undefined}>
+                            <View style={styles.statusTop}>
+                                <IconTile
+                                    icon={protectionOn === false ? 'ShieldOff' : 'Shield'}
+                                    tone={protectionOn === false ? 'danger' : 'accent'}
+                                    size={40}
+                                />
+                                <View style={styles.statusText}>
+                                    <ThemedText weight="strong">
+                                        {protectionOn === false ? 'Protection is off' : 'Protection is on'}
+                                    </ThemedText>
+                                    <ThemedText size="small" color="muted" tabular>
+                                        {activeCount} of {entries.length} block{entries.length === 1 ? '' : 's'} active
+                                        now
+                                    </ThemedText>
+                                </View>
+                                {protectionOn !== null && (
+                                    <Badge
+                                        label={protectionOn ? 'Active' : 'Off'}
+                                        tone={protectionOn ? 'success' : 'danger'}
+                                        dot
+                                    />
+                                )}
+                            </View>
+                            {protectionOn === false && (
+                                <Button
+                                    label="Turn protection on"
+                                    compact
+                                    onPress={openAccessibilitySettings}
+                                    style={styles.statusButton}
                                 />
                             )}
-                        </View>
-                        {protectionOn === false && (
-                            <Button
-                                label="Turn protection on"
-                                compact
-                                onPress={openAccessibilitySettings}
-                                style={styles.statusButton}
-                            />
-                        )}
-                    </Card>
+                        </Card>
+                    )}
 
                     {planBlocks.length > 0 ? (
                         <PlanNowCard
@@ -257,7 +283,7 @@ const HomeScreen: React.FC = () => {
                                     <BlockRow
                                         key={`${entry.kind}:${entry.key}`}
                                         entry={entry}
-                                        active={isBlockActiveNow(entry, now)}
+                                        active={!onVacation && isBlockActiveNow(entry, now)}
                                         onHide={() => setDialog({ kind: 'hide', entry })}
                                         onRemove={() => setDialog({ kind: 'remove', entry })}
                                     />

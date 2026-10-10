@@ -27,6 +27,7 @@ class WatchdogModule(private val ctx: ReactApplicationContext) :
         try {
             val intent = Intent(ctx, ReenableActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                .putExtra(ReenableActivity.EXTRA_TEST, true)
             (currentActivity ?: ctx).startActivity(intent)
             promise.resolve(true)
         } catch (e: Exception) {

@@ -49,6 +49,7 @@ import {
     Pause,
     PenLine,
     Pencil,
+    Plane,
     PhoneOff,
     Play,
     Plus,
@@ -131,6 +132,7 @@ const ICONS = {
     Accessibility: Accessibility,
     Sparkles: Sparkles,
     Apps: LayoutGrid,
+    Vacation: Plane,
     // Training
     Timer: Timer,
     Hourglass: Hourglass,

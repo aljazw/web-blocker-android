@@ -25,6 +25,7 @@ export const KEYS = {
     workoutCues: '@workout_cues',
     sleepSchedule: '@sleep_schedule',
     sleepDismissedUntil: '@sleep_dismissed_until',
+    vacation: '@vacation',
     dayPlans: '@day_plans',
     planPrefs: '@plan_prefs',
     planNudges: '@plan_nudges',

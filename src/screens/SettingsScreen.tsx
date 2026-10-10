@@ -27,8 +27,9 @@ import { requestOverlay } from '../utils/overlay';
 import { testWatchdogWarning } from '../utils/watchdog';
 import { haptics } from '../utils/haptics';
 import { ERRORS, PASSPHRASE_PROTECTION, UNINSTALL_PREVENTION } from '../constants/strings';
-import { getSleepSchedule } from '../storage';
-import { RootStackNavigation, SleepSchedule } from '../types/types';
+import { getSleepSchedule, getVacation } from '../storage';
+import { RootStackNavigation, SleepSchedule, Vacation } from '../types/types';
+import { vacationPhase, vacationRangeLabel } from '../utils/vacation';
 
 /**
  * Exactly one popup can be open at a time, so the screen can never end up
@@ -58,14 +59,26 @@ const SettingsScreen: React.FC = () => {
     const [dialog, setDialog] = useState<Dialog | null>(null);
     const navigation = useNavigation<RootStackNavigation>();
     const [sleep, setSleep] = useState<SleepSchedule | null>(null);
+    const [vacation, setVacationState] = useState<Vacation | null>(null);
 
     useFocusEffect(
         useCallback(() => {
             getSleepSchedule()
                 .then(setSleep)
                 .catch(() => setSleep(null));
+            getVacation()
+                .then(setVacationState)
+                .catch(() => setVacationState(null));
         }, []),
     );
+
+    const vacationText = () => {
+        const phase = vacation ? vacationPhase(vacation) : 'over';
+        if (!vacation || phase === 'over') {
+            return 'Off · pause every block for a few days';
+        }
+        return `${phase === 'active' ? 'On' : 'Planned'} · ${vacationRangeLabel(vacation)}`;
+    };
 
     const close = () => setDialog(null);
 
@@ -208,8 +221,8 @@ const SettingsScreen: React.FC = () => {
                     </Card>
                 </FadeIn>
 
-                {/* ---- Sleep ---- */}
-                <SectionHeader title="Sleep" />
+                {/* ---- Breaks ---- */}
+                <SectionHeader title="Sleep and breaks" />
                 <ListGroup>
                     <ListRow
                         icon="Moon"
@@ -218,6 +231,12 @@ const SettingsScreen: React.FC = () => {
                             sleep?.enabled ? `On · ${sleep.bedtime} – ${sleep.wake}` : 'Off · lock your phone at night'
                         }
                         onPress={() => navigation.navigate('Sleep')}
+                    />
+                    <ListRow
+                        icon="Vacation"
+                        title="Vacation mode"
+                        description={vacationText()}
+                        onPress={() => navigation.navigate('Vacation')}
                     />
                 </ListGroup>
 
