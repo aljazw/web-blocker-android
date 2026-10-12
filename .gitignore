@@ -75,3 +75,8 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# local helper scripts
+ship.sh
+claude-runner.sh
+.claude-bridge
