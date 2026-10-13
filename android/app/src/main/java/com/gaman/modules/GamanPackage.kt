@@ -23,6 +23,7 @@ class GamanPackage : ReactPackage {
             InstalledAppsModule(reactContext),
             ApneaModule(reactContext),
             HapticsModule(reactContext),
+            BackupFileModule(reactContext),
         )
 
     override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> = emptyList()

@@ -25,6 +25,7 @@ import {
     endSession,
     extendRest,
     nextUp,
+    roundCount,
     skipRest,
     skipSet,
     startTimedSet,
@@ -170,7 +171,17 @@ const WorkoutSessionScreen: React.FC = () => {
     return (
         <BaseScreen
             title={summary?.record.title ?? session?.title ?? ''}
-            subtitle={summary ? 'Summary' : live ? `Exercise ${live.exercise + 1} of ${live.exercises.length}` : ''}
+            subtitle={
+                summary
+                    ? 'Summary'
+                    : live
+                    ? live.circuit
+                        ? `Circuit · round ${live.set + 1} of ${roundCount(live.exercises)} · exercise ${
+                              live.exercise + 1
+                          } of ${live.exercises.length}`
+                        : `Exercise ${live.exercise + 1} of ${live.exercises.length}`
+                    : ''
+            }
             headerRight={
                 <IconButton
                     icon="Close"
@@ -229,9 +240,13 @@ const LiveView: React.FC<LiveViewProps> = ({ session, now, act }) => {
     const color =
         timer?.kind === 'rest' ? colors.primaryGreen : timer?.kind === 'leadIn' ? colors.warning : colors.accent;
 
+    // In a circuit, a rest before the next round (set number goes up) is the round rest.
+    const roundBreak = session.circuit && !!upcoming && upcoming.set > session.set;
     const label =
         session.phase === 'rest'
-            ? 'Rest'
+            ? roundBreak
+                ? 'Round rest'
+                : 'Rest'
             : timer?.kind === 'leadIn'
             ? 'Get ready'
             : timer?.kind === 'work'
@@ -251,7 +266,9 @@ const LiveView: React.FC<LiveViewProps> = ({ session, now, act }) => {
     const caption =
         session.phase === 'rest'
             ? upcoming
-                ? `Next · ${upcoming.exercise.name} · ${describeTarget(upcoming.exercise)}`
+                ? `${roundBreak ? `Round ${upcoming.set + 1} next` : 'Next'} · ${
+                      upcoming.exercise.name
+                  } · ${describeTarget(upcoming.exercise)}`
                 : 'Last set done'
             : timer?.kind === 'leadIn'
             ? exercise.name

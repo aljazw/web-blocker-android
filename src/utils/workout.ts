@@ -15,6 +15,51 @@ export const LIMITS = {
     rest: { min: 0, max: 600, step: 15 },
 };
 
+/** Default rest after a full circuit round. */
+export const DEFAULT_ROUND_REST = 90;
+
+/** One set in the order it's done: which exercise, and which of its sets. */
+export interface SetPosition {
+    exercise: number;
+    set: number;
+}
+
+/**
+ * Every set in the order it's done. Straight: all sets of exercise 1, then
+ * exercise 2, ... Circuit: set 1 of every exercise, then set 2 of every
+ * exercise, ...; an exercise with fewer sets drops out of the later rounds.
+ */
+export const setOrder = (exercises: Exercise[], circuit: boolean): SetPosition[] => {
+    const order: SetPosition[] = [];
+    if (circuit) {
+        const rounds = Math.max(0, ...exercises.map(e => e.sets));
+        for (let set = 0; set < rounds; set++) {
+            exercises.forEach((e, exercise) => {
+                if (set < e.sets) {
+                    order.push({ exercise, set });
+                }
+            });
+        }
+    } else {
+        exercises.forEach((e, exercise) => {
+            for (let set = 0; set < e.sets; set++) {
+                order.push({ exercise, set });
+            }
+        });
+    }
+    return order;
+};
+
+/** Rest after the set at `index` of `order`: the round rest when a new circuit round starts next. */
+const restAfter = (exercises: Exercise[], order: SetPosition[], index: number, circuit: boolean, roundRest: number) => {
+    const here = order[index];
+    const next = order[index + 1];
+    if (!here || !next) {
+        return 0;
+    }
+    return circuit && next.set > here.set ? roundRest : exercises[here.exercise].rest;
+};
+
 export const newExercise = (): Exercise => ({
     id: newId('e'),
     name: '',
@@ -36,14 +81,18 @@ export const describeTarget = (e: Exercise) => (e.mode === 'reps' ? `${e.reps} r
 export const describeExercise = (e: Exercise) =>
     `${e.sets} × ${describeTarget(e)}${e.rest ? ` · rest ${formatSeconds(e.rest)}` : ''}`;
 
+/** Number of rounds in a circuit: the most sets any exercise has. */
+export const roundCount = (exercises: Exercise[]) => Math.max(0, ...exercises.map(e => e.sets));
+
 /** Estimated minutes, rest after the very last set excluded. */
-export const estimateMinutes = (exercises: Exercise[]) => {
-    const seconds = exercises.reduce(
-        (sum, e) => sum + e.sets * ((e.mode === 'reps' ? e.reps * SECONDS_PER_REP : e.seconds) + e.rest),
-        0,
-    );
-    const lastRest = exercises.length ? exercises[exercises.length - 1].rest : 0;
-    return Math.max(1, Math.round((seconds - lastRest) / 60));
+export const estimateMinutes = (exercises: Exercise[], circuit = false, roundRest = DEFAULT_ROUND_REST) => {
+    const order = setOrder(exercises, circuit);
+    const seconds = order.reduce((sum, p, i) => {
+        const e = exercises[p.exercise];
+        const work = e.mode === 'reps' ? e.reps * SECONDS_PER_REP : e.seconds;
+        return sum + work + restAfter(exercises, order, i, circuit, roundRest);
+    }, 0);
+    return Math.max(1, Math.round(seconds / 60));
 };
 
 export const describeWorkout = (w: Workout) => {
@@ -51,7 +100,9 @@ export const describeWorkout = (w: Workout) => {
     if (!n) {
         return 'No exercises yet';
     }
-    return `${n} exercise${n === 1 ? '' : 's'} · ${totalSets(w.exercises)} sets · ~${estimateMinutes(w.exercises)} min`;
+    const minutes = estimateMinutes(w.exercises, !!w.circuit, w.roundRest ?? DEFAULT_ROUND_REST);
+    const shape = w.circuit ? `circuit · ${roundCount(w.exercises)} rounds` : `${totalSets(w.exercises)} sets`;
+    return `${n} exercise${n === 1 ? '' : 's'} · ${shape} · ~${minutes} min`;
 };
 
 // ---- Session state machine ------------------------------------------------------
@@ -61,6 +112,8 @@ export const startSession = (workout: Workout, now: number): WorkoutSession => (
     workoutId: workout.id,
     title: workout.name,
     exercises: workout.exercises.map(e => ({ ...e })),
+    circuit: !!workout.circuit,
+    roundRest: workout.roundRest ?? DEFAULT_ROUND_REST,
     exercise: 0,
     set: 0,
     phase: 'ready',
@@ -73,16 +126,27 @@ export const startSession = (workout: Workout, now: number): WorkoutSession => (
 
 export const currentExercise = (s: WorkoutSession): Exercise | undefined => s.exercises[s.exercise];
 
-const isLastSet = (s: WorkoutSession) =>
-    s.exercise >= s.exercises.length - 1 && s.set >= (currentExercise(s)?.sets ?? 1) - 1;
+/** Where the current set sits in the session's order (-1 if it isn't in it). */
+const positionIndex = (s: WorkoutSession, order = setOrder(s.exercises, s.circuit)) =>
+    order.findIndex(p => p.exercise === s.exercise && p.set === s.set);
+
+const nextPosition = (s: WorkoutSession): SetPosition | null => {
+    const order = setOrder(s.exercises, s.circuit);
+    return order[positionIndex(s, order) + 1] ?? null;
+};
+
+const isLastSet = (s: WorkoutSession) => nextPosition(s) === null;
+
+/** Rest after the current set, in seconds: the round rest at the end of a circuit round. */
+export const restSeconds = (s: WorkoutSession): number => {
+    const order = setOrder(s.exercises, s.circuit);
+    return restAfter(s.exercises, order, positionIndex(s, order), s.circuit, s.roundRest);
+};
 
 /** The set after the current one, or null when this is the last. */
 export const nextUp = (s: WorkoutSession): { exercise: Exercise; set: number } | null => {
-    const e = currentExercise(s);
-    if (!e || isLastSet(s)) {
-        return null;
-    }
-    return s.set < e.sets - 1 ? { exercise: e, set: s.set + 1 } : { exercise: s.exercises[s.exercise + 1], set: 0 };
+    const next = nextPosition(s);
+    return next ? { exercise: s.exercises[next.exercise], set: next.set } : null;
 };
 
 const finish = (s: WorkoutSession, now: number): WorkoutSession => ({
@@ -97,10 +161,8 @@ const advance = (s: WorkoutSession, now: number): WorkoutSession => {
     if (isLastSet(s)) {
         return finish(s, now);
     }
-    const e = currentExercise(s)!;
-    return s.set < e.sets - 1
-        ? { ...s, set: s.set + 1, phase: 'ready', phaseStartedAt: now }
-        : { ...s, exercise: s.exercise + 1, set: 0, phase: 'ready', phaseStartedAt: now };
+    const next = nextPosition(s)!;
+    return { ...s, exercise: next.exercise, set: next.set, phase: 'ready', phaseStartedAt: now };
 };
 
 /** Starts a timed set after the get-ready lead-in. Reps sets need no start. */
@@ -118,7 +180,7 @@ export const completeSet = (s: WorkoutSession, now: number): WorkoutSession => {
     if (isLastSet(done)) {
         return finish(done, now);
     }
-    const rest = currentExercise(done)?.rest ?? 0;
+    const rest = restSeconds(done);
     return rest > 0 ? { ...done, phase: 'rest', phaseStartedAt: now } : advance(done, now);
 };
 
@@ -152,7 +214,7 @@ export const tick = (s: WorkoutSession, now: number): WorkoutSession => {
             }
             state = completeSet(state, end);
         } else if (state.phase === 'rest' && e) {
-            const end = state.phaseStartedAt + e.rest * 1000;
+            const end = state.phaseStartedAt + restSeconds(state) * 1000;
             if (now < end) {
                 return state;
             }
@@ -184,7 +246,7 @@ export const countdown = (
         return { kind: 'work', remainingMs: Math.max(0, total - (now - s.phaseStartedAt)), totalMs: total };
     }
     if (s.phase === 'rest') {
-        const total = e.rest * 1000;
+        const total = restSeconds(s) * 1000;
         return { kind: 'rest', remainingMs: Math.max(0, total - (now - s.phaseStartedAt)), totalMs: total };
     }
     return null;

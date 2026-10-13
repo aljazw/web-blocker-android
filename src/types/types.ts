@@ -149,6 +149,13 @@ export interface Workout {
     id: string;
     name: string;
     exercises: Exercise[];
+    /**
+     * Circuit: one set of every exercise per round (1, 2, 3, then 1, 2, 3 again)
+     * instead of finishing all sets of one exercise first.
+     */
+    circuit?: boolean;
+    /** Circuit only: rest after each full round, in seconds (0 = none). */
+    roundRest?: number;
 }
 
 /**
@@ -166,6 +173,9 @@ export interface WorkoutSession {
     title: string;
     /** Snapshot taken at the start, so editing the workout can't break a running session. */
     exercises: Exercise[];
+    /** Circuit order (see Workout.circuit); `set` is then the round. */
+    circuit: boolean;
+    roundRest: number;
     exercise: number;
     set: number;
     phase: WorkoutPhase;

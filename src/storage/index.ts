@@ -8,3 +8,4 @@ export * from './vacation';
 export * from './dayPlans';
 export * from './preferences';
 export { KEYS as STORAGE_KEYS, onStorageChange } from './core';
+export * from './backup';

@@ -9,6 +9,7 @@ import {
     LEAD_IN_MS,
     nextUp,
     recordFromSession,
+    setOrder,
     skipRest,
     skipSet,
     startSession,
@@ -85,5 +86,78 @@ describe('describing', () => {
     it('estimates the duration without the final rest', () => {
         // 2×(30 s + 60 s) + 2×30 s = 240 s
         expect(estimateMinutes([pushups, plank])).toBe(4);
+    });
+});
+
+describe('circuit workouts', () => {
+    const a: Exercise = { id: 'a', name: 'A', mode: 'reps', sets: 3, reps: 10, seconds: 45, rest: 15 };
+    const b: Exercise = { id: 'b', name: 'B', mode: 'reps', sets: 3, reps: 10, seconds: 45, rest: 15 };
+    const c: Exercise = { id: 'c', name: 'C', mode: 'reps', sets: 2, reps: 10, seconds: 45, rest: 15 };
+    const circuit: Workout = { id: 'c', name: 'Circuit', exercises: [a, b, c], circuit: true, roundRest: 90 };
+
+    it('orders sets round by round, dropping exercises with fewer sets', () => {
+        expect(setOrder(circuit.exercises, true).map(p => `${p.exercise}${p.set}`)).toEqual([
+            '00',
+            '10',
+            '20',
+            '01',
+            '11',
+            '21',
+            '02',
+            '12',
+        ]);
+        expect(setOrder(circuit.exercises, false).map(p => `${p.exercise}${p.set}`)).toEqual([
+            '00',
+            '01',
+            '02',
+            '10',
+            '11',
+            '12',
+            '20',
+            '21',
+        ]);
+    });
+
+    it('goes 1 → 2 → 3 each round, with the round rest between rounds', () => {
+        let s = startSession(circuit, T0);
+        const seen: string[] = [];
+        let t = T0;
+        while (s.phase !== 'done') {
+            seen.push(`${s.exercises[s.exercise].name}${s.set + 1}`);
+            s = completeSet(s, t);
+            if (s.phase === 'rest') {
+                const remaining = countdown(s, t)!.remainingMs;
+                seen.push(`rest${remaining / 1000}`);
+                t += remaining;
+                s = tick(s, t);
+            }
+        }
+        expect(seen).toEqual([
+            'A1',
+            'rest15',
+            'B1',
+            'rest15',
+            'C1',
+            'rest90',
+            'A2',
+            'rest15',
+            'B2',
+            'rest15',
+            'C2',
+            'rest90',
+            'A3',
+            'rest15',
+            'B3',
+        ]);
+        expect(recordFromSession(s)).toMatchObject({ setsDone: 8, setsTotal: 8, completed: true });
+    });
+
+    it('shows the next exercise of the round as up next', () => {
+        const s = startSession(circuit, T0);
+        expect(nextUp(s)).toMatchObject({ exercise: { name: 'B' }, set: 0 });
+    });
+
+    it('counts round rests in the estimate', () => {
+        expect(estimateMinutes(circuit.exercises, true, 90)).toBeGreaterThan(estimateMinutes(circuit.exercises, false));
     });
 });

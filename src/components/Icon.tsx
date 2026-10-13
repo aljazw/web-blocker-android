@@ -80,6 +80,8 @@ import {
     Wind,
     X,
     Zap,
+    Download,
+    Upload,
 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 
@@ -129,6 +131,8 @@ const ICONS = {
     Layers: Layers,
     Globe: Globe,
     Server: Server,
+    Download: Download,
+    Upload: Upload,
     Accessibility: Accessibility,
     Sparkles: Sparkles,
     Apps: LayoutGrid,

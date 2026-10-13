@@ -19,7 +19,8 @@ import { useTheme } from '../context/ThemeContext';
 import { gutter, spacing } from '../theme';
 import { formatSeconds } from '../utils/apnea';
 import { newId } from '../utils/dates';
-import { describeExercise, describeWorkout, LIMITS, newExercise } from '../utils/workout';
+import { DEFAULT_ROUND_REST, describeExercise, describeWorkout, LIMITS, newExercise } from '../utils/workout';
+import { ListGroup, ListRow, Toggle } from '../components/ListGroup';
 import { deleteWorkout, getWorkouts, saveWorkout } from '../storage';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
@@ -43,6 +44,8 @@ const WorkoutEditorScreen: React.FC = () => {
     const [existing, setExisting] = useState<Workout | null>(null);
     const [name, setName] = useState('');
     const [exercises, setExercises] = useState<Exercise[]>([]);
+    const [circuit, setCircuit] = useState(false);
+    const [roundRest, setRoundRest] = useState(DEFAULT_ROUND_REST);
     const [dialog, setDialog] = useState<Dialog | null>(null);
     const close = () => setDialog(null);
 
@@ -61,6 +64,8 @@ const WorkoutEditorScreen: React.FC = () => {
                 setExisting(workout);
                 setName(workout.name);
                 setExercises(workout.exercises);
+                setCircuit(!!workout.circuit);
+                setRoundRest(workout.roundRest ?? DEFAULT_ROUND_REST);
             })
             .catch(() => setDialog({ kind: 'error' }));
     }, [workoutId, navigation]);
@@ -102,7 +107,12 @@ const WorkoutEditorScreen: React.FC = () => {
         if (problem) {
             return;
         }
-        const workout: Workout = { id: existing?.id ?? newId('w'), name: trimmed, exercises };
+        const workout: Workout = {
+            id: existing?.id ?? newId('w'),
+            name: trimmed,
+            exercises,
+            ...(circuit ? { circuit: true, roundRest } : {}),
+        };
         if (await saveWorkout(workout)) {
             haptics.success();
             navigation.goBack();
@@ -123,7 +133,11 @@ const WorkoutEditorScreen: React.FC = () => {
     return (
         <BaseScreen
             title={existing ? 'Edit workout' : 'New workout'}
-            subtitle={exercises.length ? describeWorkout({ id: '', name, exercises }) : 'Exercises, sets and rest'}
+            subtitle={
+                exercises.length
+                    ? describeWorkout({ id: '', name, exercises, circuit, roundRest })
+                    : 'Exercises, sets and rest'
+            }
             headerLeft={<BackButton />}
             headerRight={
                 existing ? (
@@ -138,6 +152,41 @@ const WorkoutEditorScreen: React.FC = () => {
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 <SectionHeader title="Name" />
                 <TextField value={name} onChangeText={setName} placeholder="e.g. Upper body" maxLength={MAX_NAME} />
+
+                <SectionHeader title="Order" />
+                <ListGroup>
+                    <ListRow
+                        icon="Restart"
+                        title="Circuit"
+                        description={
+                            circuit
+                                ? 'One set of each exercise per round, top to bottom, then the next round'
+                                : 'Off · all sets of one exercise, then the next'
+                        }>
+                        <Toggle
+                            value={circuit}
+                            onValueChange={value => {
+                                animateLayout();
+                                setCircuit(value);
+                            }}
+                        />
+                    </ListRow>
+                </ListGroup>
+                {circuit && (
+                    <View style={[styles.field, styles.roundRest]}>
+                        <ThemedText size="small" color="muted" style={styles.flex}>
+                            Rest after each round
+                        </ThemedText>
+                        <Stepper
+                            value={roundRest}
+                            onChange={setRoundRest}
+                            {...LIMITS.rest}
+                            format={v => (v ? formatSeconds(v) : 'None')}
+                            accessibilityLabel="rest after each round"
+                            compact
+                        />
+                    </View>
+                )}
 
                 <SectionHeader title="Exercises" />
                 {exercises.map((exercise, index) => (
@@ -196,6 +245,7 @@ const WorkoutEditorScreen: React.FC = () => {
             <ExerciseDialog
                 exercise={dialog?.kind === 'exercise' ? dialog.exercise : null}
                 isNew={dialog?.kind === 'exercise' && dialog.isNew}
+                circuit={circuit}
                 onClose={close}
                 onSave={putExercise}
                 onDelete={removeExercise}
@@ -218,10 +268,11 @@ const WorkoutEditorScreen: React.FC = () => {
 const ExerciseDialog: React.FC<{
     exercise: Exercise | null;
     isNew: boolean;
+    circuit: boolean;
     onClose: () => void;
     onSave: (exercise: Exercise) => void;
     onDelete: (id: string) => void;
-}> = ({ exercise, isNew, onClose, onSave, onDelete }) => {
+}> = ({ exercise, isNew, circuit, onClose, onSave, onDelete }) => {
     const [draft, setDraft] = useState<Exercise | null>(exercise);
 
     // Fresh copy every time the dialog opens.
@@ -299,7 +350,7 @@ const ExerciseDialog: React.FC<{
                             />
                         </Field>
                     )}
-                    <Field label="Rest after each set">
+                    <Field label={circuit ? 'Rest before the next exercise' : 'Rest after each set'}>
                         <Stepper
                             value={draft.rest}
                             onChange={rest => change({ rest })}
@@ -350,6 +401,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginTop: spacing.md,
+    },
+    roundRest: {
+        marginHorizontal: gutter + 2,
     },
     problem: {
         marginTop: spacing.lg,

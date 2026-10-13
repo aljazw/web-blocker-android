@@ -34,7 +34,19 @@ import { requestOverlay } from '../utils/overlay';
 import { testWatchdogWarning } from '../utils/watchdog';
 import { haptics } from '../utils/haptics';
 import { ERRORS, PASSPHRASE_PROTECTION, UNINSTALL_PREVENTION } from '../constants/strings';
-import { getSleepSchedule, getVacation } from '../storage';
+import {
+    Backup,
+    backupFileName,
+    createBackup,
+    describeBackup,
+    getSleepSchedule,
+    getVacation,
+    importBackup,
+    parseBackup,
+} from '../storage';
+import { openBackupFile, saveBackupFile } from '../utils/backupFile';
+import { cancelHabitReminders, syncHabitReminders } from '../utils/habitReminders';
+import { isAccentName } from '../theme/accents';
 import { RootStackNavigation, SleepSchedule, Vacation } from '../types/types';
 import { vacationPhase, vacationRangeLabel } from '../utils/vacation';
 
@@ -47,7 +59,10 @@ type Dialog =
     | { kind: 'passphrase'; onConfirm: () => void | Promise<void> }
     | { kind: 'upstream' }
     | { kind: 'dnsWizard' }
+    | { kind: 'info'; title: string; text: string }
     | { kind: 'error'; title: string; text: string };
+
+const errorText = (error: unknown) => (error instanceof Error && error.message ? error.message : 'Please try again.');
 
 const upstreamLabel = (value: string) => {
     if (!value) {
@@ -69,16 +84,15 @@ const SettingsScreen: React.FC = () => {
     const [vacation, setVacationState] = useState<Vacation | null>(null);
     const [hostDraft, setHostDraft] = useState('');
 
-    useFocusEffect(
-        useCallback(() => {
-            getSleepSchedule()
-                .then(setSleep)
-                .catch(() => setSleep(null));
-            getVacation()
-                .then(setVacationState)
-                .catch(() => setVacationState(null));
-        }, []),
-    );
+    const loadBreaks = useCallback(() => {
+        getSleepSchedule()
+            .then(setSleep)
+            .catch(() => setSleep(null));
+        getVacation()
+            .then(setVacationState)
+            .catch(() => setVacationState(null));
+    }, []);
+    useFocusEffect(loadBreaks);
 
     const vacationText = () => {
         const phase = vacation ? vacationPhase(vacation) : 'over';
@@ -128,6 +142,70 @@ const SettingsScreen: React.FC = () => {
         const current = status.upstream && isDnsHostname(status.upstream) ? status.upstream : '';
         setHostDraft(current || status.privateDnsHost || '');
         setDialog({ kind: 'upstream' });
+    };
+
+    // ---- Backup ------------------------------------------------------------
+
+    const exportData = async () => {
+        try {
+            const backup = await createBackup();
+            if (await saveBackupFile(backupFileName(), JSON.stringify(backup, null, 2))) {
+                setDialog({ kind: 'info', title: 'Backup saved', text: describeBackup(backup) });
+            }
+        } catch (error) {
+            setDialog({ kind: 'error', title: 'Couldn’t save the backup', text: errorText(error) });
+        }
+    };
+
+    const pickImport = async () => {
+        let text: string | null;
+        try {
+            text = await openBackupFile();
+        } catch (error) {
+            setDialog({ kind: 'error', title: 'Couldn’t open the file', text: errorText(error) });
+            return;
+        }
+        if (!text) {
+            return;
+        }
+        const parsed = parseBackup(text);
+        if ('error' in parsed) {
+            setDialog({ kind: 'error', title: 'Can’t import this file', text: parsed.error });
+            return;
+        }
+        setDialog({
+            kind: 'confirm',
+            title: 'Import this backup?',
+            text: `${describeBackup(
+                parsed.backup,
+            )}\n\nHabits, day plans, workouts, apnea data and appearance on this phone are replaced by the backup. Blocked sites and apps are only added: nothing on your block list is removed.`,
+            onConfirm: () => applyImport(parsed.backup),
+        });
+    };
+
+    const applyImport = async (backup: Backup) => {
+        close();
+        try {
+            const result = await importBackup(backup);
+            await Promise.all(result.oldHabits.map(h => cancelHabitReminders(h.id)));
+            await Promise.all(result.newHabits.map(syncHabitReminders));
+            if (isAccentName(backup.data.accent)) {
+                setAccent(backup.data.accent);
+            }
+            if (typeof backup.data.darkMode === 'boolean' && backup.data.darkMode !== isDarkMode) {
+                toggleTheme();
+            }
+            refresh();
+            loadBreaks();
+            const notes = result.skipped.length ? `\n\n${result.skipped.join('\n')}` : '';
+            setDialog({
+                kind: result.ok ? 'info' : 'error',
+                title: result.ok ? 'Backup imported' : 'Some data couldn’t be imported',
+                text: `${describeBackup(backup)}${notes}`,
+            });
+        } catch (error) {
+            setDialog({ kind: 'error', title: 'Import failed', text: errorText(error) });
+        }
     };
 
     // ---- Switch handlers -------------------------------------------------
@@ -366,6 +444,23 @@ const SettingsScreen: React.FC = () => {
                     />
                 </ListGroup>
 
+                {/* ---- Backup ---- */}
+                <SectionHeader title="Backup" />
+                <ListGroup>
+                    <ListRow
+                        icon="Download"
+                        title="Export data"
+                        description="Blocks, habits, plans, workouts, apnea tables and settings as a JSON file"
+                        onPress={exportData}
+                    />
+                    <ListRow
+                        icon="Upload"
+                        title="Import data"
+                        description="Restore from a Gaman backup file"
+                        onPress={pickImport}
+                    />
+                </ListGroup>
+
                 <ThemedText size="tiny" color="muted" align="center" style={styles.footer}>
                     Gaman · everything runs on your device
                 </ThemedText>
@@ -456,6 +551,15 @@ const SettingsScreen: React.FC = () => {
                     refresh();
                 }}
                 onDnsEnabledChange={dns => patch({ dns })}
+            />
+
+            <Dialog
+                visible={dialog?.kind === 'info'}
+                onClose={close}
+                icon="Check"
+                tone="success"
+                title={dialog?.kind === 'info' ? dialog.title : ''}
+                message={dialog?.kind === 'info' ? dialog.text : ''}
             />
 
             <ErrorPopup

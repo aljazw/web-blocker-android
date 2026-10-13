@@ -35,6 +35,22 @@ const blockStore = <T extends { visible: boolean }>(
     add: (entry: T): Promise<boolean> =>
         updateList(key, toItem, list => (list.some(x => idOf(x) === idOf(entry)) ? list : [...list, entry])),
     remove: (id: string): Promise<boolean> => updateList(key, toItem, list => list.filter(x => idOf(x) !== id)),
+    /**
+     * Adds every well-formed entry not already on the list (backup import).
+     * Existing entries are never removed or changed, so an import can't lift a block.
+     */
+    merge: (incoming: unknown[]): Promise<boolean> =>
+        updateList(key, toItem, list => {
+            const have = new Set(list.map(idOf));
+            const added: T[] = [];
+            for (const item of incoming.map(toItem)) {
+                if (item && !have.has(idOf(item))) {
+                    have.add(idOf(item));
+                    added.push(item);
+                }
+            }
+            return [...list, ...added];
+        }),
     /** Hidden entries keep blocking but no longer show in the list. */
     hide: (id: string): Promise<boolean> =>
         updateList(key, toItem, list => list.map(x => (idOf(x) === id ? { ...x, visible: false } : x))),
@@ -47,11 +63,13 @@ export const getBlockedWebsites = websites.get;
 export const addBlockedWebsite = websites.add;
 export const deleteBlockedWebsite = websites.remove;
 export const hideBlockedWebsite = websites.hide;
+export const mergeBlockedWebsites = websites.merge;
 
 export const getBlockedApps = apps.get;
 export const addBlockedApp = apps.add;
 export const deleteBlockedApp = apps.remove;
 export const hideBlockedApp = apps.hide;
+export const mergeBlockedApps = apps.merge;
 
 export const isWebsiteBlocked = async (url: string): Promise<boolean> => {
     try {

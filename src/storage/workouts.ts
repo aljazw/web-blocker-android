@@ -36,7 +36,14 @@ const toExercises = (v: unknown): Exercise[] =>
     Array.isArray(v) ? v.map(toExercise).filter((e): e is Exercise => e !== null) : [];
 
 const toWorkout = (v: any): Workout | null =>
-    v && isString(v.id) && isString(v.name) ? { id: v.id, name: v.name, exercises: toExercises(v.exercises) } : null;
+    v && isString(v.id) && isString(v.name)
+        ? {
+              id: v.id,
+              name: v.name,
+              exercises: toExercises(v.exercises),
+              ...(v.circuit === true ? { circuit: true, roundRest: clampInt(v.roundRest, 0, 600, 90) } : {}),
+          }
+        : null;
 
 const toWorkoutRecord = (v: any): WorkoutRecord | null =>
     v && isString(v.id) && isNumber(v.startedAt) && isNumber(v.setsDone) && isNumber(v.setsTotal)
@@ -64,6 +71,8 @@ const toWorkoutSession = (raw: string | null): WorkoutSession | null => {
         workoutId: isString(v.workoutId) ? v.workoutId : '',
         title: isString(v.title) ? v.title : 'Workout',
         exercises,
+        circuit: v.circuit === true,
+        roundRest: clampInt(v.roundRest, 0, 600, 0),
         exercise,
         set: clampInt(v.set, 0, exercises[exercise].sets - 1, 0),
         phase: v.phase,
