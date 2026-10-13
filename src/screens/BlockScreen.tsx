@@ -3,6 +3,7 @@ import BaseScreen from '../components/BaseScreen';
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import SearchBar from '../components/SearchBar';
 import Icon from '../components/Icon';
+import IconButton from '../components/IconButton';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackNavigation } from '../types/types';
 import ItemContainer from '../components/ItemContainer';
@@ -75,7 +76,15 @@ const BlockScreen: React.FC = () => {
     return (
         <BaseScreen
             title="Add a block"
-            subtitle={mode === 'sites' ? 'Type an address or pick a common distraction' : 'Pick an app to block'}>
+            subtitle={mode === 'sites' ? 'Type an address or pick a common distraction' : 'Pick an app to block'}
+            headerRight={
+                <IconButton
+                    icon="Settings"
+                    variant="outline"
+                    accessibilityLabel="Settings"
+                    onPress={() => navigation.navigate('Settings')}
+                />
+            }>
             <Segmented
                 options={[
                     { value: 'sites', label: 'Websites' },

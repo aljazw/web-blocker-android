@@ -19,6 +19,8 @@ export interface DnsStats {
     errors: number;
     lastBlocked: string | null;
     lastError: string | null;
+    /** Android's Private DNS hostname mode is on, so the filter is passing lookups through. */
+    privateDnsActive: boolean;
 }
 
 /** Live DNS diagnostics for the status panel. */
@@ -76,7 +78,21 @@ export async function openPrivateDnsSettings(): Promise<void> {
 /** AdGuard's default DNS (ad & tracker blocking). */
 export const ADGUARD_DNS = '94.140.14.14';
 
-/** Current upstream resolver ('' = system default). */
+/** Android's Private DNS hostname (e.g. dns.adguard-dns.com) when one is set, else null. */
+export async function getPrivateDnsHost(): Promise<string | null> {
+    try {
+        return (await VpnControl.getPrivateDnsHost()) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/** A Private DNS hostname like dns.adguard-dns.com (not an IP address). */
+export function isDnsHostname(value: string): boolean {
+    return /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(value.trim());
+}
+
+/** Current upstream resolver ('' = automatic). */
 export async function getUpstreamDns(): Promise<string> {
     try {
         return await VpnControl.getUpstreamDns();
@@ -85,10 +101,13 @@ export async function getUpstreamDns(): Promise<string> {
     }
 }
 
-/** Set the upstream resolver ('' = system). Restarts the filter to apply. */
-export async function setUpstreamDns(ip: string): Promise<void> {
+/**
+ * Set the resolver for allowed sites: an IP, a Private DNS hostname (sent
+ * encrypted), or '' for automatic. Applies at once.
+ */
+export async function setUpstreamDns(value: string): Promise<void> {
     try {
-        await VpnControl.setUpstreamDns(ip);
+        await VpnControl.setUpstreamDns(value);
     } catch {
         // ignore
     }

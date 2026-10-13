@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import ModalPanel from './ModalPanel';
 import { ThemedText } from './ThemedText';
 import { spacing } from '../theme';
 import Button from './Button';
-import { enableDnsBlocking, openPrivateDnsSettings, openVpnSettings } from '../utils/dnsBlocking';
+import {
+    enableDnsBlocking,
+    getPrivateDnsHost,
+    getUpstreamDns,
+    openPrivateDnsSettings,
+    openVpnSettings,
+    setUpstreamDns,
+} from '../utils/dnsBlocking';
 
 interface DnsSetupWizardProps {
     visible: boolean;
@@ -18,6 +25,27 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
     const [step, setStep] = useState(0);
     const [busy, setBusy] = useState(false);
     const [enableError, setEnableError] = useState<string | null>(null);
+    // Android's Private DNS hostname, read before the user turns it off so
+    // Gaman can keep using that provider (encrypted) for allowed sites.
+    const [privateHost, setPrivateHost] = useState<string | null>(null);
+    const [hostSaved, setHostSaved] = useState(false);
+
+    useEffect(() => {
+        if (!visible) {
+            return;
+        }
+        Promise.all([getPrivateDnsHost(), getUpstreamDns()]).then(([host, upstream]) => {
+            setPrivateHost(host);
+            setHostSaved(!!host && host === upstream);
+        });
+    }, [visible, step]);
+
+    const keepProvider = async () => {
+        if (privateHost) {
+            await setUpstreamDns(privateHost);
+            setHostSaved(true);
+        }
+    };
 
     const reset = () => {
         setStep(0);
@@ -77,13 +105,20 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
                         2. Turn OFF Private DNS
                     </ThemedText>
                     <ThemedText color="muted" style={styles.body}>
-                        Private DNS encrypts lookups so the filter can’t read them. Open the page, set it to{' '}
+                        While Private DNS is set to a provider, Android talks to it directly and the filter steps aside
+                        (your internet keeps working, but sites aren’t blocked by DNS). Set it to{' '}
                         <ThemedText weight="strong">Off</ThemedText>, then come back here.
                     </ThemedText>
-                    <ThemedText size="small" color="accent" style={styles.body}>
-                        Used AdGuard as Private DNS? After setup, set “Allowed-sites resolver” to AdGuard in Settings to
-                        keep ad and tracker blocking.
-                    </ThemedText>
+                    {privateHost && (
+                        <>
+                            <ThemedText size="small" color="accent" style={styles.body}>
+                                {hostSaved
+                                    ? `Gaman now uses ${privateHost} for allowed sites, encrypted, so its ad and tracker blocking keeps working.`
+                                    : `You use ${privateHost}. Keep it: Gaman can send allowed sites there, encrypted.`}
+                            </ThemedText>
+                            {!hostSaved && <PrimaryButton label={`Keep ${privateHost}`} onPress={keepProvider} />}
+                        </>
+                    )}
                     <SecondaryButton label="Open Private DNS settings" onPress={() => openPrivateDnsSettings()} />
                     <PrimaryButton label="It's off. Next" onPress={() => setStep(2)} />
                     <BackButton onPress={() => setStep(0)} />

@@ -145,14 +145,7 @@ const HomeScreen: React.FC = () => {
         <BaseScreen
             title={greeting(now)}
             subtitle={now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-            headerRight={
-                <IconButton
-                    icon="Settings"
-                    variant="outline"
-                    accessibilityLabel="Settings"
-                    onPress={() => navigation.navigate('Settings')}
-                />
-            }>
+>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 {/* ---- Protection status ---- */}
                 <FadeIn>

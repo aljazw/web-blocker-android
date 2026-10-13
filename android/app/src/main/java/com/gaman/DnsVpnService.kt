@@ -8,22 +8,32 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
+import android.database.ContentObserver
 import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
 import android.net.VpnService
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.provider.Settings
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
+import android.system.StructPollfd
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.Inet4Address
-import java.net.InetAddress
 import java.nio.ByteBuffer
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Second security layer: a local DNS-filtering VPN.
@@ -32,18 +42,25 @@ import java.util.concurrent.atomic.AtomicBoolean
  * turns accessibility off, so the always-blocked sites stay blocked at the
  * network (name-resolution) level.
  *
- * Design (kept deliberately "DNS only"):
- *  - We set ourselves as the system DNS server (10.111.0.1) and also route a
- *    handful of well-known public resolvers, so normal DNS traffic flows
- *    through us.
- *  - For each DNS query we read the domain. If it is on the always-blocked list
- *    (Full Week + All Day Long entries), we answer NXDOMAIN so the lookup fails
- *    and the site won't load. Everything else we forward to a real upstream
- *    resolver and relay the answer back untouched.
+ * Design, built so it can never take the phone offline:
+ *  - Only DNS goes through the tunnel. The VPN advertises one virtual DNS server
+ *    (10.111.0.1) and routes nothing but that address, so every other packet
+ *    uses the normal network untouched.
+ *  - Blocked domains get NXDOMAIN. Every other lookup is handed to
+ *    [DnsForwarder], which tries the user's resolver, then the DNS servers of
+ *    the network the phone is on right now, then public resolvers. Network
+ *    switches (Wi-Fi <-> mobile data) are tracked live; the old version pinned
+ *    the Wi-Fi router's DNS and went dark on mobile data.
+ *  - Lookups run in parallel, so one slow answer can't stall the rest.
+ *  - If Android's Private DNS is set to a hostname, Android insists on talking
+ *    to that server itself; filtering through the tunnel would fail every
+ *    lookup. The tunnel then stops advertising DNS (pass-through) so the
+ *    internet keeps working, and Settings explains how to move that hostname
+ *    into Gaman, which speaks it over encrypted DNS-over-TLS.
+ *  - If the packet loop dies or the tunnel can't be built, it rebuilds itself.
  *
- * Honest limits (documented for the user): apps that use DoH/DoT (encrypted DNS,
- * e.g. Chrome's "Secure DNS", or a hardcoded resolver on port 853) can bypass a
- * plaintext DNS filter. The accessibility layer still covers those in browsers.
+ * Honest limits: apps that use their own encrypted DNS (e.g. Chrome's "Secure
+ * DNS") bypass a DNS filter. The accessibility layer still covers browsers.
  * Only one VPN can be active on Android at a time.
  */
 class DnsVpnService : VpnService() {
@@ -58,22 +75,35 @@ class DnsVpnService : VpnService() {
     )
 
     private var vpnInterface: ParcelFileDescriptor? = null
-    private var worker: Thread? = null
     private val running = AtomicBoolean(false)
+    /** Bumped on every rebuild so a stale packet loop knows to exit quietly. */
+    private val generation = AtomicInteger(0)
+    private var passThrough = false
+    private var retryDelayMs = MIN_RETRY_MS
+
+    private val main = Handler(Looper.getMainLooper())
+    private lateinit var forwarder: DnsForwarder
+    private var lookups: ThreadPoolExecutor? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var privateDnsObserver: ContentObserver? = null
+    @Volatile private var underlying: Network? = null
 
     @Volatile private var blockedDomains: Set<String> = emptySet()
     @Volatile private var vacation: Vacation? = null
-    @Volatile private var forwardUpstream: String? = null
     private lateinit var prefs: SharedPreferences
 
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == PREF_BLOCKED || key == PREF_DNS_ENABLED) reloadBlockedDomains()
+        if (key == PREF_BLOCKED) reloadBlockedDomains()
+        if (key == PREF_UPSTREAM) { forwarder.custom = customUpstream(); forwarder.reset() }
         if (key == Vacation.KEY) vacation = Vacation.load(prefs)
     }
+
+    private val rebuild = Runnable { if (running.get()) buildTunnel() }
 
     override fun onCreate() {
         super.onCreate()
         prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        forwarder = DnsForwarder(this)
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         reloadBlockedDomains()
         vacation = Vacation.load(prefs)
@@ -82,6 +112,7 @@ class DnsVpnService : VpnService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                prefs.edit().putString(PREF_DNS_ENABLED, "false").apply()
                 stopVpn()
                 return START_NOT_STICKY
             }
@@ -92,12 +123,15 @@ class DnsVpnService : VpnService() {
 
     override fun onDestroy() {
         if (::prefs.isInitialized) prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
+        // Not a user "off": the system may be reclaiming memory. Keep the
+        // enabled flag so boot / always-on bring the filter back.
         stopVpn()
         super.onDestroy()
     }
 
     override fun onRevoke() {
-        // User disabled the VPN from system settings.
+        // The user disabled the VPN in system settings, or another VPN took over.
+        prefs.edit().putString(PREF_DNS_ENABLED, "false").apply()
         stopVpn()
         super.onRevoke()
     }
@@ -106,56 +140,8 @@ class DnsVpnService : VpnService() {
 
     private fun startVpn() {
         if (running.get()) return
-
         prefs.edit().putString(PREF_DNS_ENABLED, "true").apply()
         startAsForeground()
-
-        // Where to send ALLOWED (non-blocked) lookups. If the user picked a
-        // custom upstream (e.g. AdGuard), we send everything there so they keep
-        // that resolver's ad/tracker filtering on top of our site blocking.
-        // Otherwise we use the device's own resolvers.
-        val custom = customUpstream()
-        forwardUpstream = custom
-
-        val systemDns = upstreamDnsServers()
-        val primary: String
-        val upstreams: List<String>
-        if (custom != null) {
-            primary = custom
-            upstreams = (listOf(custom) + ROUTED_RESOLVERS).distinct()
-        } else {
-            primary = systemDns.firstOrNull() ?: FALLBACK_UPSTREAM
-            upstreams = (systemDns + ROUTED_RESOLVERS).distinct()
-        }
-
-        val builder = Builder()
-            .setSession("Gaman DNS")
-            .addAddress(TUN_ADDRESS, 32)
-            .addDnsServer(primary)
-        // Route every resolver (the device's own + common public ones) through
-        // the tun so their DNS queries reach us for inspection. We do NOT route
-        // anything else, so normal traffic is untouched.
-        for (ip in upstreams) {
-            try { builder.addRoute(ip, 32) } catch (_: Exception) {}
-        }
-        builder.setBlocking(true)
-
-        // Don't route our own forwarding sockets back into the tunnel.
-        try {
-            builder.addDisallowedApplication(packageName)
-        } catch (_: Exception) { /* ignore */ }
-
-        vpnInterface = try {
-            builder.establish()
-        } catch (e: Exception) {
-            Log.e(TAG, "establish() failed", e)
-            null
-        }
-
-        if (vpnInterface == null) {
-            stopVpn()
-            return
-        }
 
         forwardedCount.set(0)
         blockedCount.set(0)
@@ -163,32 +149,188 @@ class DnsVpnService : VpnService() {
         lastError = null
         lastBlocked = null
 
+        forwarder.custom = customUpstream()
+        lookups = ThreadPoolExecutor(
+            4, 16, 30, TimeUnit.SECONDS,
+            ArrayBlockingQueue(256),
+            // Under a flood, drop the oldest lookup: its app has given up on it anyway.
+            ThreadPoolExecutor.DiscardOldestPolicy()
+        )
         running.set(true)
         isRunning.set(true)
-        worker = Thread({ runLoop(vpnInterface!!) }, "gaman-dns").also { it.start() }
+        watchNetwork()
+        watchPrivateDns()
+        buildTunnel()
     }
 
     private fun stopVpn() {
         running.set(false)
         isRunning.set(false)
-        prefs.edit().putString(PREF_DNS_ENABLED, "false").apply()
-        worker?.interrupt()
-        worker = null
+        privateDnsActive = false
+        main.removeCallbacks(rebuild)
+        generation.incrementAndGet()
+        unwatchNetwork()
+        unwatchPrivateDns()
+        lookups?.shutdownNow()
+        lookups = null
         try { vpnInterface?.close() } catch (_: Exception) {}
         vpnInterface = null
+        if (::forwarder.isInitialized) forwarder.reset()
         stopForegroundCompat()
         stopSelf()
     }
 
+    /**
+     * (Re)builds the tunnel for the current situation. The new interface is
+     * established before the old one is closed, so there is no gap where an
+     * always-on VPN would cut the connection.
+     */
+    @Synchronized
+    private fun buildTunnel() {
+        if (!running.get()) return
+        main.removeCallbacks(rebuild)
+        val strict = strictPrivateDnsHost() != null
+        privateDnsActive = strict
+
+        val builder = Builder()
+            .setSession("Gaman DNS")
+            .addAddress(TUN_ADDRESS, 32)
+            .addRoute(DNS_ADDRESS, 32)
+            .setBlocking(true)
+        // In pass-through no DNS server is set, so Android keeps using the
+        // network's own DNS (and the user's Private DNS) directly.
+        if (!strict) builder.addDnsServer(DNS_ADDRESS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Inherit metered-ness from the real network instead of marking
+            // everything metered.
+            builder.setMetered(false)
+            underlying?.let { builder.setUnderlyingNetworks(arrayOf(it)) }
+        }
+        // Gaman's own forwarding sockets must not loop back into the tunnel.
+        try { builder.addDisallowedApplication(packageName) } catch (_: Exception) {}
+
+        val iface = try { builder.establish() } catch (e: Exception) {
+            Log.e(TAG, "establish() failed", e)
+            null
+        }
+        if (iface == null) {
+            // Consent missing (prepare() needed) means the user must act; otherwise retry.
+            if (prepare(this) != null) { stopVpn(); return }
+            scheduleRebuild()
+            return
+        }
+
+        val old = vpnInterface
+        vpnInterface = iface
+        passThrough = strict
+        val gen = generation.incrementAndGet()
+        Thread({ runLoop(iface, gen) }, "gaman-dns").start()
+        try { old?.close() } catch (_: Exception) {}
+        retryDelayMs = MIN_RETRY_MS
+    }
+
+    private fun scheduleRebuild() {
+        if (!running.get()) return
+        main.removeCallbacks(rebuild)
+        main.postDelayed(rebuild, retryDelayMs)
+        retryDelayMs = (retryDelayMs * 2).coerceAtMost(MAX_RETRY_MS)
+    }
+
+    // ---- network tracking -------------------------------------------------
+
+    private fun watchNetwork() {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        // Gaman is excluded from its own VPN, so its default network is the real one.
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                underlying = network
+                onNetworkChanged(cm, network)
+            }
+
+            override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) {
+                underlying = network
+                onNetworkChanged(cm, network)
+            }
+
+            override fun onLost(network: Network) {
+                if (underlying == network) underlying = null
+                forwarder.networkDns = emptyList()
+            }
+        }
+        try {
+            cm.registerDefaultNetworkCallback(callback)
+            networkCallback = callback
+        } catch (e: Exception) {
+            Log.w(TAG, "network callback failed", e)
+        }
+    }
+
+    private fun onNetworkChanged(cm: ConnectivityManager, network: Network) {
+        val lp = try { cm.getLinkProperties(network) } catch (_: Exception) { null }
+        val servers = lp?.dnsServers.orEmpty().filter {
+            val ip = it.hostAddress
+            ip != DNS_ADDRESS && ip != TUN_ADDRESS && !it.isLoopbackAddress
+        }
+        if (servers != forwarder.networkDns) {
+            forwarder.networkDns = servers
+            forwarder.reset()
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+            try { setUnderlyingNetworks(arrayOf(network)) } catch (_: Exception) {}
+        }
+        // Private DNS can flip with the network; adjust the tunnel if it did.
+        main.post { if (running.get() && (strictPrivateDnsHost() != null) != passThrough) buildTunnel() }
+    }
+
+    private fun unwatchNetwork() {
+        val callback = networkCallback ?: return
+        networkCallback = null
+        try {
+            (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
+                .unregisterNetworkCallback(callback)
+        } catch (_: Exception) {}
+    }
+
+    private fun watchPrivateDns() {
+        val observer = object : ContentObserver(main) {
+            override fun onChange(selfChange: Boolean) {
+                if (running.get() && (strictPrivateDnsHost() != null) != passThrough) buildTunnel()
+            }
+        }
+        try {
+            for (key in listOf(SETTING_PRIVATE_DNS_MODE, SETTING_PRIVATE_DNS_HOST)) {
+                contentResolver.registerContentObserver(Settings.Global.getUriFor(key), false, observer)
+            }
+            privateDnsObserver = observer
+        } catch (e: Exception) {
+            Log.w(TAG, "private DNS observer failed", e)
+        }
+    }
+
+    private fun unwatchPrivateDns() {
+        val observer = privateDnsObserver ?: return
+        privateDnsObserver = null
+        try { contentResolver.unregisterContentObserver(observer) } catch (_: Exception) {}
+    }
+
+    /** The hostname when Android's Private DNS is in strict ("hostname") mode, else null. */
+    private fun strictPrivateDnsHost(): String? = privateDnsHost(this, underlying)
+
     // ---- packet loop -----------------------------------------------------
 
-    private fun runLoop(iface: ParcelFileDescriptor) {
+    private fun runLoop(iface: ParcelFileDescriptor, gen: Int) {
         val input = FileInputStream(iface.fileDescriptor)
         val output = FileOutputStream(iface.fileDescriptor)
         val packet = ByteArray(32767)
+        val poll = arrayOf(StructPollfd().apply { fd = iface.fileDescriptor; events = OsConstants.POLLIN.toShort() })
 
         try {
-            while (running.get() && !Thread.currentThread().isInterrupted) {
+            while (running.get() && generation.get() == gen) {
+                // Poll with a timeout so a replaced tunnel's loop always notices and exits.
+                val ready = try { Os.poll(poll, 1000) } catch (e: ErrnoException) {
+                    if (e.errno == OsConstants.EINTR) 0 else throw e
+                }
+                if (ready <= 0) continue
                 val length = input.read(packet)
                 if (length <= 0) continue
                 try {
@@ -198,21 +340,25 @@ class DnsVpnService : VpnService() {
                 }
             }
         } catch (e: Exception) {
-            if (running.get()) Log.e(TAG, "run loop ended", e)
+            if (running.get() && generation.get() == gen) Log.e(TAG, "run loop ended", e)
         } finally {
             try { input.close() } catch (_: Exception) {}
             try { output.close() } catch (_: Exception) {}
         }
+        // The current tunnel's loop died unexpectedly: rebuild instead of
+        // leaving a tunnel that swallows every lookup.
+        if (running.get() && generation.get() == gen) main.post { scheduleRebuild() }
     }
 
-    /** Parse IPv4/UDP; filter or forward DNS (port 53). */
+    /** Parse IPv4/UDP; answer blocked DNS lookups here and forward the rest. */
     private fun handlePacket(packet: ByteArray, length: Int, output: FileOutputStream) {
+        if (length < 28) return
         val version = (packet[0].toInt() shr 4) and 0xF
-        if (version != 4) return // IPv6 not handled in this version
+        if (version != 4) return // the tunnel only has an IPv4 address
 
         val ihl = (packet[0].toInt() and 0xF) * 4
         val protocol = packet[9].toInt() and 0xFF
-        if (protocol != 17) return // UDP only
+        if (protocol != 17 || length < ihl + 8) return // UDP only
 
         val srcIp = packet.copyOfRange(12, 16)
         val dstIp = packet.copyOfRange(16, 20)
@@ -224,52 +370,44 @@ class DnsVpnService : VpnService() {
         if (dstPort != 53) return // only DNS
 
         val dnsData = packet.copyOfRange(udpHeaderEnd, length)
+        if (dnsData.size < 12) return
         val domain = parseDnsQuestion(dnsData)
 
         if (domain != null && isBlocked(domain)) {
             Log.d(TAG, "Blocking DNS: $domain")
             blockedCount.incrementAndGet()
             lastBlocked = domain
-            val response = buildNxDomain(dnsData)
-            writeUdp(output, dstIp, srcIp, dstPort, srcPort, response)
-        } else {
-            forwardDns(output, srcIp, dstIp, srcPort, dstPort, dnsData)
+            writeUdp(output, dstIp, srcIp, dstPort, srcPort, buildReply(dnsData, RCODE_NXDOMAIN))
+            return
+        }
+        val pool = lookups ?: return
+        try {
+            pool.execute { forwardDns(output, srcIp, dstIp, srcPort, dstPort, dnsData) }
+        } catch (_: Exception) {
+            // Pool shut down mid-stop.
         }
     }
 
-    /** Forward a non-blocked DNS query to a real resolver and relay the reply. */
+    /** Resolve a non-blocked lookup off the packet thread and relay the reply. */
     private fun forwardDns(
         output: FileOutputStream,
         srcIp: ByteArray, dstIp: ByteArray,
         srcPort: Int, dstPort: Int,
         dnsData: ByteArray
     ) {
-        val socket = DatagramSocket()
+        val reply = forwarder.resolve(dnsData)
         try {
-            protect(socket)
-            // Forward to the user's chosen upstream (e.g. AdGuard) if set, so its
-            // ad/tracker filtering also applies; otherwise to the resolver the app
-            // addressed (which we routed through the tun).
-            val fu = forwardUpstream
-            val upstream = if (fu != null) InetAddress.getByName(fu) else InetAddress.getByAddress(dstIp)
-
-            socket.soTimeout = 5000
-            socket.send(DatagramPacket(dnsData, dnsData.size, upstream, 53))
-
-            val buf = ByteArray(4096)
-            val reply = DatagramPacket(buf, buf.size)
-            socket.receive(reply)
-            val replyData = buf.copyOfRange(0, reply.length)
-
-            // Send the answer back as if it came from the resolver the app asked.
-            writeUdp(output, dstIp, srcIp, dstPort, srcPort, replyData)
-            forwardedCount.incrementAndGet()
+            if (reply != null) {
+                writeUdp(output, dstIp, srcIp, dstPort, srcPort, reply)
+                forwardedCount.incrementAndGet()
+            } else {
+                // Fail fast so the app's resolver retries instead of hanging.
+                errorCount.incrementAndGet()
+                writeUdp(output, dstIp, srcIp, dstPort, srcPort, buildReply(dnsData, RCODE_SERVFAIL))
+            }
         } catch (e: Exception) {
-            Log.w(TAG, "forward failed", e)
-            errorCount.incrementAndGet()
-            lastError = e.message
-        } finally {
-            socket.close()
+            // Tunnel was rebuilt while this lookup was in flight; the app retries.
+            Log.w(TAG, "reply write failed", e)
         }
     }
 
@@ -294,7 +432,7 @@ class DnsVpnService : VpnService() {
     }
 
     /**
-     * NXDOMAIN response = DNS header + the original question ONLY.
+     * Error reply (NXDOMAIN / SERVFAIL) = DNS header + the original question ONLY.
      *
      * We must TRUNCATE after the question. The incoming query often carries an
      * EDNS OPT record in its additional section; if we keep those bytes but set
@@ -302,7 +440,7 @@ class DnsVpnService : VpnService() {
      * discards it — then the lookup succeeds elsewhere and the block "fails".
      * Trimming to the question gives a clean, honored NXDOMAIN.
      */
-    private fun buildNxDomain(query: ByteArray): ByteArray {
+    private fun buildReply(query: ByteArray, rcode: Int): ByteArray {
         // Find the end of the question section: skip the 12-byte header, walk the
         // QNAME labels to the 0 terminator, then +4 for QTYPE(2) + QCLASS(2).
         var pos = 12
@@ -315,9 +453,9 @@ class DnsVpnService : VpnService() {
         val questionEnd = (pos + 4).coerceAtMost(query.size)
 
         val resp = query.copyOfRange(0, questionEnd)
-        // Flags: QR=1, Opcode 0, AA=0, TC=0, RD copied, RA=1, RCODE=3 (NXDOMAIN)
+        // Flags: QR=1, Opcode 0, AA=0, TC=0, RD copied, RA=1, RCODE as given
         resp[2] = (0x80 or (query[2].toInt() and 0x01)).toByte()
-        resp[3] = 0x83.toByte()
+        resp[3] = (0x80 or rcode).toByte()
         // Counts: exactly one question, no answer/authority/additional records.
         resp[4] = 0; resp[5] = 1
         resp[6] = 0; resp[7] = 0
@@ -378,25 +516,10 @@ class DnsVpnService : VpnService() {
         return (sum.inv() and 0xFFFF).toInt()
     }
 
-    /** User-chosen upstream resolver (e.g. AdGuard), or null to use system DNS. */
+    /** User-chosen resolver (an IP, or a Private DNS hostname), or null for automatic. */
     private fun customUpstream(): String? {
         val v = prefs.getString(PREF_UPSTREAM, null)
         return if (v.isNullOrBlank()) null else v.trim()
-    }
-
-    /** The device's current IPv4 DNS servers, read from the active network. */
-    private fun upstreamDnsServers(): List<String> {
-        return try {
-            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val net = cm.activeNetwork ?: return emptyList()
-            val lp = cm.getLinkProperties(net) ?: return emptyList()
-            lp.dnsServers
-                .filterIsInstance<Inet4Address>()
-                .mapNotNull { it.hostAddress }
-        } catch (e: Exception) {
-            Log.w(TAG, "could not read system DNS", e)
-            emptyList()
-        }
     }
 
     // ---- block list ------------------------------------------------------
@@ -485,10 +608,16 @@ class DnsVpnService : VpnService() {
         private const val PREF_UPSTREAM = "@dns_upstream"
 
         private const val TUN_ADDRESS = "10.111.0.2"
-        private const val FALLBACK_UPSTREAM = "1.1.1.1"
-        private val ROUTED_RESOLVERS = listOf(
-            "8.8.8.8", "8.8.4.4", "1.1.1.1", "1.0.0.1", "9.9.9.9"
-        )
+        /** Virtual DNS server; the only address routed into the tunnel. */
+        private const val DNS_ADDRESS = "10.111.0.1"
+        private const val RCODE_SERVFAIL = 2
+        private const val RCODE_NXDOMAIN = 3
+        private const val MIN_RETRY_MS = 2_000L
+        private const val MAX_RETRY_MS = 60_000L
+
+        // Android's own keys (Settings.Global.PRIVATE_DNS_*, hidden from the SDK).
+        private const val SETTING_PRIVATE_DNS_MODE = "private_dns_mode"
+        private const val SETTING_PRIVATE_DNS_HOST = "private_dns_specifier"
 
         // Channel ids predate the rename; kept so existing notification settings carry over.
         private const val CHANNEL = "sitelock_dns"
@@ -504,6 +633,34 @@ class DnsVpnService : VpnService() {
         @Volatile var ruleCount = 0
         @Volatile var lastError: String? = null
         @Volatile var lastBlocked: String? = null
+        /** True while Android's Private DNS hostname mode has the filter in pass-through. */
+        @Volatile var privateDnsActive = false
+
+        /**
+         * The Private DNS hostname when Android is in strict ("hostname") mode,
+         * else null. Reads the setting, and falls back to what the network
+         * reports in case the setting can't be read.
+         */
+        fun privateDnsHost(context: Context, network: Network? = null): String? {
+            try {
+                val cr = context.contentResolver
+                val mode = Settings.Global.getString(cr, SETTING_PRIVATE_DNS_MODE)
+                if (mode == "hostname") {
+                    Settings.Global.getString(cr, SETTING_PRIVATE_DNS_HOST)?.trim()?.takeIf { it.isNotEmpty() }
+                        ?.let { return it }
+                } else if (mode != null) {
+                    return null
+                }
+            } catch (_: Exception) {}
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                try {
+                    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                    val net = network ?: cm.activeNetwork ?: return null
+                    return cm.getLinkProperties(net)?.privateDnsServerName
+                } catch (_: Exception) {}
+            }
+            return null
+        }
 
         fun start(context: Context) {
             val i = Intent(context, DnsVpnService::class.java).setAction(ACTION_START)

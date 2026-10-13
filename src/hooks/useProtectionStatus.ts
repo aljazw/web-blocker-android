@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { checkAdmin } from '../utils/deviceAdmin';
 import { checkAccessibilityEnabled } from '../utils/accessibility';
-import { DnsStats, getDnsStats, getUpstreamDns, isDnsBlockingRunning } from '../utils/dnsBlocking';
+import { DnsStats, getDnsStats, getPrivateDnsHost, getUpstreamDns, isDnsBlockingRunning } from '../utils/dnsBlocking';
 import { canDrawOverlays } from '../utils/overlay';
 import { isWatchdogRunning } from '../utils/watchdog';
 import { getBlockedWebsites } from '../storage';
@@ -18,6 +18,8 @@ export interface ProtectionStatus {
     /** Sites the DNS layer covers: only "every day, all day" blocks. */
     dnsRuleCount: number;
     upstream: string;
+    /** Android's Private DNS hostname, when one is set. */
+    privateDnsHost: string | null;
 }
 
 const INITIAL: ProtectionStatus = {
@@ -29,6 +31,7 @@ const INITIAL: ProtectionStatus = {
     dnsStats: null,
     dnsRuleCount: 0,
     upstream: '',
+    privateDnsHost: null,
 };
 
 /**
@@ -41,16 +44,18 @@ export const useProtectionStatus = () => {
     const [status, setStatus] = useState<ProtectionStatus>(INITIAL);
 
     const refresh = useCallback(async () => {
-        const [admin, dns, overlay, accessibility, dnsStats, sites, upstream, watchdog] = await Promise.all([
-            checkAdmin(),
-            isDnsBlockingRunning(),
-            canDrawOverlays(),
-            checkAccessibilityEnabled(),
-            getDnsStats(),
-            getBlockedWebsites().catch(() => []),
-            getUpstreamDns(),
-            isWatchdogRunning(),
-        ]);
+        const [admin, dns, overlay, accessibility, dnsStats, sites, upstream, watchdog, privateDnsHost] =
+            await Promise.all([
+                checkAdmin(),
+                isDnsBlockingRunning(),
+                canDrawOverlays(),
+                checkAccessibilityEnabled(),
+                getDnsStats(),
+                getBlockedWebsites().catch(() => []),
+                getUpstreamDns(),
+                isWatchdogRunning(),
+                getPrivateDnsHost(),
+            ]);
         setStatus({
             admin,
             dns,
@@ -59,6 +64,7 @@ export const useProtectionStatus = () => {
             dnsStats,
             upstream,
             watchdog,
+            privateDnsHost,
             dnsRuleCount: sites.filter(s => s.days === FULL_WEEK && s.time === ALL_DAY).length,
         });
     }, []);

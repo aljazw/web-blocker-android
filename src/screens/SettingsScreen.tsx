@@ -22,7 +22,14 @@ import { useTheme } from '../context/ThemeContext';
 import { useProtectionStatus } from '../hooks/useProtectionStatus';
 import { toggleDeviceAdmin } from '../utils/deviceAdmin';
 import { openAccessibilitySettings } from '../utils/accessibility';
-import { ADGUARD_DNS, disableDnsBlocking, setUpstreamDns } from '../utils/dnsBlocking';
+import TextField from '../components/TextField';
+import {
+    ADGUARD_DNS,
+    disableDnsBlocking,
+    isDnsHostname,
+    openPrivateDnsSettings,
+    setUpstreamDns,
+} from '../utils/dnsBlocking';
 import { requestOverlay } from '../utils/overlay';
 import { testWatchdogWarning } from '../utils/watchdog';
 import { haptics } from '../utils/haptics';
@@ -44,12 +51,12 @@ type Dialog =
 
 const upstreamLabel = (value: string) => {
     if (!value) {
-        return 'System default';
+        return 'Automatic · your network’s DNS';
     }
     if (value === ADGUARD_DNS) {
         return 'AdGuard (ads & trackers)';
     }
-    return value;
+    return isDnsHostname(value) ? `${value} · encrypted` : value;
 };
 
 const SettingsScreen: React.FC = () => {
@@ -60,6 +67,7 @@ const SettingsScreen: React.FC = () => {
     const navigation = useNavigation<RootStackNavigation>();
     const [sleep, setSleep] = useState<SleepSchedule | null>(null);
     const [vacation, setVacationState] = useState<Vacation | null>(null);
+    const [hostDraft, setHostDraft] = useState('');
 
     useFocusEffect(
         useCallback(() => {
@@ -109,11 +117,17 @@ const SettingsScreen: React.FC = () => {
         refresh();
     };
 
-    const pickUpstream = async (ip: string) => {
+    const pickUpstream = async (value: string) => {
         close();
-        patch({ upstream: ip });
-        await setUpstreamDns(ip);
-        setTimeout(refresh, 1200); // the filter restarts (~0.7s) to apply it
+        patch({ upstream: value });
+        await setUpstreamDns(value);
+        refresh();
+    };
+
+    const openUpstream = () => {
+        const current = status.upstream && isDnsHostname(status.upstream) ? status.upstream : '';
+        setHostDraft(current || status.privateDnsHost || '');
+        setDialog({ kind: 'upstream' });
     };
 
     // ---- Switch handlers -------------------------------------------------
@@ -203,13 +217,32 @@ const SettingsScreen: React.FC = () => {
                                             : theme.colors.primaryRed
                                     }
                                 />
-                                {status.dnsStats.forwarded === 0 && status.dnsStats.blocked === 0 && (
-                                    <ThemedText size="small" color="primaryRed" style={styles.statusHint}>
-                                        DNS is on but sees no queries. Private DNS (encrypted) is probably on; turn it
-                                        off via the DNS blocking setup.
-                                    </ThemedText>
-                                )}
                             </>
+                        )}
+                        {status.dns && status.privateDnsHost && (
+                            <View style={styles.privateDns}>
+                                <ThemedText size="small" color="primaryRed">
+                                    Private DNS ({status.privateDnsHost}) is on, so the DNS filter is paused and lets
+                                    everything through. Your internet keeps working. To filter again, use{' '}
+                                    {status.privateDnsHost} inside Gaman, then set Private DNS to Off.
+                                </ThemedText>
+                                {status.upstream !== status.privateDnsHost && (
+                                    <Button
+                                        label={`Use ${status.privateDnsHost} in Gaman`}
+                                        variant="secondary"
+                                        compact
+                                        onPress={() => pickUpstream(status.privateDnsHost ?? '')}
+                                        style={styles.testButton}
+                                    />
+                                )}
+                                <Button
+                                    label="Open Private DNS settings"
+                                    variant="secondary"
+                                    compact
+                                    onPress={() => openPrivateDnsSettings()}
+                                    style={styles.statusHint}
+                                />
+                            </View>
                         )}
                         <Button
                             label="Test the re-enable screen"
@@ -306,7 +339,7 @@ const SettingsScreen: React.FC = () => {
                         icon="Server"
                         title="Allowed-sites resolver"
                         description={upstreamLabel(status.upstream)}
-                        onPress={() => setDialog({ kind: 'upstream' })}
+                        onPress={openUpstream}
                     />
                 </ListGroup>
 
@@ -366,19 +399,54 @@ const SettingsScreen: React.FC = () => {
                 onClose={close}
                 icon="Server"
                 title="Resolver for allowed sites"
-                message="Blocked sites are always blocked. Everything else is resolved by:"
+                message="Blocked sites are always blocked. Everything else goes to the resolver below. If it can’t be reached, Gaman falls back to your network’s DNS, so the internet keeps working."
                 actions={[{ label: 'Close', onPress: close, variant: 'secondary' }]}>
                 <UpstreamOption
-                    title="System default"
+                    title="Automatic"
+                    subtitle="The DNS of whatever Wi-Fi or mobile network you’re on"
                     selected={status.upstream === ''}
                     onPress={() => pickUpstream('')}
                 />
                 <UpstreamOption
                     title="AdGuard: also block ads and trackers"
-                    subtitle={`${ADGUARD_DNS} · keep Private DNS off`}
+                    subtitle={ADGUARD_DNS}
                     selected={status.upstream === ADGUARD_DNS}
                     onPress={() => pickUpstream(ADGUARD_DNS)}
                 />
+                <View
+                    style={[
+                        styles.option,
+                        { borderColor: theme.colors.border },
+                        isDnsHostname(status.upstream) && {
+                            borderColor: theme.colors.accent,
+                            backgroundColor: theme.colors.accentSoft,
+                        },
+                    ]}>
+                    <ThemedText weight="medium" color={isDnsHostname(status.upstream) ? 'accent' : 'text'}>
+                        Your Private DNS provider
+                    </ThemedText>
+                    <ThemedText size="small" color="muted">
+                        The hostname from Android’s Private DNS, e.g. a personal AdGuard address. Sent encrypted.
+                    </ThemedText>
+                    <TextField
+                        inset={false}
+                        surface="background"
+                        value={hostDraft}
+                        onChangeText={setHostDraft}
+                        placeholder="dns.adguard-dns.com"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                        style={styles.hostField}
+                    />
+                    <Button
+                        label="Use this provider"
+                        compact
+                        disabled={!isDnsHostname(hostDraft)}
+                        onPress={() => pickUpstream(hostDraft.trim().toLowerCase())}
+                        style={styles.statusHint}
+                    />
+                </View>
             </Dialog>
 
             <DnsSetupWizard
@@ -447,6 +515,12 @@ const styles = StyleSheet.create({
     },
     statusHint: {
         marginTop: spacing.xs,
+    },
+    privateDns: {
+        marginTop: spacing.sm,
+    },
+    hostField: {
+        marginTop: spacing.sm,
     },
     testButton: {
         marginTop: spacing.md,

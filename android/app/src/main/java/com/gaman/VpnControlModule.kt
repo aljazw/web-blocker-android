@@ -4,8 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
-import android.os.Handler
-import android.os.Looper
 import android.provider.Settings
 import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.Arguments
@@ -50,6 +48,7 @@ class VpnControlModule(private val reactContext: ReactApplicationContext) :
         map.putInt("errors", DnsVpnService.errorCount.get())
         map.putString("lastBlocked", DnsVpnService.lastBlocked)
         map.putString("lastError", DnsVpnService.lastError)
+        map.putBoolean("privateDnsActive", DnsVpnService.privateDnsActive)
         promise.resolve(map)
     }
 
@@ -117,18 +116,21 @@ class VpnControlModule(private val reactContext: ReactApplicationContext) :
     }
 
     /**
-     * Set the upstream resolver for allowed lookups (e.g. AdGuard's 94.140.14.14),
-     * or "" to use the system default. Restarts the filter so it takes effect.
+     * Set the resolver for allowed lookups: an IP (e.g. AdGuard's 94.140.14.14),
+     * a Private DNS hostname (spoken over DNS-over-TLS), or "" for automatic.
+     * The running filter picks it up at once, no restart needed.
      */
     @ReactMethod
-    fun setUpstreamDns(ip: String, promise: Promise) {
+    fun setUpstreamDns(value: String, promise: Promise) {
         val prefs = reactContext.getSharedPreferences("BlockedPrefs", Context.MODE_PRIVATE)
-        prefs.edit().putString("@dns_upstream", ip.trim()).apply()
-        if (DnsVpnService.isRunning.get()) {
-            DnsVpnService.stop(reactContext)
-            Handler(Looper.getMainLooper()).postDelayed({ DnsVpnService.start(reactContext) }, 700)
-        }
+        prefs.edit().putString("@dns_upstream", value.trim().lowercase()).apply()
         promise.resolve(true)
+    }
+
+    /** Android's Private DNS hostname when it is set to a provider, else null. */
+    @ReactMethod
+    fun getPrivateDnsHost(promise: Promise) {
+        promise.resolve(DnsVpnService.privateDnsHost(reactContext))
     }
 
     /** Opens the Private DNS settings page (falls back to network settings). */
