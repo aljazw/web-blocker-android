@@ -1,105 +1,157 @@
-/** Loading, saving and notifications for the day plan. Pure plan logic lives in dayPlan.ts. */
-import notifee, { AndroidImportance, RepeatFrequency, TriggerType } from '@notifee/react-native';
-import { DayPlan, PlanBlock } from '../types/types';
-import { addDays, fromDateKey, toDateKey } from './dates';
+/** Loading, changing and notifications for the day plan. Pure plan logic lives in dayPlan.ts. */
+import notifee, { AndroidImportance, TriggerType } from '@notifee/react-native';
+import { DayPlan, Habit, OneOffTask, SleepSchedule } from '../types/types';
+import { addDays, fromDateKey, newId, toDateKey } from './dates';
 import { markDone } from './habits';
-import { dismissTodaysReminder } from './habitReminders';
 import {
-    blockTimes,
-    copyPlan,
-    fitBlock,
+    PlanTask,
+    anchorsOf,
+    dayTasks,
+    formatDuration,
     formatMinutes,
-    isBlockDone,
+    laterOrder,
+    minutesNow,
     motivationFor,
-    parseMinutes,
-    sortBlocks,
+    orderWith,
+    routineFromLegacy,
+    scheduleDay,
     timestampOf,
-    visibleBlocks,
 } from './dayPlan';
 import {
     STORAGE_KEYS,
-    getDayPlans,
-    onStorageChange,
+    getDay,
     getHabits,
+    getLegacyPlans,
     getPlanPrefs,
     getSleepSchedule,
-    saveDayPlan,
-    updateDayPlan,
+    onStorageChange,
+    saveHabits,
+    updateDay,
     updateHabit,
 } from '../storage';
+import { KEYS, readBool, writeJson } from '../storage/core';
 import { logger } from './logger';
 
-export interface LoadedPlan {
-    plan: DayPlan;
-    /** False for a day that hasn't been saved yet (a copy of the latest earlier plan, or empty). */
-    stored: boolean;
+export interface LoadedDay {
+    day: DayPlan;
+    habits: Habit[];
+    sleep: SleepSchedule;
 }
 
-/**
- * The plan for `dateKey`. A day without its own plan starts as a copy of the
- * latest earlier one, so each day is edited from yesterday instead of built
- * from scratch. Today's copy is saved right away (check-offs need somewhere to
- * live); a future day's copy is only saved once it's edited, so it keeps
- * following today's changes until then.
- */
-export const loadDayPlan = async (dateKey: string): Promise<LoadedPlan> => {
-    const plans = await getDayPlans();
-    const own = plans.find(p => p.date === dateKey);
-    if (own) {
-        return { plan: own, stored: true }; // saved sorted, and the same object while unchanged
-    }
-    const previous = plans.filter(p => p.date < dateKey).pop();
-    const plan = previous ? copyPlan(previous, dateKey) : { date: dateKey, blocks: [] };
-    if (previous && dateKey <= toDateKey(new Date()) && (await saveDayPlan(plan))) {
-        return { plan, stored: true };
-    }
-    return { plan, stored: false };
+export const loadDay = async (date: string): Promise<LoadedDay> => {
+    const [day, habits, sleep] = await Promise.all([getDay(date), getHabits(), getSleepSchedule()]);
+    return { day, habits, sleep };
 };
 
-/** Saves the plan (sorted by time); reminders follow through watchPlanReminders. */
-export const persistDayPlan = (plan: DayPlan): Promise<boolean> =>
-    saveDayPlan({ ...plan, blocks: sortBlocks(plan.blocks) });
+const without = (finished: Record<string, number>, id: string): Record<string, number> =>
+    Object.fromEntries(Object.entries(finished).filter(([key]) => key !== id));
 
-/** Checks a block off on `dateKey`: its linked habit, or the block itself. */
-export const completeBlock = async (dateKey: string, block: PlanBlock): Promise<boolean> => {
-    const { habitId } = block;
-    if (!habitId) {
-        return updateDayPlan(dateKey, plan => ({
-            ...plan,
-            blocks: plan.blocks.map(b => (b.id === block.id ? { ...b, done: true } : b)),
+/** Checks a task off at `at` (minutes after midnight): its habit too, for a routine task. */
+export const completeTask = async (date: string, task: PlanTask, at: number): Promise<boolean> => {
+    if (task.habit) {
+        const ok = await updateHabit(task.habit.id, h => markDone(h, fromDateKey(date)));
+        if (!ok) {
+            return false;
+        }
+    }
+    return updateDay(date, day => ({
+        ...day,
+        finished: { ...day.finished, [task.id]: at },
+        skipped: day.skipped.filter(id => id !== task.id),
+    }));
+};
+
+export const undoTask = async (date: string, task: PlanTask): Promise<boolean> => {
+    if (task.habit) {
+        const ok = await updateHabit(task.habit.id, h => ({
+            ...h,
+            completions: h.completions.filter(k => k !== date),
         }));
+        if (!ok) {
+            return false;
+        }
     }
-    const ok = await updateHabit(habitId, habit => markDone(habit, fromDateKey(dateKey)));
-    const habit = ok ? (await getHabits()).find(h => h.id === habitId) : undefined;
-    if (habit) {
-        dismissTodaysReminder(habit);
-    }
-    return ok;
+    return updateDay(date, day => ({ ...day, finished: without(day.finished, task.id) }));
 };
+
+/** Skips a task for the day (a routine task's streak ends), or brings it back. */
+export const setSkipped = (date: string, taskId: string, skipped: boolean): Promise<boolean> =>
+    updateDay(date, day => ({
+        ...day,
+        skipped: skipped ? [...day.skipped.filter(id => id !== taskId), taskId] : day.skipped.filter(id => id !== taskId),
+    }));
+
+/** "Later": the task swaps places with the next open one. */
+export const moveLater = (date: string, tasks: PlanTask[], taskId: string): Promise<boolean> =>
+    updateDay(date, day => ({ ...day, order: laterOrder(tasks, taskId) }));
 
 /**
- * Replaces (or adds) one block in the day's plan, moving the others out of
- * its way (see fitBlock). Resolves false if saving fails or the moved blocks
- * would run past midnight.
+ * Adds or updates a one-off task. A new one goes right after `afterId` (first
+ * when null), or at the end of the day when `afterId` is left out.
  */
-export const upsertBlock = async (dateKey: string, block: PlanBlock): Promise<boolean> => {
-    const [{ plan }, habits] = await Promise.all([loadDayPlan(dateKey), getHabits()]);
-    const fit = fitBlock(plan, habits, block);
-    return !fit.overflow && persistDayPlan({ ...plan, blocks: fit.blocks });
+export const saveOneOff = async (date: string, task: OneOffTask, afterId?: string | null): Promise<boolean> => {
+    const habits = afterId === undefined ? [] : await getHabits();
+    return updateDay(date, day => {
+        if (day.oneOffs.some(t => t.id === task.id)) {
+            return { ...day, oneOffs: day.oneOffs.map(t => (t.id === task.id ? task : t)) };
+        }
+        const added = { ...day, oneOffs: [...day.oneOffs, task] };
+        return afterId === undefined ? added : { ...added, order: orderWith(dayTasks(added, habits), task.id, afterId) };
+    });
 };
 
-export const removeBlock = async (dateKey: string, blockId: string): Promise<boolean> => {
-    const { plan } = await loadDayPlan(dateKey);
-    return persistDayPlan({ ...plan, blocks: plan.blocks.filter(b => b.id !== blockId) });
+/** A one-off that became a routine task with the same id: it keeps its place and check-off on the day. */
+export const promoteOneOff = (date: string, taskId: string): Promise<boolean> =>
+    updateDay(date, day => ({ ...day, oneOffs: day.oneOffs.filter(t => t.id !== taskId) }));
+
+export const removeOneOff = (date: string, taskId: string): Promise<boolean> =>
+    updateDay(date, day => ({
+        ...day,
+        oneOffs: day.oneOffs.filter(t => t.id !== taskId),
+        order: day.order.filter(id => id !== taskId),
+        skipped: day.skipped.filter(id => id !== taskId),
+        finished: without(day.finished, taskId),
+    }));
+
+/** Remembers when a routine task was checked off elsewhere (e.g. by finishing a workout). */
+export const recordFinished = (date: string, taskId: string, at: number): Promise<boolean> =>
+    updateDay(date, day => ({ ...day, finished: { ...day.finished, [taskId]: at } }));
+
+// ---- Moving over from time windows ------------------------------------------------
+
+/**
+ * Once: turns the old time-window plan into the routine (see
+ * routineFromLegacy) and clears the old habit reminders, whose fixed times
+ * no longer exist. Never throws.
+ */
+export const migrateRoutine = async (): Promise<void> => {
+    try {
+        if (await readBool(KEYS.routineMigrated)) {
+            return;
+        }
+        const [legacy, habits] = await Promise.all([getLegacyPlans(), getHabits()]);
+        const latest = legacy.filter(p => p.date <= toDateKey(new Date())).pop() ?? legacy[legacy.length - 1];
+        if (latest && latest.blocks.length > 0) {
+            const routine = routineFromLegacy(latest.blocks, habits, new Date(), () => newId('h'));
+            if (!(await saveHabits(routine))) {
+                return;
+            }
+        }
+        await writeJson(KEYS.routineMigrated, true);
+        // Not awaited: app start must never wait on the notification service.
+        notifee
+            .getTriggerNotificationIds()
+            .then(ids => notifee.cancelTriggerNotifications(ids.filter(id => id.startsWith('habit:'))))
+            .catch(error => logger.warn('Could not clear old habit reminders', error));
+    } catch (error) {
+        logger.warn('Could not move the old plan into the routine', error);
+    }
 };
 
 // ---- Notifications ------------------------------------------------------------
 
 const CHANNEL_ID = 'plan';
 const ID_PREFIX = 'plan:';
-const REVIEW_ID = `${ID_PREFIX}review`;
-/** Evening "plan tomorrow" reminder: an hour before bedtime, or 21:00 without sleep time. */
-const REVIEW_FALLBACK = 21 * 60;
 
 const notification = (id: string, title: string, body: string) => ({
     id,
@@ -114,16 +166,16 @@ const notification = (id: string, title: string, body: string) => ({
 
 /** Everything the reminders are built from. */
 const REMINDER_INPUTS: string[] = [
-    STORAGE_KEYS.dayPlans,
+    STORAGE_KEYS.days,
     STORAGE_KEYS.habits,
     STORAGE_KEYS.planPrefs,
     STORAGE_KEYS.sleepSchedule,
 ];
 
 /**
- * Keeps plan notifications in step with the data: any change to plans,
- * habits, plan settings or sleep time reschedules them (once per burst of
- * writes). Call once at startup; returns a function that stops watching.
+ * Keeps plan notifications in step with the data: any change to the day,
+ * the routine, plan settings or sleep time reschedules them (once per burst
+ * of writes). Call once at startup; returns a function that stops watching.
  */
 export const watchPlanReminders = (): (() => void) => {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -147,8 +199,8 @@ let syncing: Promise<void> | null = null;
 let again = false;
 
 /**
- * Replaces all plan notifications: one when each remaining block of today and
- * tomorrow starts, plus a daily evening reminder to look over tomorrow. Runs
+ * Replaces all plan notifications: one when each task of today and tomorrow
+ * is estimated to start, so they tell you where you should be by now. Runs
  * one at a time (a call during a sync queues one more run). Never throws.
  */
 export const syncPlanReminders = (): Promise<void> => {
@@ -179,45 +231,37 @@ const syncOnce = async (): Promise<void> => {
         }
         await notifee.createChannel({ id: CHANNEL_ID, name: 'Day plan', importance: AndroidImportance.HIGH });
 
-        const [habits, sleep] = await Promise.all([getHabits(), getSleepSchedule()]);
-        const now = Date.now();
-        const today = new Date();
-
-        for (const dateKey of [toDateKey(today), toDateKey(addDays(today, 1))]) {
-            const { plan } = await loadDayPlan(dateKey);
-            const blocks = visibleBlocks(plan, habits);
+        const now = new Date();
+        const today = toDateKey(now);
+        for (const date of [today, toDateKey(addDays(now, 1))]) {
+            const { day, habits, sleep } = await loadDay(date);
+            const tasks = dayTasks(day, habits);
+            const { slots } = scheduleDay(tasks, anchorsOf(sleep), date === today ? minutesNow(now) : null);
+            const open = slots.filter(s => s.task.status === 'open');
             await Promise.all(
-                blocks.map((block, i) => {
-                    const at = timestampOf(dateKey, block.start);
-                    if (at <= now || isBlockDone(block, habits, dateKey)) {
+                open.map((slot, i) => {
+                    const at = timestampOf(date, slot.start);
+                    if (at <= now.getTime()) {
                         return Promise.resolve();
                     }
-                    const next = blocks.slice(i + 1).find(b => b.start >= block.end);
-                    const body = `${motivationFor(dateKey + block.id)}${
-                        next ? `\nNext: ${next.title} at ${formatMinutes(next.start)}` : ''
-                    }`;
+                    const previous = i > 0 ? open[i - 1].task : null;
+                    const after = open[i + 1];
+                    const title = previous
+                        ? `Time for ${slot.task.title} · ${formatDuration(slot.task.duration)}`
+                        : `First up: ${slot.task.title} · ${formatDuration(slot.task.duration)}`;
+                    const body = [
+                        previous ? `Wrap up ${previous.title} and move on.` : motivationFor(date + slot.task.id),
+                        after ? `Then ${after.task.title} around ${formatMinutes(after.start)}.` : null,
+                    ]
+                        .filter(Boolean)
+                        .join('\n');
                     return notifee.createTriggerNotification(
-                        notification(
-                            `${ID_PREFIX}${dateKey}:${block.id}`,
-                            `${block.title} · ${blockTimes(block)}`,
-                            body,
-                        ),
+                        notification(`${ID_PREFIX}${date}:${slot.task.id}`, title, body),
                         { type: TriggerType.TIMESTAMP, timestamp: at },
                     );
                 }),
             );
         }
-
-        const bed = sleep.enabled ? parseMinutes(sleep.bedtime) : null;
-        const reviewAt = bed !== null && bed >= 60 ? bed - 60 : REVIEW_FALLBACK;
-        let review = timestampOf(toDateKey(today), reviewAt);
-        if (review <= now) {
-            review = timestampOf(toDateKey(addDays(today, 1)), reviewAt);
-        }
-        await notifee.createTriggerNotification(
-            notification(REVIEW_ID, 'Plan tomorrow', "Take a minute to look over tomorrow's plan."),
-            { type: TriggerType.TIMESTAMP, timestamp: review, repeatFrequency: RepeatFrequency.DAILY },
-        );
     } catch (error) {
         logger.warn('Could not schedule plan reminders', error);
     }

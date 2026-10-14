@@ -1,7 +1,7 @@
 /**
  * Backup export / import as one JSON file.
  *
- * Export takes everything worth keeping: blocks, habits, day plans, workouts
+ * Export takes everything worth keeping: blocks, the routine and day plans, workouts
  * and their history, apnea tables, records and settings, sleep time,
  * vacation, appearance and the DNS resolver.
  *
@@ -13,11 +13,10 @@
  *  - Passphrase protection is left as it is.
  * Everything else replaces what's on the phone.
  */
-import { Habit, SleepSchedule, Vacation } from '../types/types';
+import { SleepSchedule, Vacation } from '../types/types';
 import { isValidVacation, vacationPhase } from '../utils/vacation';
 import { KEYS, parseJson, readRaw, serialized, writeJson, writeRaw } from './core';
 import { mergeBlockedApps, mergeBlockedWebsites } from './blockList';
-import { getHabits } from './habits';
 import { getSleepSchedule, setSleepSchedule } from './sleep';
 import { getVacation, setVacation } from './vacation';
 
@@ -30,7 +29,7 @@ const DNS_UPSTREAM = '@dns_upstream';
 /** Restored by replacing the current value. Lists must be arrays, the rest objects or flags. */
 const REPLACED = {
     habits: { key: KEYS.habits, kind: 'list' },
-    dayPlans: { key: KEYS.dayPlans, kind: 'list' },
+    days: { key: KEYS.days, kind: 'list' },
     planPrefs: { key: KEYS.planPrefs, kind: 'object' },
     workouts: { key: KEYS.workouts, kind: 'list' },
     workoutRecords: { key: KEYS.workoutRecords, kind: 'list' },
@@ -114,8 +113,7 @@ export const describeBackup = (backup: Backup): string => {
     const parts = [
         [count(d.websites), 'blocked site'],
         [count(d.apps), 'blocked app'],
-        [count(d.habits), 'habit'],
-        [count(d.dayPlans), 'day plan'],
+        [count(d.habits), 'routine task'],
         [count(d.workouts), 'workout'],
         [count(d.workoutRecords), 'workout session'],
         [count(d.apneaTables), 'apnea table'],
@@ -131,9 +129,6 @@ export interface ImportResult {
     ok: boolean;
     /** Things the import deliberately left alone, to tell the user. */
     skipped: string[];
-    /** Habits before and after, so reminders can be rescheduled. */
-    oldHabits: Habit[];
-    newHabits: Habit[];
 }
 
 /** Applies a parsed backup under the rules at the top of this file. */
@@ -141,7 +136,6 @@ export const importBackup = async (backup: Backup, now: Date = new Date()): Prom
     const d = backup.data;
     const skipped: string[] = [];
     let ok = true;
-    const oldHabits = await getHabits().catch(() => [] as Habit[]);
 
     for (const name of names) {
         const value = d[name];
@@ -149,6 +143,11 @@ export const importBackup = async (backup: Backup, now: Date = new Date()): Prom
             continue;
         }
         ok = (await serialized(() => writeJson(REPLACED[name].key, value)).catch(() => false)) && ok;
+    }
+    // A backup from before the routine: its time-window plan is moved over like on the phone itself.
+    if (Array.isArray(d.dayPlans) && d.days === undefined) {
+        ok = (await serialized(() => writeJson(KEYS.dayPlans, d.dayPlans)).catch(() => false)) && ok;
+        ok = (await writeRaw(KEYS.routineMigrated, 'false').catch(() => false)) && ok;
     }
     if (typeof d.dnsUpstream === 'string') {
         ok = (await writeRaw(DNS_UPSTREAM, d.dnsUpstream.trim().toLowerCase()).catch(() => false)) && ok;
@@ -186,8 +185,7 @@ export const importBackup = async (backup: Backup, now: Date = new Date()): Prom
         ok = (await mergeBlockedApps(d.apps)) && ok;
     }
 
-    const newHabits = await getHabits().catch(() => [] as Habit[]);
-    return { ok, skipped, oldHabits, newHabits };
+    return { ok, skipped };
 };
 
 /** The file name an export suggests, e.g. gaman-backup-2026-10-13.json. */

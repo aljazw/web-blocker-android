@@ -2,64 +2,74 @@ import { StyleSheet, View } from 'react-native';
 import { Habit } from '../types/types';
 import { useTheme } from '../context/ThemeContext';
 import { spacing } from '../theme';
-import { currentStreak, isDoneOn, recentDays } from '../utils/habits';
+import { currentStreak, recentDays } from '../utils/habits';
 import { describeHabitDays } from '../utils/habitText';
+import { formatDuration } from '../utils/dayPlan';
 import { ThemedText } from './ThemedText';
 import Card from './Card';
-import CheckButton from './CheckButton';
+import IconButton from './IconButton';
 import IconTile from './IconTile';
 
 interface HabitCardProps {
     habit: Habit;
-    /** Whether the habit is due today; habits that aren't show no check button. */
-    dueToday: boolean;
-    onToggle: () => void;
     onOpen: () => void;
+    /** Reordering: up/down buttons instead of the last-7-days strip. Omit a handler at either end. */
+    onMoveUp?: () => void;
+    onMoveDown?: () => void;
+    reordering?: boolean;
 }
 
-/** One habit: icon, title, schedule, streak, last-7-days strip and (if due) the check box. */
-const HabitCard: React.FC<HabitCardProps> = ({ habit, dueToday, onToggle, onOpen }) => {
+/** One routine task: icon, title, days, length, streak and the last 7 days. */
+const HabitCard: React.FC<HabitCardProps> = ({ habit, onOpen, onMoveUp, onMoveDown, reordering }) => {
     const { colors } = useTheme().theme;
-    const done = isDoneOn(habit, new Date());
     const streak = currentStreak(habit);
 
     return (
-        <Card
-            onPress={onOpen}
-            accessibilityLabel={`Edit ${habit.title}`}
-            style={[styles.card, !dueToday && styles.notDue]}>
-            <IconTile icon={habit.icon} size={40} tone={done ? 'success' : 'neutral'} />
+        <Card onPress={reordering ? undefined : onOpen} accessibilityLabel={`Edit ${habit.title}`} style={styles.card}>
+            <IconTile icon={habit.icon} size={40} />
 
             <View style={styles.body}>
-                <ThemedText weight="medium" numberOfLines={1} color={done ? 'muted' : 'text'}>
+                <ThemedText weight="medium" numberOfLines={1}>
                     {habit.title}
                 </ThemedText>
                 <ThemedText size="small" color="muted" numberOfLines={1} tabular>
-                    {describeHabitDays(habit.days)}
-                    {habit.reminder ? ` · ${habit.reminder}` : ''}
+                    {formatDuration(habit.duration)} · {describeHabitDays(habit.days)}
                     {streak > 0 ? ` · ${streak}-day streak` : ''}
                 </ThemedText>
-                <View style={styles.strip}>
-                    {recentDays(habit).map(day => (
-                        <View
-                            key={day.key}
-                            style={[
-                                styles.day,
-                                day.scheduled && { backgroundColor: colors.elevated },
-                                day.done && { backgroundColor: colors.primaryGreen },
-                                day.isToday && { borderColor: colors.muted },
-                            ]}
-                        />
-                    ))}
-                </View>
+                {!reordering && (
+                    <View style={styles.strip}>
+                        {recentDays(habit).map(day => (
+                            <View
+                                key={day.key}
+                                style={[
+                                    styles.day,
+                                    day.scheduled && { backgroundColor: colors.elevated },
+                                    day.done && { backgroundColor: colors.primaryGreen },
+                                    day.isToday && { borderColor: colors.muted },
+                                ]}
+                            />
+                        ))}
+                    </View>
+                )}
             </View>
 
-            {dueToday && (
-                <CheckButton
-                    checked={done}
-                    onPress={onToggle}
-                    accessibilityLabel={done ? `Undo ${habit.title}` : `Complete ${habit.title}`}
-                />
+            {reordering && (
+                <View style={styles.moves}>
+                    <IconButton
+                        icon="Up"
+                        size={34}
+                        accessibilityLabel={`Move ${habit.title} earlier`}
+                        onPress={onMoveUp ?? (() => undefined)}
+                        tint={onMoveUp ? undefined : colors.border}
+                    />
+                    <IconButton
+                        icon="Down"
+                        size={34}
+                        accessibilityLabel={`Move ${habit.title} later`}
+                        onPress={onMoveDown ?? (() => undefined)}
+                        tint={onMoveDown ? undefined : colors.border}
+                    />
+                </View>
             )}
         </Card>
     );
@@ -71,9 +81,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginTop: spacing.sm - 2,
         paddingVertical: spacing.sm + 4,
-    },
-    notDue: {
-        opacity: 0.55,
     },
     body: {
         flex: 1,
@@ -91,6 +98,9 @@ const styles = StyleSheet.create({
         marginRight: 3,
         borderWidth: 0.5,
         borderColor: 'transparent',
+    },
+    moves: {
+        flexDirection: 'row',
     },
 });
 

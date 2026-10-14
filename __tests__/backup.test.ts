@@ -36,7 +36,7 @@ const habit = (id: string) => ({
     title: id,
     icon: 'Target',
     days: [true, true, true, true, true, true, true],
-    reminder: null,
+    duration: 15,
     createdAt: '2026-10-01',
     completions: ['2026-10-02'],
 });

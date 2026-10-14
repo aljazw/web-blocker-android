@@ -45,7 +45,7 @@ import {
     parseBackup,
 } from '../storage';
 import { openBackupFile, saveBackupFile } from '../utils/backupFile';
-import { cancelHabitReminders, syncHabitReminders } from '../utils/habitReminders';
+import { migrateRoutine } from '../utils/planService';
 import { isAccentName } from '../theme/accents';
 import { RootStackNavigation, SleepSchedule, Vacation } from '../types/types';
 import { vacationPhase, vacationRangeLabel } from '../utils/vacation';
@@ -178,7 +178,7 @@ const SettingsScreen: React.FC = () => {
             title: 'Import this backup?',
             text: `${describeBackup(
                 parsed.backup,
-            )}\n\nHabits, day plans, workouts, apnea data and appearance on this phone are replaced by the backup. Blocked sites and apps are only added: nothing on your block list is removed.`,
+            )}\n\nYour routine, day plans, workouts, apnea data and appearance on this phone are replaced by the backup. Blocked sites and apps are only added: nothing on your block list is removed.`,
             onConfirm: () => applyImport(parsed.backup),
         });
     };
@@ -187,8 +187,7 @@ const SettingsScreen: React.FC = () => {
         close();
         try {
             const result = await importBackup(backup);
-            await Promise.all(result.oldHabits.map(h => cancelHabitReminders(h.id)));
-            await Promise.all(result.newHabits.map(syncHabitReminders));
+            await migrateRoutine();
             if (isAccentName(backup.data.accent)) {
                 setAccent(backup.data.accent);
             }

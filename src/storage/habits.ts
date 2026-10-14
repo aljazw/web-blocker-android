@@ -1,6 +1,9 @@
 import { Habit } from '../types/types';
 import { habitIconFrom } from '../constants/habitIcons';
-import { DATE_KEY, KEYS, TIME, isString, readList, updateList, upsertById, withoutId } from './core';
+import { DATE_KEY, KEYS, clampInt, isString, readList, serialized, updateList, upsertById, withoutId, writeJson } from './core';
+
+export const DEFAULT_TASK_MINUTES = 15;
+export const MAX_TASK_MINUTES = 12 * 60;
 
 const toHabit = (v: any): Habit | null => {
     if (!v || !isString(v.id) || !isString(v.title) || !Array.isArray(v.days) || v.days.length !== 7) {
@@ -11,7 +14,7 @@ const toHabit = (v: any): Habit | null => {
         title: v.title,
         icon: habitIconFrom(v.icon, v.emoji),
         days: v.days.map((d: unknown) => d === true),
-        reminder: typeof v.reminder === 'string' && TIME.test(v.reminder) ? v.reminder : null,
+        duration: clampInt(v.duration, 1, MAX_TASK_MINUTES, DEFAULT_TASK_MINUTES),
         createdAt: typeof v.createdAt === 'string' && DATE_KEY.test(v.createdAt) ? v.createdAt : '1970-01-01',
         completions: Array.isArray(v.completions)
             ? [
@@ -22,6 +25,7 @@ const toHabit = (v: any): Habit | null => {
     };
 };
 
+/** Habits are kept in routine order: the order they come in during the day. */
 export const getHabits = async (): Promise<Habit[]> => {
     try {
         return await readList(KEYS.habits, toHabit);
@@ -40,3 +44,13 @@ export const updateHabit = (id: string, change: (habit: Habit) => Habit): Promis
 
 export const deleteHabit = (id: string): Promise<boolean> =>
     updateList(KEYS.habits, toHabit, list => withoutId(list, id));
+
+/** Replaces the whole list, e.g. after reordering the routine. */
+export const saveHabits = (habits: Habit[]): Promise<boolean> =>
+    serialized(async () => {
+        try {
+            return await writeJson(KEYS.habits, habits);
+        } catch {
+            return false;
+        }
+    });

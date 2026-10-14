@@ -1,22 +1,32 @@
 import type { IconName } from '../components/Icon';
 
-/** Icons a habit can use, in picker order. */
+/** Icons a task can use, in picker order. */
 export const HABIT_ICONS: IconName[] = [
+    'Meal',
+    'Coffee',
+    'Apple',
+    'Droplet',
+    'Work',
+    'Meeting',
+    'Study',
+    'Code',
     'Dumbbell',
     'Footprints',
-    'Book',
-    'Brain',
     'Waves',
-    'Droplet',
-    'Apple',
+    'Commute',
+    'Errand',
+    'House',
+    'Book',
     'Pen',
-    'Code',
+    'Brain',
     'Music',
-    'Bed',
-    'PhoneOff',
-    'Sun',
     'Leaf',
-    'Coffee',
+    'PhoneOff',
+    'Sunrise',
+    'Sun',
+    'Bed',
+    'Moon',
+    'Rest',
     'Target',
 ];
 

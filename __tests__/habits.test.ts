@@ -20,7 +20,7 @@ const habit = (over: Partial<Habit> = {}): Habit => ({
     title: 'Workout',
     icon: 'Dumbbell',
     days: EVERY_DAY,
-    reminder: null,
+    duration: 15,
     createdAt: '2026-09-01',
     completions: [],
     ...over,

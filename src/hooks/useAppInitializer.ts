@@ -4,6 +4,7 @@ import { hasUserSeenWelcome, isNotificationScheduled, setNotificationScheduled }
 import { checkAccessibilityEnabled } from '../utils/accessibility';
 import { scheduleDailyNotification } from '../utils/notificationService';
 import { logger } from '../utils/logger';
+import { migrateRoutine } from '../utils/planService';
 
 export type AppStatus = 'loading' | 'welcome' | 'main';
 
@@ -38,6 +39,9 @@ export const useAppInitializer = () => {
 
         const initialize = async () => {
             syncAccessibilityReminder().catch(error => logger.warn('Reminder sync failed', error));
+
+            // Before any screen reads the routine.
+            await migrateRoutine();
 
             let showWelcome = false;
             try {

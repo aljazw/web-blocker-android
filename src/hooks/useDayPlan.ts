@@ -1,57 +1,30 @@
 import { useCallback, useMemo } from 'react';
-import { DayPlan, PlanBlock } from '../types/types';
-import { STORAGE_KEYS } from '../storage';
-import { loadDayPlan, persistDayPlan } from '../utils/planService';
+import { DayPlan } from '../types/types';
+import { STORAGE_KEYS, emptyDay, getDay, getSleepSchedule } from '../storage';
+import { DEFAULT_SLEEP_SCHEDULE } from '../utils/sleep';
+import { anchorsOf, dayTasks } from '../utils/dayPlan';
 import { useFocusData } from './useFocusData';
+import { useHabits } from './useHabits';
 
-const WATCH = [STORAGE_KEYS.dayPlans];
+const DAY_KEYS = [STORAGE_KEYS.days];
+const SLEEP_KEYS = [STORAGE_KEYS.sleepSchedule];
 
-/** The plan for one day; stays current with changes made anywhere (editor, pop-ups). */
+/**
+ * One day of the plan: its tasks in order and the wake-up and bedtime they
+ * fit between. Stays current with changes made anywhere.
+ */
 export const useDayPlan = (dateKey: string) => {
-    const load = useCallback(async () => (await loadDayPlan(dateKey)).plan, [dateKey]);
-    const empty = useMemo<DayPlan>(() => ({ date: dateKey, blocks: [] }), [dateKey]);
-    const { data, setData, loaded, reload } = useFocusData(load, empty, { watch: WATCH });
+    const { habits, loaded: habitsLoaded } = useHabits();
+    const load = useCallback(() => getDay(dateKey), [dateKey]);
+    const empty = useMemo<DayPlan>(() => emptyDay(dateKey), [dateKey]);
+    const { data, loaded } = useFocusData(load, empty, { watch: DAY_KEYS });
+    const { data: sleep } = useFocusData(getSleepSchedule, DEFAULT_SLEEP_SCHEDULE, { watch: SLEEP_KEYS });
 
-    // Right after switching days the previous day's plan is still in state; never show it.
+    // Right after switching days the previous day is still in state; never show it.
     const current = data.date === dateKey;
-    const plan = current ? data : empty;
+    const day = current ? data : empty;
+    const tasks = useMemo(() => dayTasks(day, habits), [day, habits]);
+    const anchors = useMemo(() => anchorsOf(sleep), [sleep]);
 
-    /** Shows `next` at once and saves it; rolls back and resolves false if saving fails. */
-    const commit = useCallback(
-        async (next: DayPlan): Promise<boolean> => {
-            const before = plan;
-            setData(next);
-            const ok = await persistDayPlan(next);
-            if (!ok) {
-                setData(before);
-            }
-            return ok;
-        },
-        [plan, setData],
-    );
-
-    const setBlockDone = useCallback(
-        (block: PlanBlock, done: boolean) =>
-            commit({
-                ...plan,
-                blocks: plan.blocks.map(b => {
-                    if (b.id !== block.id) {
-                        return b;
-                    }
-                    const next: PlanBlock = { ...b, done: true };
-                    if (!done) {
-                        delete next.done;
-                    }
-                    return next;
-                }),
-            }),
-        [commit, plan],
-    );
-
-    const addBlocks = useCallback(
-        (blocks: PlanBlock[]) => commit({ ...plan, blocks: [...plan.blocks, ...blocks] }),
-        [commit, plan],
-    );
-
-    return { plan, loaded: loaded && current, reload, commit, setBlockDone, addBlocks };
+    return { day, tasks, habits, anchors, loaded: loaded && current && habitsLoaded };
 };

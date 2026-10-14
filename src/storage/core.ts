@@ -26,7 +26,10 @@ export const KEYS = {
     sleepSchedule: '@sleep_schedule',
     sleepDismissedUntil: '@sleep_dismissed_until',
     vacation: '@vacation',
+    /** Old time-window plans; only read once, to move them into the routine. */
     dayPlans: '@day_plans',
+    days: '@days',
+    routineMigrated: '@routine_migrated',
     planPrefs: '@plan_prefs',
     planNudges: '@plan_nudges',
 } as const;

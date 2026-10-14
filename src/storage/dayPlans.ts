@@ -1,53 +1,85 @@
-import { DayPlan, PlanBlock, PlanPrefs } from '../types/types';
+import { DayPlan, OneOffTask, PlanPrefs } from '../types/types';
 import { DEFAULT_HABIT_ICON } from '../constants/habitIcons';
-import { isIconName } from '../components/Icon';
+import { IconName, isIconName } from '../components/Icon';
 import { DATE_KEY, KEYS, clampInt, isNumber, isString, readList, readObject, updateList, writeJson } from './core';
+import { DEFAULT_TASK_MINUTES, MAX_TASK_MINUTES } from './habits';
 
-/** Only recent days are kept; a new day is always copied from the latest one. */
-const MAX_DAY_PLANS = 60;
+/** Only recent days are kept. */
+const MAX_DAYS = 60;
 
 const byDate = (a: DayPlan, b: DayPlan) => a.date.localeCompare(b.date);
 
-const toPlanBlock = (v: any): PlanBlock | null => {
-    if (!v || !isString(v.id) || !isString(v.title) || !isNumber(v.start) || !isNumber(v.end)) {
-        return null;
-    }
-    const start = clampInt(v.start, 0, 1435, 0);
-    const end = clampInt(v.end, start + 5, 1440, start + 30);
-    return {
-        id: v.id,
-        title: v.title,
-        icon: isIconName(v.icon) ? v.icon : DEFAULT_HABIT_ICON,
-        start,
-        end,
-        ...(isString(v.habitId) ? { habitId: v.habitId } : {}),
-        ...(v.once === true ? { once: true } : {}),
-        ...(v.done === true ? { done: true } : {}),
-        ...(isNumber(v.shift) && v.shift !== 0 ? { shift: clampInt(v.shift, -1440, 1440, 0) } : {}),
-        ...(isNumber(v.cut) && v.cut > 0 ? { cut: clampInt(v.cut, 1, 1440, 0) } : {}),
-    };
-};
+export const emptyDay = (date: string): DayPlan => ({ date, order: [], oneOffs: [], finished: {}, skipped: [] });
 
-const toDayPlan = (v: any): DayPlan | null =>
-    v && typeof v.date === 'string' && DATE_KEY.test(v.date) && Array.isArray(v.blocks)
+const toOneOff = (v: any): OneOffTask | null =>
+    v && isString(v.id) && isString(v.title)
         ? {
-              date: v.date,
-              blocks: v.blocks.map(toPlanBlock).filter((b: PlanBlock | null): b is PlanBlock => b !== null),
+              id: v.id,
+              title: v.title,
+              icon: isIconName(v.icon) ? v.icon : DEFAULT_HABIT_ICON,
+              duration: clampInt(v.duration, 1, MAX_TASK_MINUTES, DEFAULT_TASK_MINUTES),
           }
         : null;
 
-/** Stored plans, oldest first (saving keeps them sorted). */
-export const getDayPlans = async (): Promise<DayPlan[]> => readList(KEYS.dayPlans, toDayPlan);
+const toDayPlan = (v: any): DayPlan | null => {
+    if (!v || typeof v.date !== 'string' || !DATE_KEY.test(v.date)) {
+        return null;
+    }
+    const finished: Record<string, number> = {};
+    if (v.finished && typeof v.finished === 'object') {
+        for (const [id, at] of Object.entries(v.finished)) {
+            if (isNumber(at)) {
+                finished[id] = clampInt(at, 0, 2 * 1440, 0);
+            }
+        }
+    }
+    return {
+        date: v.date,
+        order: Array.isArray(v.order) ? v.order.filter(isString) : [],
+        oneOffs: Array.isArray(v.oneOffs)
+            ? v.oneOffs.map(toOneOff).filter((t: OneOffTask | null): t is OneOffTask => t !== null)
+            : [],
+        finished,
+        skipped: Array.isArray(v.skipped) ? v.skipped.filter(isString) : [],
+    };
+};
 
-/** Inserts the day's plan, or replaces the stored one for the same date. */
-export const saveDayPlan = (plan: DayPlan): Promise<boolean> =>
-    updateList(KEYS.dayPlans, toDayPlan, list =>
-        [...list.filter(p => p.date !== plan.date), plan].sort(byDate).slice(-MAX_DAY_PLANS),
-    );
+/** Stored days, oldest first. */
+export const getDays = (): Promise<DayPlan[]> => readList(KEYS.days, toDayPlan);
 
-/** Applies `change` to the stored plan for `date` (inside the write queue); no-op if there is none. */
-export const updateDayPlan = (date: string, change: (plan: DayPlan) => DayPlan): Promise<boolean> =>
-    updateList(KEYS.dayPlans, toDayPlan, list => list.map(p => (p.date === date ? change(p) : p)));
+/** The stored state of `date`, or an empty day. */
+export const getDay = async (date: string): Promise<DayPlan> =>
+    (await getDays()).find(d => d.date === date) ?? emptyDay(date);
+
+/** Applies `change` to the day (an empty one if none is stored), inside the write queue. */
+export const updateDay = (date: string, change: (day: DayPlan) => DayPlan): Promise<boolean> =>
+    updateList(KEYS.days, toDayPlan, list => {
+        const day = change(list.find(d => d.date === date) ?? emptyDay(date));
+        return [...list.filter(d => d.date !== date), day].sort(byDate).slice(-MAX_DAYS);
+    });
+
+/** A time-window block from before the routine; only read to move it over. */
+export interface LegacyBlock {
+    title: string;
+    icon: IconName;
+    start: number;
+    end: number;
+    habitId?: string;
+    once?: boolean;
+    shift?: number;
+}
+
+const toLegacyPlan = (v: any): { date: string; blocks: LegacyBlock[] } | null =>
+    v && typeof v.date === 'string' && Array.isArray(v.blocks)
+        ? {
+              date: v.date,
+              blocks: v.blocks
+                  .filter((b: any) => b && isString(b.title) && isNumber(b.start) && isNumber(b.end) && b.end > b.start)
+                  .map((b: any) => ({ ...b, icon: isIconName(b.icon) ? b.icon : DEFAULT_HABIT_ICON })),
+          }
+        : null;
+
+export const getLegacyPlans = () => readList(KEYS.dayPlans, toLegacyPlan);
 
 export const DEFAULT_PLAN_PREFS: PlanPrefs = { reminders: true, nudges: true };
 
@@ -57,7 +89,7 @@ export const getPlanPrefs = (): Promise<PlanPrefs> => readObject(KEYS.planPrefs,
 
 export const setPlanPrefs = (prefs: PlanPrefs): Promise<boolean> => writeJson(KEYS.planPrefs, prefs);
 
-/** Which in-app pop-ups were already shown today, so each one appears at most once. */
+/** Which in-app check-ins were already shown today, so each one appears at most once. */
 export interface PlanNudgeLog {
     date: string;
     shown: string[];

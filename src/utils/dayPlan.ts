@@ -1,22 +1,30 @@
-/** Pure logic for the day plan: times, copying a day forward, gaps and the current block. */
-import { DayPlan, Habit, PlanBlock, SleepSchedule } from '../types/types';
+/**
+ * Pure logic for the day plan. Only wake-up and bedtime are fixed; every task
+ * has a duration and they follow each other in order. Times are estimates,
+ * worked out live from when you last finished something.
+ */
+import { DayPlan, Habit, OneOffTask, SleepSchedule } from '../types/types';
 import type { IconName } from '../components/Icon';
-import { addDays, fromDateKey, newId, toDateKey, weekdayIndex } from './dates';
+import { fromDateKey, newId, toDateKey } from './dates';
 import { isDoneOn, isScheduled } from './habits';
+import type { LegacyBlock } from '../storage/dayPlans';
 
 export const DAY_MINUTES = 24 * 60;
-/** Gaps shorter than this aren't worth showing as free time. */
-export const MIN_GAP = 15;
-export const DEFAULT_BLOCK_LENGTH = 30;
+export const DEFAULT_TASK_LENGTH = 30;
+/** Pace within this many minutes counts as on time. */
+const ON_TIME = 5;
 
-export const newBlockId = (): string => newId('b');
+export const newTaskId = (): string => newId('t');
 
 // ---- Time helpers -----------------------------------------------------------
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** 450 -> "07:30"; 1440 -> "24:00". */
-export const formatMinutes = (minutes: number): string => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+/** 450 -> "07:30"; past midnight wraps (1500 -> "01:00"). */
+export const formatMinutes = (minutes: number): string => {
+    const m = ((Math.round(minutes) % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
+    return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+};
 
 /** "07:30" -> 450, or null if it isn't a valid time. */
 export const parseMinutes = (hhmm: string): number | null => {
@@ -31,8 +39,9 @@ export const parseMinutes = (hhmm: string): number | null => {
 
 /** 45 -> "45 min", 60 -> "1 h", 90 -> "1 h 30 min". */
 export const formatDuration = (minutes: number): string => {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
+    const total = Math.max(0, Math.round(minutes));
+    const h = Math.floor(total / 60);
+    const m = total % 60;
     if (h === 0) {
         return `${m} min`;
     }
@@ -41,10 +50,7 @@ export const formatDuration = (minutes: number): string => {
 
 export const minutesNow = (now: Date = new Date()): number => now.getHours() * 60 + now.getMinutes();
 
-export const blockTimes = (block: Pick<PlanBlock, 'start' | 'end'>): string =>
-    `${formatMinutes(block.start)}–${formatMinutes(block.end)}`;
-
-/** Epoch millis of `minutes` after local midnight on the plan's day. */
+/** Epoch millis of `minutes` after local midnight on the plan's day (past 1440 runs into the next day). */
 export const timestampOf = (dateKey: string, minutes: number): number => {
     const date = fromDateKey(dateKey);
     date.setHours(0, 0, 0, 0);
@@ -52,334 +58,279 @@ export const timestampOf = (dateKey: string, minutes: number): number => {
     return date.getTime();
 };
 
-// ---- Blocks -----------------------------------------------------------------
+export interface Anchors {
+    wake: number;
+    /** After `wake`; past 1440 when bedtime is after midnight. */
+    bed: number;
+}
 
-export const sortBlocks = (blocks: PlanBlock[]): PlanBlock[] =>
-    [...blocks].sort((a, b) => a.start - b.start || a.end - b.end || a.title.localeCompare(b.title));
+export const anchorsOf = (sleep: Pick<SleepSchedule, 'wake' | 'bedtime'>): Anchors => {
+    const wake = parseMinutes(sleep.wake) ?? 7 * 60;
+    const bed = parseMinutes(sleep.bedtime) ?? 23 * 60;
+    return { wake, bed: bed <= wake ? bed + DAY_MINUTES : bed };
+};
+
+// ---- The day's tasks ------------------------------------------------------------
+
+export type TaskStatus = 'open' | 'done' | 'skipped';
+
+export interface PlanTask {
+    id: string;
+    title: string;
+    icon: IconName;
+    duration: number;
+    /** Set for routine tasks; one-offs have none. */
+    habit?: Habit;
+    status: TaskStatus;
+    /** When it was checked off, if known (minutes after midnight). */
+    finishedAt?: number;
+}
 
 /**
- * The blocks that apply on the plan's day, in time order. A block linked to a
- * habit only shows on days the habit is due (and disappears if the habit is
- * deleted), but it stays in the plan so it's back in place on the next due day.
+ * Puts `order` first, then slots every id it doesn't mention in after the one
+ * that comes before it in `base` (so a task added to the routine later still
+ * lands in its usual place).
  */
-export const visibleBlocks = (plan: DayPlan, habits: Habit[]): PlanBlock[] => {
-    const day = fromDateKey(plan.date);
-    return sortBlocks(
-        plan.blocks.filter(block => {
-            if (!block.habitId) {
-                return true;
-            }
-            const habit = habits.find(h => h.id === block.habitId);
-            return !!habit && isScheduled(habit, day);
-        }),
-    );
-};
-
-export const isBlockDone = (block: PlanBlock, habits: Habit[], dateKey: string): boolean => {
-    if (block.habitId) {
-        const habit = habits.find(h => h.id === block.habitId);
-        return !!habit && isDoneOn(habit, fromDateKey(dateKey));
-    }
-    return block.done === true;
-};
-
-/** Ids of the blocks that overlap another block. */
-export const overlapping = (blocks: PlanBlock[]): Set<string> => {
-    const ids = new Set<string>();
-    const sorted = sortBlocks(blocks);
-    for (let i = 0; i < sorted.length; i++) {
-        for (let j = i + 1; j < sorted.length && sorted[j].start < sorted[i].end; j++) {
-            ids.add(sorted[i].id);
-            ids.add(sorted[j].id);
+export const mergeOrder = (base: string[], order: string[]): string[] => {
+    const known = new Set(base);
+    const result = order.filter((id, i) => known.has(id) && order.indexOf(id) === i);
+    base.forEach((id, i) => {
+        if (result.includes(id)) {
+            return;
         }
-    }
-    return ids;
+        const before = i > 0 ? result.indexOf(base[i - 1]) : -1;
+        result.splice(before + 1, 0, id);
+    });
+    return result;
 };
 
-export interface Gap {
+/** Routine tasks due on the day (in routine order) and the day's one-offs, in the day's order. */
+export const dayTasks = (day: DayPlan, habits: Habit[]): PlanTask[] => {
+    const date = fromDateKey(day.date);
+    const routine: PlanTask[] = habits
+        .filter(h => isScheduled(h, date) && h.createdAt <= day.date)
+        .map(h => ({
+            id: h.id,
+            title: h.title,
+            icon: h.icon,
+            duration: h.duration,
+            habit: h,
+            status: isDoneOn(h, date) ? 'done' : 'open',
+        }));
+    const oneOffs: PlanTask[] = day.oneOffs.map(t => ({
+        ...t,
+        status: day.finished[t.id] !== undefined ? 'done' : 'open',
+    }));
+    const byId = new Map([...routine, ...oneOffs].map(t => [t.id, t]));
+    return mergeOrder([...byId.keys()], day.order).map(id => {
+        const task = byId.get(id)!;
+        const finishedAt = day.finished[id];
+        if (task.status === 'done') {
+            return finishedAt !== undefined ? { ...task, finishedAt } : task;
+        }
+        return day.skipped.includes(id) ? { ...task, status: 'skipped' } : task;
+    });
+};
+
+// ---- Timing -----------------------------------------------------------------
+
+export interface Slot {
+    task: PlanTask;
+    /** Estimated (or, once done, actual) start and end in minutes after midnight. */
     start: number;
+    end: number;
+    /** The task on now (today only): the first one not done or skipped. */
+    current: boolean;
+    /** Ends by bedtime. */
+    fits: boolean;
+}
+
+export interface DaySchedule {
+    anchors: Anchors;
+    slots: Slot[];
+    current: Slot | null;
+    /**
+     * Minutes behind (positive) or ahead (negative) of a day where every task
+     * took exactly its time, back to back from wake-up. Today only.
+     */
+    behind: number | null;
+    /** Open tasks that won't fit before bedtime at this pace. */
+    overflow: PlanTask[];
+    /** When the last open task should be done. */
     end: number;
 }
 
-/** Free stretches of at least MIN_GAP minutes between blocks (not before the first or after the last). */
-export const gapsBetween = (blocks: PlanBlock[]): Gap[] => {
-    const gaps: Gap[] = [];
-    let reach = -1;
-    for (const block of sortBlocks(blocks)) {
-        if (reach >= 0 && block.start - reach >= MIN_GAP) {
-            gaps.push({ start: reach, end: block.start });
-        }
-        reach = Math.max(reach, block.end);
-    }
-    return gaps;
-};
-
 /**
- * Earliest start at or after `from` (rounded up to 5 minutes) where a block of
- * `length` fits without overlapping. Falls back to `from` if the day is full.
+ * Lines the tasks up from wake-up. For today (`now` given) the current task
+ * started when you last finished something, and runs at least until now, so
+ * an interruption simply pushes everything after it back.
  */
-export const findFreeSlot = (blocks: PlanBlock[], length: number, from: number): number => {
-    let start = Math.ceil(from / 5) * 5;
-    for (const block of sortBlocks(blocks)) {
-        if (block.end <= start) {
+export const scheduleDay = (tasks: PlanTask[], anchors: Anchors, now: number | null): DaySchedule => {
+    const { wake, bed } = anchors;
+    const finishes = tasks.map(t => t.finishedAt).filter((m): m is number => m !== undefined);
+    let cursor = now === null ? wake : Math.max(wake, ...finishes);
+    let baseline = wake;
+    let current: Slot | null = null;
+    let behind: number | null = null;
+    const slots: Slot[] = [];
+
+    for (const task of tasks) {
+        if (task.status === 'skipped') {
+            slots.push({ task, start: cursor, end: cursor, current: false, fits: true });
             continue;
         }
-        if (block.start >= start + length) {
-            break;
-        }
-        start = block.end;
-    }
-    return start + length <= DAY_MINUTES ? start : Math.min(from, DAY_MINUTES - length);
-};
-
-export type PlanMoment =
-    | { kind: 'empty' }
-    | { kind: 'before'; next: PlanBlock }
-    | { kind: 'during'; block: PlanBlock; next: PlanBlock | null }
-    | { kind: 'free'; until: number; next: PlanBlock }
-    | { kind: 'after' };
-
-/** Where `now` (minutes after midnight) falls in the day's blocks. */
-export const planMoment = (blocks: PlanBlock[], now: number): PlanMoment => {
-    const sorted = sortBlocks(blocks);
-    if (sorted.length === 0) {
-        return { kind: 'empty' };
-    }
-    // When blocks overlap, the one that started last is the one "on" now.
-    const current = sorted.filter(b => b.start <= now && now < b.end).pop();
-    const next = sorted.find(b => b.start > now) ?? null;
-    if (current) {
-        return { kind: 'during', block: current, next };
-    }
-    if (!next) {
-        return { kind: 'after' };
-    }
-    return now < sorted[0].start ? { kind: 'before', next } : { kind: 'free', until: next.start, next };
-};
-
-// ---- Making a day's plan ----------------------------------------------------
-
-/**
- * The next day's plan, copied from `previous`: same blocks at their usual
- * times (a "running late" shift is undone), nothing checked off, one-off
- * blocks left out.
- */
-export const copyPlan = (previous: DayPlan, dateKey: string): DayPlan => ({
-    date: dateKey,
-    blocks: sortBlocks(
-        previous.blocks
-            .filter(b => !b.once)
-            .map(({ done: _done, shift = 0, cut = 0, ...block }) => ({
-                ...block,
-                start: block.start - shift,
-                end: Math.min(DAY_MINUTES, block.end - shift + cut),
-            })),
-    ),
-});
-
-/**
- * Running late: pushes every block that hasn't started by `now` back by
- * `minutes`, for this day only. Blocks never move past midnight.
- */
-export const shiftRemaining = (plan: DayPlan, now: number, minutes: number): DayPlan => ({
-    ...plan,
-    blocks: plan.blocks.map(b => {
-        const by = Math.min(minutes, DAY_MINUTES - b.end);
-        if (b.start < now || by <= 0) {
-            return b;
-        }
-        return { ...b, start: b.start + by, end: b.end + by, shift: (b.shift ?? 0) + by };
-    }),
-});
-
-/** A block that `fitBlock` moved or shortened, with its times before. */
-export interface BlockChange {
-    before: PlanBlock;
-    after: PlanBlock;
-}
-
-export interface Fit {
-    /** All blocks of the plan, with `block` in place and nothing overlapping it. */
-    blocks: PlanBlock[];
-    changes: BlockChange[];
-    /** A pushed block would run past midnight; the plan can't be saved like this. */
-    overflow: PlanBlock | null;
-}
-
-/**
- * Puts `block` into the plan so no times overlap. A block that started
- * earlier and runs into it ends when it starts; blocks from its start on are
- * pushed back (keeping their length) as far as needed, each one pushing the
- * next, so free gaps absorb the delay. Blocks hidden on this day (habit not
- * due) are left alone. When `block` is a one-off, the moves are for this day
- * only (the next day's copy puts blocks back at their usual times).
- */
-export const fitBlock = (plan: DayPlan, habits: Habit[], block: PlanBlock): Fit => {
-    const visible = new Set(visibleBlocks(plan, habits).map(b => b.id));
-    const others = sortBlocks(plan.blocks.filter(b => b.id !== block.id && visible.has(b.id)));
-    const changed = new Map<string, PlanBlock>();
-    let overflow: PlanBlock | null = null;
-
-    let reach = block.end;
-    for (const b of others) {
-        if (b.start < block.start && b.start + 5 <= block.start) {
-            if (b.end > block.start) {
-                const cut = b.end - block.start;
-                changed.set(b.id, {
-                    ...b,
-                    end: block.start,
-                    ...(block.once ? { cut: (b.cut ?? 0) + cut } : {}),
-                });
-            }
+        baseline += task.duration;
+        if (task.status === 'done') {
+            const end = task.finishedAt ?? cursor;
+            slots.push({ task, start: end - task.duration, end, current: false, fits: true });
             continue;
         }
-        if (b.start >= reach) {
-            reach = b.end;
-            continue;
+        const start = cursor;
+        let end = start + task.duration;
+        const isCurrent = now !== null && !current;
+        if (isCurrent) {
+            end = Math.max(end, now);
+            behind = end - baseline;
         }
-        const by = reach - b.start;
-        const moved: PlanBlock = {
-            ...b,
-            start: b.start + by,
-            end: b.end + by,
-            ...(block.once ? { shift: (b.shift ?? 0) + by } : {}),
-        };
-        if (moved.end > DAY_MINUTES && !overflow) {
-            overflow = b;
+        const slot: Slot = { task, start, end, current: isCurrent, fits: end <= bed };
+        if (isCurrent) {
+            current = slot;
         }
-        changed.set(b.id, moved);
-        reach = moved.end;
+        slots.push(slot);
+        cursor = end;
     }
 
-    const exists = plan.blocks.some(b => b.id === block.id);
-    const blocks = (exists ? plan.blocks : [...plan.blocks, block]).map(b =>
-        b.id === block.id ? block : changed.get(b.id) ?? b,
-    );
-    const changes = others.filter(b => changed.has(b.id)).map(b => ({ before: b, after: changed.get(b.id)! }));
-    return { blocks: sortBlocks(blocks), changes, overflow };
-};
-
-/** Blocks that haven't started by `now`, i.e. what a shift would move. */
-export const upcomingBlocks = (blocks: PlanBlock[], now: number): PlanBlock[] => blocks.filter(b => b.start >= now);
-
-export interface DayScore {
-    date: string;
-    /** One-letter weekday. */
-    label: string;
-    total: number;
-    done: number;
-}
-
-/** How much of each day's plan got done, for the last `days` days ending today (oldest first). */
-export const planHistory = (plans: DayPlan[], habits: Habit[], today: Date, days = 7): DayScore[] =>
-    Array.from({ length: days }, (_, i) => {
-        const day = addDays(today, i - (days - 1));
-        const date = toDateKey(day);
-        const plan = plans.find(p => p.date === date);
-        const blocks = plan ? visibleBlocks(plan, habits) : [];
-        return {
-            date,
-            label: 'MTWTFSS'[weekdayIndex(day)],
-            total: blocks.length,
-            done: blocks.filter(b => isBlockDone(b, habits, date)).length,
-        };
-    });
-
-/** Habits due on the plan's day that have no block yet, for the "add from habits" row. */
-export const unplannedHabits = (plan: DayPlan, habits: Habit[]): Habit[] => {
-    const day = fromDateKey(plan.date);
-    const planned = new Set(plan.blocks.map(b => b.habitId).filter(Boolean));
-    return habits.filter(h => isScheduled(h, day) && !planned.has(h.id));
-};
-
-/** A block for the habit: at its reminder time if that's free-ish, otherwise the next free slot. */
-export const blockForHabit = (habit: Habit, blocks: PlanBlock[], from: number): PlanBlock => {
-    const reminder = habit.reminder ? parseMinutes(habit.reminder) : null;
-    const start = findFreeSlot(blocks, DEFAULT_BLOCK_LENGTH, reminder ?? from);
     return {
-        id: newBlockId(),
-        title: habit.title,
-        icon: habit.icon,
-        start,
-        end: Math.min(DAY_MINUTES, start + DEFAULT_BLOCK_LENGTH),
-        habitId: habit.id,
+        anchors,
+        slots,
+        current,
+        behind,
+        overflow: slots.filter(s => s.task.status === 'open' && !s.fits).map(s => s.task),
+        end: cursor,
     };
 };
 
-interface Template {
-    title: string;
-    icon: IconName;
-    /** Minutes after wake-up (positive) or before bedtime (negative). */
-    offset: number;
-    length: number;
-    fromBed?: boolean;
-}
+export type Pace = { kind: 'onTime' } | { kind: 'behind'; minutes: number } | { kind: 'ahead'; minutes: number };
 
-const STARTER_DAY: Template[] = [
-    { title: 'Morning routine', icon: 'Sunrise', offset: 0, length: 30 },
-    { title: 'Breakfast', icon: 'Meal', offset: 30, length: 30 },
-    { title: 'Deep work', icon: 'Work', offset: 120, length: 180 },
-    { title: 'Lunch', icon: 'Meal', offset: 330, length: 45 },
-    { title: 'Work', icon: 'Work', offset: 375, length: 225 },
-    { title: 'Workout', icon: 'Dumbbell', offset: 630, length: 60 },
-    { title: 'Dinner', icon: 'Meal', offset: 720, length: 45 },
-    { title: 'Wind down', icon: 'Bed', offset: -45, length: 45, fromBed: true },
+export const paceOf = (behind: number | null): Pace | null =>
+    behind === null
+        ? null
+        : behind > ON_TIME
+        ? { kind: 'behind', minutes: behind }
+        : behind < -ON_TIME
+        ? { kind: 'ahead', minutes: -behind }
+        : { kind: 'onTime' };
+
+/** Total minutes of the tasks that still count (done or open). */
+export const plannedMinutes = (tasks: PlanTask[]): number =>
+    tasks.filter(t => t.status !== 'skipped').reduce((sum, t) => sum + t.duration, 0);
+
+// ---- Changing the day -------------------------------------------------------------
+
+/** The day's order with the task swapped behind the next open task ("Later"). */
+export const laterOrder = (tasks: PlanTask[], id: string): string[] => {
+    const ids = tasks.map(t => t.id);
+    const from = ids.indexOf(id);
+    if (from < 0) {
+        return ids;
+    }
+    const after = tasks.findIndex((t, i) => i > from && t.status === 'open');
+    ids.splice(from, 1);
+    ids.splice(after < 0 ? ids.length : after, 0, id);
+    return ids;
+};
+
+/** The day's order with `id` placed right after `afterId` (or first when null). */
+export const orderWith = (tasks: PlanTask[], id: string, afterId: string | null): string[] => {
+    const ids = tasks.map(t => t.id).filter(t => t !== id);
+    ids.splice(afterId === null ? 0 : ids.indexOf(afterId) + 1, 0, id);
+    return ids;
+};
+
+export const newOneOff = (title: string, icon: IconName, duration: number): OneOffTask => ({
+    id: newTaskId(),
+    title,
+    icon,
+    duration,
+});
+
+// ---- Getting started ----------------------------------------------------------
+
+const EVERY_DAY = [true, true, true, true, true, true, true];
+const WEEKDAYS = [true, true, true, true, true, false, false];
+
+const STARTER: { title: string; icon: IconName; duration: number; days: boolean[] }[] = [
+    { title: 'Morning routine', icon: 'Sunrise', duration: 30, days: EVERY_DAY },
+    { title: 'Breakfast', icon: 'Meal', duration: 30, days: EVERY_DAY },
+    { title: 'Deep work', icon: 'Work', duration: 180, days: WEEKDAYS },
+    { title: 'Lunch', icon: 'Meal', duration: 45, days: EVERY_DAY },
+    { title: 'Work', icon: 'Work', duration: 180, days: WEEKDAYS },
+    { title: 'Workout', icon: 'Dumbbell', duration: 60, days: EVERY_DAY },
+    { title: 'Dinner', icon: 'Meal', duration: 45, days: EVERY_DAY },
+    { title: 'Read', icon: 'Book', duration: 30, days: EVERY_DAY },
+    { title: 'Wind down', icon: 'Bed', duration: 30, days: EVERY_DAY },
 ];
 
+/** A typical routine to start from; everything is editable. */
+export const starterRoutine = (today: Date, makeId: () => string): Habit[] =>
+    STARTER.map(t => ({ ...t, id: makeId(), createdAt: toDateKey(today), completions: [] }));
+
 /**
- * A typical day to start from, fitted between wake-up and bedtime (from sleep
- * time), with each habit due that day slotted in. Everything is editable.
+ * Moves the old time-window plan into the routine: the latest plan's blocks,
+ * in time order, become routine tasks with their length as duration. Blocks
+ * linked to a habit give it that duration; habits without a block keep their
+ * place at the end.
  */
-export const starterPlan = (
-    dateKey: string,
+export const routineFromLegacy = (
+    latest: LegacyBlock[],
     habits: Habit[],
-    sleep: Pick<SleepSchedule, 'wake' | 'bedtime'>,
-): DayPlan => {
-    const wake = parseMinutes(sleep.wake) ?? 7 * 60;
-    let bed = parseMinutes(sleep.bedtime) ?? 23 * 60;
-    if (bed <= wake + 12 * 60) {
-        bed = DAY_MINUTES; // bedtime after midnight (or a very short day): end the plan at midnight
-    }
-
-    const blocks: PlanBlock[] = [];
-    for (const t of STARTER_DAY) {
-        const start = t.fromBed ? bed + t.offset : wake + t.offset;
-        const end = Math.min(start + t.length, bed);
-        if (start < wake || end - start < MIN_GAP || blocks.some(b => start < b.end && b.start < end)) {
+    today: Date,
+    makeId: () => string,
+): Habit[] => {
+    // In the order of their usual times (a "running late" shift undone).
+    const usual = (b: LegacyBlock) => b.start - (b.shift ?? 0);
+    const blocks = latest.filter(b => !b.once).sort((a, b) => usual(a) - usual(b));
+    const used = new Set<string>();
+    const routine: Habit[] = [];
+    for (const block of blocks) {
+        const duration = Math.max(1, Math.min(12 * 60, block.end - block.start));
+        const habit = block.habitId ? habits.find(h => h.id === block.habitId) : undefined;
+        if (habit) {
+            if (!used.has(habit.id)) {
+                used.add(habit.id);
+                routine.push({ ...habit, duration });
+            }
             continue;
         }
-        blocks.push({ id: newBlockId(), title: t.title, icon: t.icon, start, end });
+        routine.push({
+            id: makeId(),
+            title: block.title,
+            icon: block.icon,
+            duration,
+            days: EVERY_DAY,
+            createdAt: toDateKey(today),
+            completions: [],
+        });
     }
-
-    const plan: DayPlan = { date: dateKey, blocks };
-    for (const habit of unplannedHabits(plan, habits)) {
-        // Linked habits replace the generic block of the same kind ("Workout").
-        const twin = plan.blocks.find(b => !b.habitId && b.title.toLowerCase() === habit.title.toLowerCase());
-        if (twin) {
-            Object.assign(twin, { habitId: habit.id, icon: habit.icon });
-            continue;
-        }
-        plan.blocks.push(blockForHabit(habit, plan.blocks, wake + 60));
-    }
-    return { date: dateKey, blocks: sortBlocks(plan.blocks) };
+    return [...routine, ...habits.filter(h => !used.has(h.id))];
 };
 
 // ---- Motivation ---------------------------------------------------------------
 
 const LINES = [
     'You planned this for a reason. Follow through.',
-    'One block at a time.',
+    'One task at a time.',
     'Small actions, done on time, add up.',
     'The plan only works if you do.',
     'Start now. Adjust later.',
-    'Give this block your full attention. The rest can wait.',
+    'Give this your full attention. The rest can wait.',
     'Consistency beats intensity.',
     'Discipline is choosing what you want most over what you want now.',
     'Do the next right thing.',
     'You already decided. Now just begin.',
 ];
 
-/** A short line to go with a reminder; stable for the same block on the same day. */
+/** A short line to go with a reminder; stable for the same task on the same day. */
 export const motivationFor = (seed: string): string => {
     let hash = 0;
     for (let i = 0; i < seed.length; i++) {

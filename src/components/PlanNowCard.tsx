@@ -1,133 +1,101 @@
 import { StyleSheet, View } from 'react-native';
-import { Habit, PlanBlock } from '../types/types';
 import { useTheme } from '../context/ThemeContext';
 import { spacing } from '../theme';
-import { blockTimes, formatDuration, formatMinutes, isBlockDone, motivationFor, planMoment } from '../utils/dayPlan';
+import { DaySchedule, PlanTask, formatDuration, formatMinutes } from '../utils/dayPlan';
 import { ThemedText } from './ThemedText';
+import Button from './Button';
 import Card from './Card';
-import CheckButton from './CheckButton';
 import IconTile from './IconTile';
 import ProgressBar from './ProgressBar';
 
 interface PlanNowCardProps {
-    /** Today's visible blocks. */
-    blocks: PlanBlock[];
-    habits: Habit[];
-    dateKey: string;
+    schedule: DaySchedule;
     /** Minutes after midnight. */
     now: number;
-    onToggle?: (block: PlanBlock) => void;
+    onDone?: (task: PlanTask) => void | Promise<unknown>;
+    onLater?: (task: PlanTask) => void | Promise<unknown>;
+    onSkip?: (task: PlanTask) => void | Promise<unknown>;
     onPress?: () => void;
 }
 
-/** What you should be doing right now, how long is left, and what comes next. */
-const PlanNowCard: React.FC<PlanNowCardProps> = ({ blocks, habits, dateKey, now, onToggle, onPress }) => {
+/** The one task to do right now, how long it has left, and what comes next. */
+const PlanNowCard: React.FC<PlanNowCardProps> = ({ schedule, now, onDone, onLater, onSkip, onPress }) => {
     const { colors } = useTheme().theme;
-    const moment = planMoment(blocks, now);
-    if (moment.kind === 'empty') {
+    const { slots, current, anchors } = schedule;
+    const counted = slots.filter(s => s.task.status !== 'skipped');
+    if (slots.length === 0) {
         return null;
     }
 
-    const doneCount = blocks.filter(b => isBlockDone(b, habits, dateKey)).length;
-    const progress = (
-        <View style={styles.dayRow}>
-            <ProgressBar
-                fraction={doneCount / blocks.length}
-                color={doneCount === blocks.length ? colors.primaryGreen : colors.accent}
-                style={styles.dayBar}
-            />
-            <ThemedText size="small" color="muted" tabular>
-                {doneCount}/{blocks.length} done
-            </ThemedText>
-        </View>
-    );
-
-    const nextLine = (next: PlanBlock | null) =>
-        next ? (
-            <ThemedText size="small" color="muted" numberOfLines={1} style={styles.next} tabular>
-                Next · {formatMinutes(next.start)} {next.title}
-            </ThemedText>
-        ) : null;
-
-    if (moment.kind === 'during') {
-        const { block, next } = moment;
-        const done = isBlockDone(block, habits, dateKey);
-        const length = block.end - block.start;
+    if (!current) {
+        const done = counted.filter(s => s.task.status === 'done').length;
         return (
-            <Card highlight={done ? undefined : colors.accent} onPress={onPress} accessibilityLabel="Open day plan">
-                <ThemedText size="tiny" weight="strong" color="accent" caps tabular>
-                    Now · {blockTimes(block)}
+            <Card onPress={onPress} accessibilityLabel="Open day plan">
+                <ThemedText size="tiny" weight="strong" caps color="primaryGreen">
+                    Day complete
                 </ThemedText>
                 <View style={styles.head}>
-                    <IconTile icon={block.icon} size={44} tone={done ? 'success' : 'accent'} />
+                    <IconTile icon="Award" size={44} tone="success" />
                     <View style={styles.headText}>
-                        <ThemedText size="large" weight="bold" numberOfLines={1}>
-                            {block.title}
+                        <ThemedText size="large" weight="bold">
+                            {done === counted.length ? 'You did everything you planned' : `${done} of ${counted.length} done`}
                         </ThemedText>
-                        <ThemedText size="small" color="muted" numberOfLines={2}>
-                            {done
-                                ? 'Done. Well executed.'
-                                : `${formatDuration(block.end - now)} left · ${motivationFor(dateKey + block.id)}`}
+                        <ThemedText size="small" color="muted" tabular>
+                            Free until bed at {formatMinutes(anchors.bed)}
                         </ThemedText>
                     </View>
-                    {onToggle && (
-                        <CheckButton
-                            checked={done}
-                            onPress={() => onToggle(block)}
-                            accessibilityLabel={done ? `Undo ${block.title}` : `Complete ${block.title}`}
-                        />
-                    )}
                 </View>
-                <ProgressBar fraction={(now - block.start) / length} style={styles.blockBar} />
-                {nextLine(next)}
-                {progress}
             </Card>
         );
     }
 
-    const eyebrow =
-        moment.kind === 'before'
-            ? `Day starts in ${formatDuration(moment.next.start - now)}`
-            : moment.kind === 'free'
-            ? `Free time · until ${formatMinutes(moment.until)}`
-            : doneCount === blocks.length
-            ? 'Day complete'
-            : 'Day over';
-    const title =
-        moment.kind === 'after'
-            ? doneCount === blocks.length
-                ? 'You followed your plan today'
-                : `${doneCount} of ${blocks.length} blocks done`
-            : `${moment.next.title} at ${formatMinutes(moment.next.start)}`;
+    const { task, start } = current;
+    const notYet = now < start;
+    const left = start + task.duration - now;
+    const over = !notYet && left < 0;
+    const next = slots.slice(slots.indexOf(current) + 1).find(s => s.task.status === 'open');
 
     return (
-        <Card onPress={onPress} accessibilityLabel="Open day plan">
-            <ThemedText
-                size="tiny"
-                weight="strong"
-                caps
-                tabular
-                color={moment.kind === 'after' && doneCount === blocks.length ? 'primaryGreen' : 'muted'}>
-                {eyebrow}
+        <Card highlight={colors.accent} onPress={onPress} accessibilityLabel="Open day plan">
+            <ThemedText size="tiny" weight="strong" color="accent" caps tabular>
+                {notYet ? `Day starts at ${formatMinutes(start)}` : `Now · since ${formatMinutes(start)}`}
             </ThemedText>
             <View style={styles.head}>
-                <IconTile
-                    icon={moment.kind === 'after' ? 'Award' : moment.next.icon}
-                    size={44}
-                    tone={moment.kind === 'after' && doneCount === blocks.length ? 'success' : 'neutral'}
-                />
+                <IconTile icon={task.icon} size={44} tone="accent" />
                 <View style={styles.headText}>
                     <ThemedText size="large" weight="bold" numberOfLines={2}>
-                        {title}
+                        {task.title}
                     </ThemedText>
-                    {moment.kind === 'after' && (
-                        <ThemedText size="small" color="muted">
-                            Look over tomorrow and adjust what needs to change.
-                        </ThemedText>
-                    )}
+                    <ThemedText size="small" color={over ? 'warning' : 'muted'} tabular>
+                        {notYet
+                            ? formatDuration(task.duration)
+                            : over
+                            ? `${formatDuration(-left)} over`
+                            : `${formatDuration(left)} left`}
+                    </ThemedText>
                 </View>
             </View>
-            {progress}
+            {!notYet && (
+                <ProgressBar
+                    fraction={Math.min(1, (now - start) / task.duration)}
+                    color={over ? colors.warning : colors.accent}
+                    style={styles.bar}
+                />
+            )}
+            {next && (
+                <ThemedText size="small" color="muted" numberOfLines={1} style={styles.next} tabular>
+                    Next · {next.task.title} around {formatMinutes(next.start)}
+                </ThemedText>
+            )}
+            {onDone && (
+                <View style={styles.actions}>
+                    <Button label="Done" icon="Check" iconLeading compact onPress={() => onDone(task)} />
+                    {onLater && next && (
+                        <Button label="Later" variant="ghost" compact onPress={() => onLater(task)} />
+                    )}
+                    {onSkip && <Button label="Skip" variant="ghost" compact onPress={() => onSkip(task)} />}
+                </View>
+            )}
         </Card>
     );
 };
@@ -140,22 +108,19 @@ const styles = StyleSheet.create({
     },
     headText: {
         flex: 1,
-        marginHorizontal: spacing.sm + 2,
+        marginLeft: spacing.sm + 2,
     },
-    blockBar: {
+    bar: {
         marginTop: spacing.md,
     },
     next: {
         marginTop: spacing.sm,
     },
-    dayRow: {
+    actions: {
         flexDirection: 'row',
         alignItems: 'center',
         marginTop: spacing.md,
-    },
-    dayBar: {
-        flex: 1,
-        marginRight: spacing.sm,
+        gap: spacing.xs,
     },
 });
 

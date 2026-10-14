@@ -18,7 +18,7 @@ interface WelcomeScreenProps {
 
 const HIGHLIGHTS: { icon: IconName; title: string; text: string }[] = [
     { icon: 'Ban', title: 'Block distractions', text: 'Websites and apps, all day or on the schedule you choose.' },
-    { icon: 'Habits', title: 'Build habits', text: 'Daily check-ins, streaks and reminders on the days you pick.' },
+    { icon: 'Habits', title: 'Plan your day', text: 'A routine of tasks between waking up and bedtime, with streaks.' },
     { icon: 'Waves', title: 'Train breath-holds', text: 'CO₂ and O₂ tables, max-hold tests and breathing exercises.' },
     {
         icon: 'Shield',

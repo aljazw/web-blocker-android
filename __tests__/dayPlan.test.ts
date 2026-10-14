@@ -1,55 +1,65 @@
-import { DayPlan, Habit, PlanBlock } from '../src/types/types';
+import { DayPlan, Habit } from '../src/types/types';
 import {
-    copyPlan,
-    findFreeSlot,
-    fitBlock,
+    PlanTask,
+    anchorsOf,
+    dayTasks,
     formatDuration,
     formatMinutes,
-    gapsBetween,
-    isBlockDone,
+    laterOrder,
+    mergeOrder,
     motivationFor,
-    overlapping,
+    orderWith,
+    paceOf,
     parseMinutes,
-    planHistory,
-    planMoment,
-    shiftRemaining,
-    starterPlan,
-    unplannedHabits,
-    visibleBlocks,
+    routineFromLegacy,
+    scheduleDay,
+    starterRoutine,
 } from '../src/utils/dayPlan';
 
 // 2026-10-10 is a Saturday.
 const SAT = '2026-10-10';
 const EVERY_DAY = [true, true, true, true, true, true, true];
 const WEEKDAYS = [true, true, true, true, true, false, false];
+const ANCHORS = { wake: 7 * 60, bed: 23 * 60 };
 
-const block = (id: string, start: number, end: number, over: Partial<PlanBlock> = {}): PlanBlock => ({
+const habit = (id: string, duration: number, over: Partial<Habit> = {}): Habit => ({
     id,
     title: id,
     icon: 'Target',
-    start,
-    end,
-    ...over,
-});
-
-const habit = (id: string, over: Partial<Habit> = {}): Habit => ({
-    id,
-    title: id,
-    icon: 'Dumbbell',
     days: EVERY_DAY,
-    reminder: null,
+    duration,
     createdAt: '2026-09-01',
     completions: [],
     ...over,
 });
 
+const day = (over: Partial<DayPlan> = {}): DayPlan => ({
+    date: SAT,
+    order: [],
+    oneOffs: [],
+    finished: {},
+    skipped: [],
+    ...over,
+});
+
+const task = (id: string, duration: number, over: Partial<PlanTask> = {}): PlanTask => ({
+    id,
+    title: id,
+    icon: 'Target',
+    duration,
+    status: 'open',
+    ...over,
+});
+
+const times = (tasks: PlanTask[], now: number | null) =>
+    scheduleDay(tasks, ANCHORS, now).slots.map(s => `${s.task.id} ${formatMinutes(s.start)}-${formatMinutes(s.end)}`);
+
 describe('time helpers', () => {
-    it('formats and parses minutes', () => {
+    it('formats and parses clock times', () => {
         expect(formatMinutes(450)).toBe('07:30');
-        expect(formatMinutes(1440)).toBe('24:00');
+        expect(formatMinutes(1500)).toBe('01:00');
         expect(parseMinutes('07:30')).toBe(450);
         expect(parseMinutes('24:00')).toBeNull();
-        expect(parseMinutes('7:5')).toBeNull();
     });
 
     it('formats durations', () => {
@@ -57,199 +67,139 @@ describe('time helpers', () => {
         expect(formatDuration(60)).toBe('1 h');
         expect(formatDuration(90)).toBe('1 h 30 min');
     });
-});
 
-describe('copyPlan', () => {
-    it('copies blocks to the new day, unchecked and without one-offs', () => {
-        const previous: DayPlan = {
-            date: '2026-10-09',
-            blocks: [block('lunch', 750, 795, { done: true }), block('dentist', 900, 960, { once: true })],
-        };
-        const next = copyPlan(previous, SAT);
-        expect(next.date).toBe(SAT);
-        expect(next.blocks).toEqual([block('lunch', 750, 795)]);
+    it('puts a bedtime after midnight on the next day', () => {
+        expect(anchorsOf({ wake: '07:00', bedtime: '23:00' })).toEqual({ wake: 420, bed: 1380 });
+        expect(anchorsOf({ wake: '07:00', bedtime: '00:30' })).toEqual({ wake: 420, bed: 1470 });
     });
 });
 
-describe('visibleBlocks', () => {
-    it('hides blocks of habits that are not due, or deleted, but keeps them in the plan', () => {
-        const plan: DayPlan = {
-            date: SAT,
-            blocks: [
-                block('gym', 1020, 1080, { habitId: 'weekday' }),
-                block('read', 1260, 1290, { habitId: 'daily' }),
-                block('gone', 600, 630, { habitId: 'deleted' }),
-                block('lunch', 750, 795),
+describe('dayTasks', () => {
+    it('lists the routine due that day, in routine order, then one-offs', () => {
+        const habits = [habit('a', 30), habit('work', 60, { days: WEEKDAYS }), habit('b', 15)];
+        const tasks = dayTasks(day({ oneOffs: [{ id: 'x', title: 'x', icon: 'Target', duration: 20 }] }), habits);
+        expect(tasks.map(t => t.id)).toEqual(['a', 'b', 'x']);
+    });
+
+    it('leaves out tasks created after the day', () => {
+        const tasks = dayTasks(day(), [habit('new', 30, { createdAt: '2026-10-11' })]);
+        expect(tasks).toEqual([]);
+    });
+
+    it('marks done, skipped and finish times', () => {
+        const habits = [habit('a', 30, { completions: [SAT] }), habit('b', 30)];
+        const tasks = dayTasks(day({ finished: { a: 480 }, skipped: ['b'] }), habits);
+        expect(tasks.map(t => [t.id, t.status, t.finishedAt])).toEqual([
+            ['a', 'done', 480],
+            ['b', 'skipped', undefined],
+        ]);
+    });
+
+    it('follows the day’s own order', () => {
+        const tasks = dayTasks(day({ order: ['b', 'a'] }), [habit('a', 30), habit('b', 30)]);
+        expect(tasks.map(t => t.id)).toEqual(['b', 'a']);
+    });
+});
+
+describe('mergeOrder', () => {
+    it('keeps a task missing from the order next to the one before it', () => {
+        expect(mergeOrder(['a', 'b', 'c'], ['c', 'a'])).toEqual(['c', 'a', 'b']);
+        expect(mergeOrder(['new', 'a'], ['a'])).toEqual(['new', 'a']);
+    });
+
+    it('drops ids that no longer exist', () => {
+        expect(mergeOrder(['a'], ['gone', 'a'])).toEqual(['a']);
+    });
+});
+
+describe('scheduleDay', () => {
+    it('lines tasks up from wake-up for another day', () => {
+        expect(times([task('a', 30), task('b', 60)], null)).toEqual(['a 07:00-07:30', 'b 07:30-08:30']);
+    });
+
+    it('starts the current task when the last one was finished', () => {
+        const tasks = [task('a', 30, { status: 'done', finishedAt: 500 }), task('b', 60), task('c', 30)];
+        expect(times(tasks, 510)).toEqual(['a 07:50-08:20', 'b 08:20-09:20', 'c 09:20-09:50']);
+    });
+
+    it('lets a task that runs long push the rest back', () => {
+        const tasks = [task('a', 30), task('b', 30)];
+        const schedule = scheduleDay(tasks, ANCHORS, 8 * 60 + 15);
+        expect(schedule.current?.task.id).toBe('a');
+        expect(schedule.slots.map(s => s.end)).toEqual([495, 525]);
+        expect(schedule.behind).toBe(45);
+        expect(paceOf(schedule.behind)).toEqual({ kind: 'behind', minutes: 45 });
+    });
+
+    it('counts finishing early as ahead', () => {
+        const tasks = [task('a', 60, { status: 'done', finishedAt: 450 }), task('b', 30)];
+        expect(paceOf(scheduleDay(tasks, ANCHORS, 450).behind)).toEqual({ kind: 'ahead', minutes: 30 });
+    });
+
+    it('takes skipped tasks out of the timing', () => {
+        const tasks = [task('a', 120, { status: 'skipped' }), task('b', 30)];
+        expect(times(tasks, null)).toEqual(['a 07:00-07:00', 'b 07:00-07:30']);
+    });
+
+    it('flags tasks that won’t fit before bedtime', () => {
+        const tasks = [task('long', 15 * 60 + 30), task('read', 60), task('walk', 30)];
+        expect(scheduleDay(tasks, ANCHORS, null).overflow.map(t => t.id)).toEqual(['read', 'walk']);
+    });
+
+    it('has no current task once everything is done', () => {
+        const schedule = scheduleDay([task('a', 30, { status: 'done', finishedAt: 450 })], ANCHORS, 600);
+        expect(schedule.current).toBeNull();
+        expect(schedule.behind).toBeNull();
+    });
+});
+
+describe('changing the order', () => {
+    const tasks = [task('a', 30), task('b', 30, { status: 'done' }), task('c', 30), task('d', 30)];
+
+    it('moves a task behind the next open one', () => {
+        expect(laterOrder(tasks, 'a')).toEqual(['b', 'c', 'a', 'd']);
+        expect(laterOrder(tasks, 'd')).toEqual(['a', 'b', 'c', 'd']);
+    });
+
+    it('places a task after another one, or first', () => {
+        expect(orderWith(tasks, 'x', 'a')).toEqual(['a', 'x', 'b', 'c', 'd']);
+        expect(orderWith(tasks, 'x', null)).toEqual(['x', 'a', 'b', 'c', 'd']);
+    });
+});
+
+describe('starting a routine', () => {
+    it('creates editable routine tasks', () => {
+        let n = 0;
+        const routine = starterRoutine(new Date(2026, 9, 10), () => `h${n++}`);
+        expect(routine.length).toBeGreaterThan(5);
+        expect(routine.every(h => h.duration > 0 && h.createdAt === SAT)).toBe(true);
+    });
+
+    it('turns old time windows into routine tasks in time order', () => {
+        let n = 0;
+        const habits = [habit('gym', 15), habit('other', 15)];
+        const routine = routineFromLegacy(
+            [
+                { title: 'Lunch', icon: 'Meal', start: 720, end: 765 },
+                { title: 'Dentist', icon: 'Target', start: 600, end: 660, once: true },
+                { title: 'gym', icon: 'Dumbbell', start: 1080, end: 1140, habitId: 'gym' },
+                { title: 'Breakfast', icon: 'Meal', start: 480, end: 510 },
             ],
-        };
-        const habits = [habit('weekday', { days: WEEKDAYS }), habit('daily')];
-        expect(visibleBlocks(plan, habits).map(b => b.id)).toEqual(['lunch', 'read']);
-        expect(plan.blocks).toHaveLength(4);
-    });
-});
-
-describe('isBlockDone', () => {
-    it('follows the linked habit, or the block flag', () => {
-        const h = habit('read', { completions: [SAT] });
-        expect(isBlockDone(block('a', 0, 30, { habitId: 'read' }), [h], SAT)).toBe(true);
-        expect(isBlockDone(block('a', 0, 30, { habitId: 'read' }), [h], '2026-10-11')).toBe(false);
-        expect(isBlockDone(block('b', 0, 30, { done: true }), [], SAT)).toBe(true);
-        expect(isBlockDone(block('c', 0, 30), [], SAT)).toBe(false);
-    });
-});
-
-describe('gaps and slots', () => {
-    const blocks = [block('a', 420, 450), block('b', 450, 480), block('c', 540, 600), block('d', 605, 660)];
-
-    it('finds free time between blocks, ignoring tiny gaps', () => {
-        expect(gapsBetween(blocks)).toEqual([{ start: 480, end: 540 }]);
-    });
-
-    it('finds the first free slot that fits', () => {
-        expect(findFreeSlot(blocks, 30, 420)).toBe(480);
-        expect(findFreeSlot(blocks, 90, 420)).toBe(660);
-        expect(findFreeSlot(blocks, 30, 701)).toBe(705);
-    });
-
-    it('flags overlaps', () => {
-        expect([...overlapping([block('x', 0, 60), block('y', 30, 90), block('z', 90, 120)])].sort()).toEqual([
-            'x',
-            'y',
+            habits,
+            new Date(2026, 9, 10),
+            () => `new${n++}`,
+        );
+        expect(routine.map(h => [h.title, h.duration])).toEqual([
+            ['Breakfast', 30],
+            ['Lunch', 45],
+            ['gym', 60],
+            ['other', 15],
         ]);
-    });
-});
-
-describe('planMoment', () => {
-    const blocks = [block('a', 420, 450), block('b', 540, 600)];
-
-    it('knows what is on now', () => {
-        expect(planMoment([], 500)).toEqual({ kind: 'empty' });
-        expect(planMoment(blocks, 400)).toMatchObject({ kind: 'before', next: { id: 'a' } });
-        expect(planMoment(blocks, 430)).toMatchObject({ kind: 'during', block: { id: 'a' }, next: { id: 'b' } });
-        expect(planMoment(blocks, 500)).toMatchObject({ kind: 'free', until: 540 });
-        expect(planMoment(blocks, 600)).toEqual({ kind: 'after' });
-    });
-});
-
-describe('starterPlan', () => {
-    it('fits a typical day between wake-up and bedtime and slots in due habits', () => {
-        const habits = [
-            habit('Workout'),
-            habit('Read 10 pages', { icon: 'Book', reminder: '21:00' }),
-            habit('Weekday only', { days: WEEKDAYS }),
-        ];
-        const plan = starterPlan(SAT, habits, { wake: '07:00', bedtime: '23:00' });
-        const byTitle = Object.fromEntries(plan.blocks.map(b => [b.title, b]));
-
-        expect(byTitle['Morning routine'].start).toBe(420);
-        expect(byTitle['Wind down']).toMatchObject({ start: 1335, end: 1380 });
-        // The generic "Workout" block becomes the linked habit instead of a duplicate.
-        expect(byTitle.Workout.habitId).toBe('Workout');
-        expect(plan.blocks.filter(b => b.title === 'Workout')).toHaveLength(1);
-        expect(byTitle['Read 10 pages']).toMatchObject({ start: 1260, habitId: 'Read 10 pages' });
-        expect(byTitle['Weekday only']).toBeUndefined();
-        expect(overlapping(plan.blocks).size).toBe(0);
-        expect(plan.blocks.every(b => b.start >= 420 && b.end <= 1380)).toBe(true);
-    });
-});
-
-describe('unplannedHabits', () => {
-    it('lists habits due that day without a block', () => {
-        const plan: DayPlan = { date: SAT, blocks: [block('r', 0, 30, { habitId: 'read' })] };
-        const habits = [habit('read'), habit('walk'), habit('weekday', { days: WEEKDAYS })];
-        expect(unplannedHabits(plan, habits).map(h => h.id)).toEqual(['walk']);
-    });
-});
-
-describe('shiftRemaining', () => {
-    it('moves only blocks that have not started, for today only', () => {
-        const plan: DayPlan = {
-            date: SAT,
-            blocks: [block('past', 420, 450), block('next', 600, 660), block('late', 1400, 1430)],
-        };
-        const shifted = shiftRemaining(plan, 500, 30);
-        expect(shifted.blocks.map(b => [b.id, b.start, b.end])).toEqual([
-            ['past', 420, 450],
-            ['next', 630, 690],
-            ['late', 1410, 1440], // never past midnight
-        ]);
-        // Tomorrow's copy goes back to the usual times.
-        expect(copyPlan(shifted, '2026-10-11').blocks.map(b => [b.id, b.start, b.end, b.shift])).toEqual([
-            ['past', 420, 450, undefined],
-            ['next', 600, 660, undefined],
-            ['late', 1400, 1430, undefined],
-        ]);
-    });
-});
-
-describe('planHistory', () => {
-    it('scores each day of the last week', () => {
-        const plans: DayPlan[] = [
-            { date: '2026-10-09', blocks: [block('a', 0, 30, { done: true }), block('b', 30, 60)] },
-            { date: SAT, blocks: [block('c', 0, 30, { done: true })] },
-        ];
-        const days = planHistory(plans, [], new Date(2026, 9, 10, 12));
-        expect(days).toHaveLength(7);
-        expect(days[5]).toMatchObject({ date: '2026-10-09', label: 'F', total: 2, done: 1 });
-        expect(days[6]).toMatchObject({ date: SAT, label: 'S', total: 1, done: 1 });
-        expect(days[0]).toMatchObject({ total: 0, done: 0 });
     });
 });
 
 describe('motivationFor', () => {
     it('is stable for the same seed', () => {
-        expect(motivationFor('2026-10-10b1')).toBe(motivationFor('2026-10-10b1'));
-    });
-});
-
-describe('fitBlock', () => {
-    const plan = (...blocks: PlanBlock[]): DayPlan => ({ date: SAT, blocks });
-    const times = (blocks: PlanBlock[]) => blocks.map(b => `${b.id} ${b.start}-${b.end}`);
-
-    it('adds a block into free time without touching the rest', () => {
-        const fit = fitBlock(plan(block('a', 480, 540), block('c', 720, 780)), [], block('b', 600, 660));
-        expect(times(fit.blocks)).toEqual(['a 480-540', 'b 600-660', 'c 720-780']);
-        expect(fit.changes).toEqual([]);
-        expect(fit.overflow).toBeNull();
-    });
-
-    it('pushes later blocks back in a chain, letting gaps absorb the delay', () => {
-        const fit = fitBlock(
-            plan(block('a', 480, 540), block('b', 540, 600), block('c', 600, 660), block('d', 720, 780)),
-            [],
-            block('a', 480, 570),
-        );
-        expect(times(fit.blocks)).toEqual(['a 480-570', 'b 570-630', 'c 630-690', 'd 720-780']);
-        expect(fit.changes.map(c => c.after.id)).toEqual(['b', 'c']);
-        expect(fit.blocks.find(b => b.id === 'b')!.shift).toBeUndefined();
-    });
-
-    it('ends an earlier block when the new one starts', () => {
-        const fit = fitBlock(plan(block('work', 540, 720)), [], block('call', 600, 630));
-        expect(times(fit.blocks)).toEqual(['work 540-600', 'call 600-630']);
-    });
-
-    it('makes a one-off block move the others for this day only', () => {
-        const fit = fitBlock(
-            plan(block('work', 540, 720), block('lunch', 720, 765)),
-            [],
-            block('dentist', 690, 750, { once: true }),
-        );
-        const next = copyPlan({ date: SAT, blocks: fit.blocks }, '2026-10-11');
-        expect(times(next.blocks)).toEqual(['work 540-720', 'lunch 720-765']);
-    });
-
-    it('reports a block pushed past midnight', () => {
-        const fit = fitBlock(plan(block('late', 1380, 1440)), [], block('new', 1350, 1410));
-        expect(fit.overflow?.id).toBe('late');
-    });
-
-    it('leaves blocks hidden on this day alone', () => {
-        const fit = fitBlock(
-            plan(block('gym', 600, 660, { habitId: 'h' })),
-            [habit('h', { days: WEEKDAYS })],
-            block('new', 600, 660),
-        );
-        expect(times(fit.blocks)).toEqual(['gym 600-660', 'new 600-660']);
+        expect(motivationFor('x')).toBe(motivationFor('x'));
     });
 });

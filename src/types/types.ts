@@ -3,7 +3,7 @@ import type { IconName } from '../components/Icon';
 
 export type TabParamList = {
     Home: undefined;
-    /** Opens on the day plan or the habit list. */
+    /** Opens on today, tomorrow or the routine list. */
     Habits: { view?: RoutineView } | undefined;
     Workout: undefined;
     Breathe: undefined;
@@ -15,8 +15,12 @@ export type RootStackParamList = {
     AddSite: undefined;
     /** Pass websiteUrl for a site, or app for an app. */
     Schedule: { websiteUrl?: string; app?: { packageName: string; appName: string } };
-    /** No habitId = create a new habit. */
-    HabitEditor: { habitId?: string } | undefined;
+    /**
+     * A routine task (habitId), a one-off task of a day (date + taskId), or a
+     * new task: with a date it starts as a one-off for that day, placed after
+     * the task `after` (first when null, at the end when left out).
+     */
+    TaskEditor: { habitId?: string; date?: string; taskId?: string; after?: string | null } | undefined;
     /** A generated CO2/O2 table, or a custom one (no tableId = create, optionally prefilled). */
     ApneaTable: { kind: 'co2' | 'o2' } | { kind: 'custom'; tableId?: string; name?: string; rounds?: TableRound[] };
     /** The live (or just finished) training session. */
@@ -30,44 +34,41 @@ export type RootStackParamList = {
     WorkoutEditor: { workoutId?: string } | undefined;
     /** The live (or just finished) workout. */
     WorkoutSession: undefined;
-    /** No blockId = add a block, optionally prefilled (times in minutes after midnight). */
-    PlanBlockEditor: { date: string; blockId?: string; start?: number; end?: number; habitId?: string };
 };
 
-export type RoutineView = 'plan' | 'habits';
+export type RoutineView = 'today' | 'tomorrow' | 'routine';
 
 // ---- Day plan ---------------------------------------------------------------
 
-/** One time window of the day plan, e.g. "Lunch 12:30–13:15". */
-export interface PlanBlock {
+/** A task for one day only, e.g. "Dentist". Routine tasks are habits. */
+export interface OneOffTask {
     id: string;
     title: string;
     icon: IconName;
-    /** Minutes after midnight; start < end <= 1440. */
-    start: number;
-    end: number;
-    /** Linked habit: checking the block checks off the habit (and the other way round). */
-    habitId?: string;
-    /** Only for this day; left out when the next day's plan is copied from this one. */
-    once?: boolean;
-    /** Checked off. Linked blocks follow their habit instead. */
-    done?: boolean;
-    /** Minutes this block was pushed back today ("running late"); the next day's copy undoes it. */
-    shift?: number;
-    /** Minutes cut off the end today to make room for a one-off block; the next day's copy undoes it. */
-    cut?: number;
+    /** Minutes. */
+    duration: number;
 }
 
+/**
+ * What happened on one day. The day's tasks are the routine tasks due that
+ * day plus its one-offs, between wake-up and bedtime; nothing has a fixed time.
+ */
 export interface DayPlan {
     /** Local date "YYYY-MM-DD". */
     date: string;
-    blocks: PlanBlock[];
+    /** Task ids in the day's order, once it differs from the routine ("Later", one-offs). */
+    order: string[];
+    oneOffs: OneOffTask[];
+    /** When each finished task was checked off, in minutes after midnight. */
+    finished: Record<string, number>;
+    /** Task ids skipped for the day. */
+    skipped: string[];
 }
 
 export interface PlanPrefs {
-    /** A notification when each block starts, plus an evening "plan tomorrow" reminder. */
+    /** A notification when each task is due to start (by the estimate). */
     reminders: boolean;
-    /** Occasional in-app pop-ups about the current block. */
+    /** Occasional in-app check-ins when a task runs long. */
     nudges: boolean;
 }
 
@@ -110,15 +111,18 @@ export interface BlockEntry {
     visible: boolean;
 }
 
-/** A recurring task the user checks off, e.g. "Workout 10 min". */
+/**
+ * A routine task, e.g. "Workout · 45 min" on Mon, Wed, Fri. It's in the day
+ * plan on each of its days, and missing one breaks its streak.
+ */
 export interface Habit {
     id: string;
     title: string;
     icon: IconName;
-    /** Seven flags, Monday first: which weekdays the habit is due. */
+    /** Seven flags, Monday first: which weekdays the task is due. */
     days: boolean[];
-    /** Daily reminder time "HH:MM" on due days, or null for none. */
-    reminder: string | null;
+    /** How long it usually takes, in minutes. */
+    duration: number;
     /** Local date "YYYY-MM-DD" the habit was created; streaks never look further back. */
     createdAt: string;
     /** Local dates "YYYY-MM-DD" the habit was checked off. */

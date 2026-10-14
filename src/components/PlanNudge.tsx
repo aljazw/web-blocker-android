@@ -1,35 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, StyleSheet, View } from 'react-native';
-import { PlanBlock } from '../types/types';
+import { AppState } from 'react-native';
 import { useAppForeground } from '../hooks/useAppForeground';
-import { spacing } from '../theme';
 import { toDateKey } from '../utils/dates';
-import {
-    blockTimes,
-    formatDuration,
-    formatMinutes,
-    isBlockDone,
-    minutesNow,
-    motivationFor,
-    planMoment,
-    visibleBlocks,
-} from '../utils/dayPlan';
-import { completeBlock, loadDayPlan, syncPlanReminders, watchPlanReminders } from '../utils/planService';
-import { getHabits, getPlanNudgeLog, getPlanPrefs, setPlanNudgeLog } from '../storage';
+import { PlanTask, anchorsOf, dayTasks, formatDuration, minutesNow, scheduleDay } from '../utils/dayPlan';
+import { completeTask, loadDay, syncPlanReminders, watchPlanReminders } from '../utils/planService';
+import { getPlanNudgeLog, getPlanPrefs, setPlanNudgeLog } from '../storage';
 import { haptics } from '../utils/haptics';
 import { logger } from '../utils/logger';
 import Dialog from './Dialog';
-import { ThemedText } from './ThemedText';
 
 /** Pop-ups are spaced out so they stay occasional. */
 const MIN_INTERVAL = 20 * 60_000;
-/** Only ask about blocks that ended within this many minutes. */
-const ASK_WINDOW = 180;
+/** Ask once the current task runs this many minutes past its length. */
+const OVER_BY = 15;
 const CHECK_EVERY = 60_000;
 
-type Nudge =
-    | { kind: 'ask'; date: string; block: PlanBlock }
-    | { kind: 'now'; date: string; block: PlanBlock; left: number; next: PlanBlock | null };
+type Nudge = { date: string; task: PlanTask; over: number };
 
 interface PlanNudgeProps {
     /** False while the user is busy (a training session, an editor), so nothing interrupts them. */
@@ -38,9 +24,9 @@ interface PlanNudgeProps {
 }
 
 /**
- * Occasional in-app check-ins about today's plan: "did you finish the last
- * block?" and "this is what's on now". Each one appears at most once per
- * block, with at least MIN_INTERVAL between them.
+ * An occasional in-app check-in when the current task runs well past its
+ * length: still on it, or done and forgot to tap? Once per task a day, with
+ * at least MIN_INTERVAL between pop-ups. Also keeps plan notifications fresh.
  */
 const PlanNudge: React.FC<PlanNudgeProps> = ({ canShow, onOpenPlan }) => {
     const [nudge, setNudge] = useState<Nudge | null>(null);
@@ -59,46 +45,19 @@ const PlanNudge: React.FC<PlanNudgeProps> = ({ canShow, onOpenPlan }) => {
             }
             const now = new Date();
             const date = toDateKey(now);
-            const [{ plan }, habits, stored] = await Promise.all([loadDayPlan(date), getHabits(), getPlanNudgeLog()]);
+            const [{ day, habits, sleep }, stored] = await Promise.all([loadDay(date), getPlanNudgeLog()]);
             const log = stored.date === date ? stored : { date, shown: [], lastAt: 0 };
             if (Date.now() - log.lastAt < MIN_INTERVAL) {
                 return;
             }
-            const blocks = visibleBlocks(plan, habits);
             const nowMin = minutesNow(now);
-            const open = (b: PlanBlock) => !isBlockDone(b, habits, date);
-
-            const finished = blocks
-                .filter(b => b.end <= nowMin && nowMin - b.end <= ASK_WINDOW && open(b))
-                .filter(b => !log.shown.includes(`ask:${b.id}`))
-                .pop();
-            const moment = planMoment(blocks, nowMin);
-            const current =
-                moment.kind === 'during' && open(moment.block) && !log.shown.includes(`now:${moment.block.id}`)
-                    ? moment
-                    : null;
-
-            let next: Nudge | null = null;
-            if (finished) {
-                next = { kind: 'ask', date, block: finished };
-            } else if (current) {
-                next = {
-                    kind: 'now',
-                    date,
-                    block: current.block,
-                    left: current.block.end - nowMin,
-                    next: current.next,
-                };
-            }
-            if (!next || !canShow()) {
+            const { current } = scheduleDay(dayTasks(day, habits), anchorsOf(sleep), nowMin);
+            const over = current ? nowMin - (current.start + current.task.duration) : 0;
+            if (!current || over < OVER_BY || log.shown.includes(current.task.id) || !canShow()) {
                 return;
             }
-            await setPlanNudgeLog({
-                date,
-                shown: [...log.shown, `${next.kind}:${next.block.id}`],
-                lastAt: Date.now(),
-            });
-            setNudge(next);
+            await setPlanNudgeLog({ date, shown: [...log.shown, current.task.id], lastAt: Date.now() });
+            setNudge({ date, task: current.task, over });
         } catch (error) {
             logger.warn('Plan check-in failed', error);
         } finally {
@@ -129,69 +88,35 @@ const PlanNudge: React.FC<PlanNudgeProps> = ({ canShow, onOpenPlan }) => {
             return;
         }
         close();
-        if (await completeBlock(nudge.date, nudge.block)) {
+        if (await completeTask(nudge.date, nudge.task, minutesNow(new Date()))) {
             haptics.success();
         }
     };
 
-    if (nudge?.kind === 'ask') {
-        return (
-            <Dialog
-                visible
-                onClose={close}
-                icon="Habits"
-                title={`Did you finish ${nudge.block.title}?`}
-                message={`${blockTimes(nudge.block)}. An honest plan shows you where the day really goes.`}
-                actions={[
-                    { label: 'Not done', onPress: close, variant: 'secondary' },
-                    { label: 'Done', onPress: markDone },
-                ]}
-            />
-        );
-    }
-
     return (
         <Dialog
-            visible={nudge?.kind === 'now'}
+            visible={nudge !== null}
             onClose={close}
-            icon="Plan"
-            title={nudge?.kind === 'now' ? `Now: ${nudge.block.title}` : ''}
+            icon="Time"
+            title={nudge ? `Still on ${nudge.task.title}?` : ''}
             message={
-                nudge?.kind === 'now' ? (
-                    <View>
-                        <ThemedText color="muted" tabular>
-                            {blockTimes(nudge.block)} · {formatDuration(nudge.left)} left
-                        </ThemedText>
-                        <ThemedText weight="medium" style={styles.line}>
-                            {motivationFor(nudge.date + nudge.block.id)}
-                        </ThemedText>
-                        {nudge.next && (
-                            <ThemedText size="small" color="muted" tabular style={styles.line}>
-                                Next · {formatMinutes(nudge.next.start)} {nudge.next.title}
-                            </ThemedText>
-                        )}
-                    </View>
-                ) : undefined
+                nudge
+                    ? `It's ${formatDuration(nudge.over)} longer than planned. If you're done, tap Done so the rest of the day moves on.`
+                    : undefined
             }
             actions={[
                 {
-                    label: 'Open plan',
+                    label: 'Still going',
                     variant: 'secondary',
                     onPress: () => {
                         close();
                         onOpenPlan();
                     },
                 },
-                { label: 'On it', onPress: close },
+                { label: 'Done', onPress: markDone },
             ]}
         />
     );
 };
-
-const styles = StyleSheet.create({
-    line: {
-        marginTop: spacing.sm,
-    },
-});
 
 export default PlanNudge;

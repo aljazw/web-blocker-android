@@ -25,7 +25,6 @@ import { FadeIn, animateLayout } from '../components/Motion';
 import { usePassphrase } from '../context/PassphraseContext';
 import { useTheme } from '../context/ThemeContext';
 import { useBlockList } from '../hooks/useBlockList';
-import { useHabits } from '../hooks/useHabits';
 import { useApneaData } from '../hooks/useApneaData';
 import { useDayPlan } from '../hooks/useDayPlan';
 import { usePreloadTabs } from '../navigation/usePreloadTabs';
@@ -33,9 +32,9 @@ import { useAppForeground } from '../hooks/useAppForeground';
 import { gutter, spacing } from '../theme';
 import { checkAccessibilityEnabled, openAccessibilitySettings } from '../utils/accessibility';
 import { describeSchedule, isBlockActiveNow } from '../utils/schedule';
-import { currentStreak, isDoneOn, isScheduled } from '../utils/habits';
+import { currentStreak } from '../utils/habits';
 import { formatClock, personalBest } from '../utils/apnea';
-import { minutesNow, visibleBlocks } from '../utils/dayPlan';
+import { minutesNow, scheduleDay } from '../utils/dayPlan';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 import { getVacation } from '../storage';
@@ -72,9 +71,8 @@ const HomeScreen: React.FC = () => {
 
     const { isPassphraseEnabled } = usePassphrase();
     const { entries, loaded: listLoaded, loadFailed, remove, hide } = useBlockList();
-    const { habits } = useHabits();
     const [now, setNow] = useState(new Date());
-    const { plan, loaded: planLoaded } = useDayPlan(toDateKey(now));
+    const { tasks, habits, anchors, loaded: planLoaded } = useDayPlan(toDateKey(now));
     // Finished sessions are left for the session screen, which shows their summary.
     const { records } = useApneaData({ collect: false });
     const [protectionOn, setProtectionOn] = useState<boolean | null>(null);
@@ -132,14 +130,14 @@ const HomeScreen: React.FC = () => {
         return q ? visible.filter(w => w.label.toLowerCase().includes(q)) : visible;
     }, [visible, query]);
 
-    const dueToday = habits.filter(h => isScheduled(h, now));
-    const doneToday = dueToday.filter(h => isDoneOn(h, now)).length;
+    const counted = tasks.filter(t => t.status !== 'skipped');
+    const doneToday = counted.filter(t => t.status === 'done').length;
     const habitStreak = habits.reduce((max, h) => Math.max(max, currentStreak(h, now)), 0);
     const best = useMemo(() => personalBest(records), [records]);
 
     const goToAdd = () => navigation.navigate('BottomTabs', { screen: 'Block' });
-    const goToPlan = () => navigation.navigate('BottomTabs', { screen: 'Habits', params: { view: 'plan' } });
-    const planBlocks = visibleBlocks(plan, habits);
+    const goToPlan = () => navigation.navigate('BottomTabs', { screen: 'Habits', params: { view: 'today' } });
+    const schedule = scheduleDay(tasks, anchors, minutesNow(now));
 
     return (
         <BaseScreen
@@ -198,14 +196,8 @@ const HomeScreen: React.FC = () => {
                         </Card>
                     )}
 
-                    {planBlocks.length > 0 ? (
-                        <PlanNowCard
-                            blocks={planBlocks}
-                            habits={habits}
-                            dateKey={plan.date}
-                            now={minutesNow(now)}
-                            onPress={goToPlan}
-                        />
+                    {tasks.length > 0 ? (
+                        <PlanNowCard schedule={schedule} now={minutesNow(now)} onPress={goToPlan} />
                     ) : (
                         planLoaded && (
                             <Card onPress={goToPlan} accessibilityLabel="Plan your day" style={styles.planRow}>
@@ -213,7 +205,7 @@ const HomeScreen: React.FC = () => {
                                 <View style={styles.statusText}>
                                     <ThemedText weight="strong">Plan your day</ThemedText>
                                     <ThemedText size="small" color="muted">
-                                        Meals, workouts, work and habits, each in its own time window
+                                        Your routine, from waking up to bedtime
                                     </ThemedText>
                                 </View>
                                 <IconTile icon="Next" size={28} />
@@ -223,10 +215,10 @@ const HomeScreen: React.FC = () => {
 
                     <StatRow>
                         <StatTile
-                            label="Habits today"
-                            value={habits.length ? `${doneToday}/${dueToday.length}` : '—'}
+                            label="Done today"
+                            value={counted.length ? `${doneToday}/${counted.length}` : '—'}
                         />
-                        <StatTile label="Habit streak" value={habitStreak} suffix=" d" />
+                        <StatTile label="Best streak" value={habitStreak} suffix=" d" />
                         <StatTile label="Apnea best" value={best ? formatClock(best.ms) : '—'} />
                     </StatRow>
                 </FadeIn>

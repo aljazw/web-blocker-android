@@ -3,7 +3,7 @@ import { DarkTheme, DefaultTheme, NavigationContainer, createNavigationContainer
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomTabNavigator from './BottomTabNavigator';
 import ScheduleScreen from '../screens/ScheduleScreen';
-import HabitEditorScreen from '../screens/HabitEditorScreen';
+import TaskEditorScreen from '../screens/TaskEditorScreen';
 import ApneaTableScreen from '../screens/ApneaTableScreen';
 import ApneaSessionScreen from '../screens/ApneaSessionScreen';
 import ApneaHistoryScreen from '../screens/ApneaHistoryScreen';
@@ -13,7 +13,6 @@ import VacationScreen from '../screens/VacationScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import WorkoutEditorScreen from '../screens/WorkoutEditorScreen';
 import WorkoutSessionScreen from '../screens/WorkoutSessionScreen';
-import PlanBlockEditorScreen from '../screens/PlanBlockEditorScreen';
 import PlanNudge from '../components/PlanNudge';
 import { RootStackParamList } from '../types/types';
 import { useAppForeground } from '../hooks/useAppForeground';
@@ -29,9 +28,8 @@ const NO_NUDGE: string[] = [
     'ApneaSession',
     'WorkoutSession',
     'ApneaTable',
-    'HabitEditor',
+    'TaskEditor',
     'WorkoutEditor',
-    'PlanBlockEditor',
     'Schedule',
 ];
 
@@ -42,7 +40,7 @@ const canNudge = () => {
 
 const openPlan = () => {
     if (navigationRef.isReady()) {
-        navigationRef.navigate('BottomTabs', { screen: 'Habits', params: { view: 'plan' } });
+        navigationRef.navigate('BottomTabs', { screen: 'Habits', params: { view: 'today' } });
     }
 };
 
@@ -106,7 +104,7 @@ const Navigation: React.FC = () => {
                 }}>
                 <Stack.Screen name="BottomTabs" component={BottomTabNavigator} />
                 <Stack.Screen name="Schedule" component={ScheduleScreen} />
-                <Stack.Screen name="HabitEditor" component={HabitEditorScreen} />
+                <Stack.Screen name="TaskEditor" component={TaskEditorScreen} />
                 <Stack.Screen name="ApneaTable" component={ApneaTableScreen} />
                 <Stack.Screen name="ApneaSession" component={ApneaSessionScreen} options={{ gestureEnabled: false }} />
                 <Stack.Screen name="ApneaHistory" component={ApneaHistoryScreen} />
@@ -120,7 +118,6 @@ const Navigation: React.FC = () => {
                     component={WorkoutSessionScreen}
                     options={{ gestureEnabled: false }}
                 />
-                <Stack.Screen name="PlanBlockEditor" component={PlanBlockEditorScreen} />
             </Stack.Navigator>
             <PlanNudge canShow={canNudge} onOpenPlan={openPlan} />
         </NavigationContainer>
