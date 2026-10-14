@@ -70,11 +70,3 @@ export const addBlockedApp = apps.add;
 export const deleteBlockedApp = apps.remove;
 export const hideBlockedApp = apps.hide;
 export const mergeBlockedApps = apps.merge;
-
-export const isWebsiteBlocked = async (url: string): Promise<boolean> => {
-    try {
-        return (await getBlockedWebsites()).some(site => site.websiteUrl === url);
-    } catch {
-        return false;
-    }
-};

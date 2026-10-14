@@ -39,8 +39,18 @@ class DnsForwarder(private val vpn: VpnService) {
         class Tls(val host: String) : Upstream("tls:$host")
     }
 
-    /** "" / null = automatic; an IP literal = plain DNS; anything else = DoT hostname. */
+    /**
+     * "" / null = automatic; an IP literal = plain DNS; a hostname = DoT. Anything
+     * else (a typo, an old value) is ignored, so it can never break every lookup.
+     */
     @Volatile var custom: String? = null
+        set(value) {
+            field = value
+            customUpstream = parseUpstream(value)
+        }
+    @Volatile private var customUpstream: Upstream? = null
+
+    private val fallbacks: List<Upstream> = FALLBACKS.map { Upstream.Udp(InetAddress.getByName(it)) }
 
     /** DNS servers of the current physical network, kept fresh by the service. */
     @Volatile var networkDns: List<InetAddress> = emptyList()
@@ -87,15 +97,18 @@ class DnsForwarder(private val vpn: VpnService) {
         }
     }
 
-    private fun chain(): List<Upstream> {
-        val list = mutableListOf<Upstream>()
-        val c = custom?.trim().orEmpty()
-        if (c.isNotEmpty()) {
-            list += if (isIpLiteral(c)) Upstream.Udp(InetAddress.getByName(c)) else Upstream.Tls(c)
+    private fun chain(): List<Upstream> =
+        (listOfNotNull(customUpstream) + networkDns.take(2).map { Upstream.Udp(it) } + fallbacks).distinctBy { it.key }
+
+    private fun parseUpstream(value: String?): Upstream? {
+        val v = value?.trim()?.lowercase().orEmpty()
+        return when {
+            v.isEmpty() -> null
+            // A valid literal never triggers a lookup; anything else is rejected first.
+            isIpLiteral(v) -> try { Upstream.Udp(InetAddress.getByName(v)) } catch (_: Exception) { null }
+            HOSTNAME.matches(v) -> Upstream.Tls(v)
+            else -> null
         }
-        networkDns.take(2).forEach { list += Upstream.Udp(it) }
-        FALLBACKS.forEach { list += Upstream.Udp(InetAddress.getByName(it)) }
-        return list.distinctBy { it.key }
     }
 
     // ---- plain DNS --------------------------------------------------------
@@ -227,8 +240,13 @@ class DnsForwarder(private val vpn: VpnService) {
         private val FALLBACKS = listOf("1.1.1.1", "8.8.8.8", "9.9.9.9")
 
         private val IPV4 = Regex("""^\d{1,3}(\.\d{1,3}){3}$""")
+        private val IPV6 = Regex("""^[0-9a-fA-F:.]+$""")
+        /** Letters in the last label, so "1.2.3.999" is never taken for a hostname. */
+        private val HOSTNAME = Regex("""^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}$""")
 
-        /** True for IPv4/IPv6 literals (hostnames never contain ':'); never does a lookup. */
-        fun isIpLiteral(value: String): Boolean = IPV4.matches(value) || value.contains(':')
+        /** True for well-formed IPv4/IPv6 literals; never does a lookup. */
+        fun isIpLiteral(value: String): Boolean =
+            (IPV4.matches(value) && value.split('.').all { it.toInt() <= 255 }) ||
+                (value.contains(':') && IPV6.matches(value))
     }
 }

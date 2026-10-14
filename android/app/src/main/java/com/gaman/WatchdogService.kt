@@ -304,13 +304,21 @@ class WatchdogService : Service() {
             nm.cancel(ALERT_NOTIF_ID)
         }
 
-        /** Idempotently (re)start the watchdog as a foreground service. */
+        /**
+         * Idempotently (re)start the watchdog as a foreground service. Never
+         * throws: Android can refuse a background start, and an exception here
+         * would crash the accessibility service, which Android then turns off.
+         */
         fun ensureRunning(context: Context) {
             val intent = Intent(context.applicationContext, WatchdogService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.applicationContext.startForegroundService(intent)
-            } else {
-                context.applicationContext.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.applicationContext.startForegroundService(intent)
+                } else {
+                    context.applicationContext.startService(intent)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("GamanWatchdog", "could not start the watchdog", e)
             }
         }
     }

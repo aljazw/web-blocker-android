@@ -114,9 +114,23 @@ class BlockAccessibilityService : AccessibilityService() {
         )
         private val BROWSER_PACKAGES = setOf(
             "com.android.chrome",
+            "com.chrome.beta",
+            "com.chrome.dev",
+            "com.google.android.apps.chrome",
             "org.mozilla.firefox",
+            "org.mozilla.firefox_beta",
+            "org.mozilla.focus",
             "com.brave.browser",
-            "com.opera.browser"
+            "com.opera.browser",
+            "com.opera.mini.native",
+            "com.opera.gx",
+            "com.sec.android.app.sbrowser", // Samsung Internet, the default on Samsung phones
+            "com.microsoft.emmx", // Edge
+            "com.duckduckgo.mobile.android",
+            "com.vivaldi.browser",
+            "com.kiwibrowser.browser",
+            "com.mi.globalbrowser",
+            "com.UCMobile.intl",
         )
     }
 

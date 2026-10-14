@@ -17,10 +17,9 @@ export type RootStackParamList = {
     Schedule: { websiteUrl?: string; app?: { packageName: string; appName: string } };
     /**
      * A routine task (habitId), a one-off task of a day (date + taskId), or a
-     * new task: with a date it starts as a one-off for that day, placed after
-     * the task `after` (first when null, at the end when left out).
+     * new task: with a date it starts as a one-off for that day (up next, today).
      */
-    TaskEditor: { habitId?: string; date?: string; taskId?: string; after?: string | null } | undefined;
+    TaskEditor: { habitId?: string; date?: string; taskId?: string } | undefined;
     /** A generated CO2/O2 table, or a custom one (no tableId = create, optionally prefilled). */
     ApneaTable: { kind: 'co2' | 'o2' } | { kind: 'custom'; tableId?: string; name?: string; rounds?: TableRound[] };
     /** The live (or just finished) training session. */

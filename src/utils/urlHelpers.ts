@@ -1,11 +1,5 @@
-export const normalizeUrl = (url: string): string => {
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        return `https://${url}`;
-    }
-    return url;
-};
-
-export const denormalizeUrl = (url: string): string => {
+/** Drops the scheme and "www.". */
+const denormalizeUrl = (url: string): string => {
     return url.replace(/^(https?:\/\/)?(www\.)?/, '');
 };
 
@@ -19,7 +13,7 @@ export const denormalizeUrl = (url: string): string => {
  * Accepts: facebook.com, sub.domain.co.uk, example.com/some/path
  * Rejects: empty, "hello world", "notadomain"
  */
-export const isValidWebsiteInput = (value: string): boolean => {
+const isValidWebsiteInput = (value: string): boolean => {
     const v = denormalizeUrl(value.trim().toLowerCase());
     if (!v || /\s/.test(v)) {
         return false;
@@ -39,5 +33,5 @@ export const toBlockableUrl = (input: string): string | null => {
     if (!isValidWebsiteInput(trimmed)) {
         return null;
     }
-    return denormalizeUrl(normalizeUrl(trimmed)).replace(/\/+$/, '');
+    return denormalizeUrl(trimmed).replace(/\/+$/, '');
 };

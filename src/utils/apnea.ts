@@ -207,14 +207,6 @@ export const formatMinutes = (seconds: number): string => {
 
 // ---- Records & statistics -------------------------------------------------------
 
-export const KIND_LABEL: Record<ApneaKind, string> = {
-    co2: 'CO₂ table',
-    o2: 'O₂ table',
-    custom: 'Custom table',
-    pb: 'Max hold',
-    breathing: 'Breathing',
-};
-
 export const longestHold = (record: ApneaRecord): number => record.holds.reduce((max, h) => Math.max(max, h), 0);
 
 const maxTests = (records: ApneaRecord[]) => records.filter(r => r.kind === 'pb' && r.holds.length > 0);

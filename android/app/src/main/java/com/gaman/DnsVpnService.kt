@@ -395,7 +395,11 @@ class DnsVpnService : VpnService() {
         srcPort: Int, dstPort: Int,
         dnsData: ByteArray
     ) {
-        val reply = forwarder.resolve(dnsData)
+        // Every lookup gets an answer, even if resolving throws: no app waits on a timeout.
+        val reply = try { forwarder.resolve(dnsData) } catch (e: Exception) {
+            Log.w(TAG, "resolve failed", e)
+            null
+        }
         try {
             if (reply != null) {
                 writeUdp(output, dstIp, srcIp, dstPort, srcPort, reply)
@@ -550,9 +554,13 @@ class DnsVpnService : VpnService() {
         url.trim().lowercase()
             .removePrefix("https://").removePrefix("http://").removePrefix("www.")
             .substringBefore('/')
+            .substringBefore(':')
+            .trimEnd('.')
 
-    private fun isBlocked(host: String): Boolean =
-        vacation?.isActive() != true && blockedDomains.any { host == it || host.endsWith(".$it") }
+    private fun isBlocked(host: String): Boolean {
+        val name = host.trimEnd('.')
+        return vacation?.isActive() != true && blockedDomains.any { name == it || name.endsWith(".$it") }
+    }
 
     // ---- foreground ------------------------------------------------------
 
@@ -662,14 +670,23 @@ class DnsVpnService : VpnService() {
             return null
         }
 
+        /** Never throws: Android can refuse a background start (it retries on the next boot or app open). */
         fun start(context: Context) {
             val i = Intent(context, DnsVpnService::class.java).setAction(ACTION_START)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                context.startForegroundService(i) else context.startService(i)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                    context.startForegroundService(i) else context.startService(i)
+            } catch (e: Exception) {
+                Log.w(TAG, "could not start the DNS filter", e)
+            }
         }
 
         fun stop(context: Context) {
-            context.startService(Intent(context, DnsVpnService::class.java).setAction(ACTION_STOP))
+            try {
+                context.startService(Intent(context, DnsVpnService::class.java).setAction(ACTION_STOP))
+            } catch (e: Exception) {
+                Log.w(TAG, "could not stop the DNS filter", e)
+            }
         }
     }
 }

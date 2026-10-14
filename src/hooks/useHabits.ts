@@ -7,7 +7,13 @@ const WATCH = [STORAGE_KEYS.habits];
 
 /** The routine (all habits, in order); stays current with changes made anywhere. */
 export const useHabits = () => {
-    const { data: habits, setData: setHabits, loaded, failed: loadFailed, reload } = useFocusData(getHabits, NONE, {
+    const {
+        data: habits,
+        setData: setHabits,
+        loaded,
+        failed: loadFailed,
+        reload,
+    } = useFocusData(getHabits, NONE, {
         watch: WATCH,
     });
     return { habits, setHabits, loaded, loadFailed, reload };

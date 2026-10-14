@@ -79,7 +79,7 @@ type Popup = { kind: 'delete' } | { kind: 'error' };
 const TaskEditorScreen: React.FC = () => {
     const navigation = useNavigation<RootStackNavigation>();
     const { params } = useRoute<RouteProp<RootStackParamList, 'TaskEditor'>>();
-    const { habitId, date, taskId, after } = params ?? {};
+    const { habitId, date, taskId } = params ?? {};
 
     const [habit, setHabit] = useState<Habit | null>(null);
     const [oneOff, setOneOff] = useState<OneOffTask | null>(null);
@@ -183,7 +183,7 @@ const TaskEditorScreen: React.FC = () => {
             }
         } else {
             const task: OneOffTask = { id: oneOff?.id ?? newTaskId(), title: trimmed, icon, duration };
-            ok = await saveOneOff(date!, task, oneOff ? undefined : after);
+            ok = await saveOneOff(date!, task, !oneOff && date === toDateKey(new Date()));
         }
         if (!ok) {
             setPopup({ kind: 'error' });
@@ -295,7 +295,11 @@ const TaskEditorScreen: React.FC = () => {
                             onPress={() => pickDays(preset.days)}
                         />
                     ))}
-                    <Chip label="Pick days" selected={repeat.kind === 'days' && custom} onPress={() => pickDays(null)} />
+                    <Chip
+                        label="Pick days"
+                        selected={repeat.kind === 'days' && custom}
+                        onPress={() => pickDays(null)}
+                    />
                 </ChipGroup>
                 {repeat.kind === 'days' && custom && (
                     <Card>
@@ -305,7 +309,9 @@ const TaskEditorScreen: React.FC = () => {
                 <ThemedText size="small" color="muted" style={styles.note}>
                     {repeat.kind === 'once'
                         ? `Just for ${dayName}. It won’t come back.`
-                        : `${describeHabitDays(repeat.days)}. It’s in your plan on these days, and missing it ends its streak.`}
+                        : `${describeHabitDays(
+                              repeat.days,
+                          )}. It’s in your plan on these days, and missing it ends its streak.`}
                 </ThemedText>
 
                 <SectionHeader title="Icon" />

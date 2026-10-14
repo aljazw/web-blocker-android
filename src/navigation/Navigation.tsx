@@ -24,14 +24,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 /** Screens where a plan pop-up would get in the way: training and editing. */
-const NO_NUDGE: string[] = [
-    'ApneaSession',
-    'WorkoutSession',
-    'ApneaTable',
-    'TaskEditor',
-    'WorkoutEditor',
-    'Schedule',
-];
+const NO_NUDGE: string[] = ['ApneaSession', 'WorkoutSession', 'ApneaTable', 'TaskEditor', 'WorkoutEditor', 'Schedule'];
 
 const canNudge = () => {
     const route = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;

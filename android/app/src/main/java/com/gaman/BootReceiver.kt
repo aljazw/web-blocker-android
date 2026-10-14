@@ -23,6 +23,9 @@ class BootReceiver : BroadcastReceiver() {
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_LOCKED_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                // Before the first unlock app storage can't be read (it would
+                // crash); BOOT_COMPLETED follows once the user unlocks.
+                if (!AccessibilityUtils.isUserUnlocked(context)) return
                 if (AccessibilityUtils.isServiceEnabled(context)) {
                     WatchdogService.ensureRunning(context)
                 }

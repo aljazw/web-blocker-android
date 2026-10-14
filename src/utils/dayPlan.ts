@@ -3,7 +3,7 @@
  * has a duration and they follow each other in order. Times are estimates,
  * worked out live from when you last finished something.
  */
-import { DayPlan, Habit, OneOffTask, SleepSchedule } from '../types/types';
+import { DayPlan, Habit, SleepSchedule } from '../types/types';
 import type { IconName } from '../components/Icon';
 import { fromDateKey, newId, toDateKey } from './dates';
 import { isDoneOn, isScheduled } from './habits';
@@ -246,13 +246,6 @@ export const orderWith = (tasks: PlanTask[], id: string, afterId: string | null)
     ids.splice(afterId === null ? 0 : ids.indexOf(afterId) + 1, 0, id);
     return ids;
 };
-
-export const newOneOff = (title: string, icon: IconName, duration: number): OneOffTask => ({
-    id: newTaskId(),
-    title,
-    icon,
-    duration,
-});
 
 // ---- Getting started ----------------------------------------------------------
 

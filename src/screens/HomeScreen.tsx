@@ -142,8 +142,7 @@ const HomeScreen: React.FC = () => {
     return (
         <BaseScreen
             title={greeting(now)}
-            subtitle={now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
->
+            subtitle={now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 {/* ---- Protection status ---- */}
                 <FadeIn>
@@ -214,10 +213,7 @@ const HomeScreen: React.FC = () => {
                     )}
 
                     <StatRow>
-                        <StatTile
-                            label="Done today"
-                            value={counted.length ? `${doneToday}/${counted.length}` : '—'}
-                        />
+                        <StatTile label="Done today" value={counted.length ? `${doneToday}/${counted.length}` : '—'} />
                         <StatTile label="Best streak" value={habitStreak} suffix=" d" />
                         <StatTile label="Apnea best" value={best ? formatClock(best.ms) : '—'} />
                     </StatRow>

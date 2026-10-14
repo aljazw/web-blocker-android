@@ -1,6 +1,17 @@
 import { Habit } from '../types/types';
 import { habitIconFrom } from '../constants/habitIcons';
-import { DATE_KEY, KEYS, clampInt, isString, readList, serialized, updateList, upsertById, withoutId, writeJson } from './core';
+import {
+    DATE_KEY,
+    KEYS,
+    clampInt,
+    isString,
+    readList,
+    serialized,
+    updateList,
+    upsertById,
+    withoutId,
+    writeJson,
+} from './core';
 
 export const DEFAULT_TASK_MINUTES = 15;
 export const MAX_TASK_MINUTES = 12 * 60;

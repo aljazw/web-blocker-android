@@ -84,20 +84,46 @@ export const onStorageChange = (listener: ChangeListener): (() => void) => {
     };
 };
 
+const notify = (key: string) => changeListeners.forEach(listener => listener(key));
+
+/**
+ * Writes a value. Cached keys show the new value at once (screens update
+ * without waiting on the native write) and roll back if the write fails.
+ */
 export const writeRaw = async (key: string, value: string): Promise<boolean> => {
-    versions.set(key, (versions.get(key) ?? 0) + 1);
+    const version = (versions.get(key) ?? 0) + 1;
+    versions.set(key, version);
     reads.delete(key);
-    try {
-        const ok = (await SharedStorage.setItem(key, value)) === true;
-        if (ok) {
-            rawCache.set(key, value);
-            changeListeners.forEach(listener => listener(key));
+    const cacheable = !NATIVE_WRITTEN.has(key);
+    const had = rawCache.has(key);
+    const before = rawCache.get(key);
+    if (cacheable) {
+        rawCache.set(key, value);
+        notify(key);
+    }
+    const rollBack = () => {
+        if (versions.get(key) !== version) {
+            return; // a newer write owns the value now
+        }
+        if (had) {
+            rawCache.set(key, before ?? null);
         } else {
             rawCache.delete(key);
         }
+        if (cacheable) {
+            notify(key);
+        }
+    };
+    try {
+        const ok = (await SharedStorage.setItem(key, value)) === true;
+        if (!ok) {
+            rollBack();
+        } else if (!cacheable) {
+            notify(key);
+        }
         return ok;
     } catch (error) {
-        rawCache.delete(key);
+        rollBack();
         throw error;
     }
 };

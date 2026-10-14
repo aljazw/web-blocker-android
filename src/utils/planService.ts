@@ -78,7 +78,9 @@ export const undoTask = async (date: string, task: PlanTask): Promise<boolean> =
 export const setSkipped = (date: string, taskId: string, skipped: boolean): Promise<boolean> =>
     updateDay(date, day => ({
         ...day,
-        skipped: skipped ? [...day.skipped.filter(id => id !== taskId), taskId] : day.skipped.filter(id => id !== taskId),
+        skipped: skipped
+            ? [...day.skipped.filter(id => id !== taskId), taskId]
+            : day.skipped.filter(id => id !== taskId),
     }));
 
 /** "Later": the task swaps places with the next open one. */
@@ -86,17 +88,19 @@ export const moveLater = (date: string, tasks: PlanTask[], taskId: string): Prom
     updateDay(date, day => ({ ...day, order: laterOrder(tasks, taskId) }));
 
 /**
- * Adds or updates a one-off task. A new one goes right after `afterId` (first
- * when null), or at the end of the day when `afterId` is left out.
+ * Adds or updates a one-off task. A new one goes at the end of the day, or
+ * with `upNext` right after the task on now, so it's what comes next.
  */
-export const saveOneOff = async (date: string, task: OneOffTask, afterId?: string | null): Promise<boolean> => {
-    const habits = afterId === undefined ? [] : await getHabits();
+export const saveOneOff = async (date: string, task: OneOffTask, upNext = false): Promise<boolean> => {
+    const habits = upNext ? await getHabits() : [];
     return updateDay(date, day => {
         if (day.oneOffs.some(t => t.id === task.id)) {
             return { ...day, oneOffs: day.oneOffs.map(t => (t.id === task.id ? task : t)) };
         }
         const added = { ...day, oneOffs: [...day.oneOffs, task] };
-        return afterId === undefined ? added : { ...added, order: orderWith(dayTasks(added, habits), task.id, afterId) };
+        const tasks = dayTasks(added, habits);
+        const current = tasks.find(t => t.status === 'open' && t.id !== task.id);
+        return upNext && current ? { ...added, order: orderWith(tasks, task.id, current.id) } : added;
     });
 };
 

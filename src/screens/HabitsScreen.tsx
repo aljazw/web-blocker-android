@@ -31,7 +31,8 @@ const VIEWS: { value: RoutineView; label: string }[] = [
     { value: 'routine', label: 'Routine' },
 ];
 
-const dateLabel = (date: Date) => date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+const dateLabel = (date: Date) =>
+    date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
 /** The routine tab: today's plan, tomorrow's, and the routine they're built from. */
 const HabitsScreen: React.FC = () => {
@@ -55,7 +56,8 @@ const HabitsScreen: React.FC = () => {
     useFocusEffect(useCallback(() => setNow(new Date()), []));
 
     const tomorrow = addDays(now, 1);
-    const subtitle = view === 'routine' ? 'What you do, and on which days' : dateLabel(view === 'today' ? now : tomorrow);
+    const subtitle =
+        view === 'routine' ? 'What you do, and on which days' : dateLabel(view === 'today' ? now : tomorrow);
 
     return (
         <BaseScreen
@@ -179,7 +181,12 @@ const RoutineList: React.FC = () => {
                 <ListRow icon="Target" title="Check-ins" description="Asks when a task runs much longer than planned">
                     <Toggle value={prefs.nudges} onValueChange={v => changePrefs({ nudges: v })} />
                 </ListRow>
-                <ListRow icon="Moon" title="Wake-up and bedtime" description="Your day runs between these" onPress={() => navigation.navigate('Sleep')} />
+                <ListRow
+                    icon="Moon"
+                    title="Wake-up and bedtime"
+                    description="Your day runs between these"
+                    onPress={() => navigation.navigate('Sleep')}
+                />
             </ListGroup>
             <ErrorPopup {...ERRORS.saveFailed} visible={failed} onClose={() => setFailed(false)} />
         </ScrollView>

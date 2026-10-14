@@ -101,7 +101,9 @@ const PlanNudge: React.FC<PlanNudgeProps> = ({ canShow, onOpenPlan }) => {
             title={nudge ? `Still on ${nudge.task.title}?` : ''}
             message={
                 nudge
-                    ? `It's ${formatDuration(nudge.over)} longer than planned. If you're done, tap Done so the rest of the day moves on.`
+                    ? `It's ${formatDuration(
+                          nudge.over,
+                      )} longer than planned. If you're done, tap Done so the rest of the day moves on.`
                     : undefined
             }
             actions={[

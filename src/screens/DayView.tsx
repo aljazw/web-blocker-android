@@ -98,14 +98,10 @@ const DayView: React.FC<DayViewProps> = ({ dateKey, now }) => {
 
     const edit = (task: PlanTask) => {
         close();
-        navigation.navigate(
-            'TaskEditor',
-            task.habit ? { habitId: task.habit.id } : { date: dateKey, taskId: task.id },
-        );
+        navigation.navigate('TaskEditor', task.habit ? { habitId: task.habit.id } : { date: dateKey, taskId: task.id });
     };
 
-    // Today a new task comes right after the current one; tomorrow it goes at the end.
-    const add = () => navigation.navigate('TaskEditor', { date: dateKey, after: schedule.current?.task.id });
+    const add = () => navigation.navigate('TaskEditor', { date: dateKey });
 
     const startRoutine = async () => {
         if (await run(saveHabits(starterRoutine(new Date(), newHabitId)))) {
@@ -120,7 +116,14 @@ const DayView: React.FC<DayViewProps> = ({ dateKey, now }) => {
                 title="Build your routine"
                 text="Add what you do in a day and how long each thing takes. Gaman lines it all up between waking up and bedtime, and moves the rest along when something runs long.">
                 <Button label="Start from a typical day" icon="Sparkles" iconLeading onPress={startRoutine} />
-                <Button label="Add a task" variant="secondary" icon="Plus" iconLeading onPress={add} style={styles.gap} />
+                <Button
+                    label="Add a task"
+                    variant="secondary"
+                    icon="Plus"
+                    iconLeading
+                    onPress={add}
+                    style={styles.gap}
+                />
             </EmptyState>
         ) : (
             <EmptyState icon="Plan" title="Nothing planned" text="None of your routine falls on this day.">
@@ -149,7 +152,9 @@ const DayView: React.FC<DayViewProps> = ({ dateKey, now }) => {
                 <PlanTimeline
                     schedule={schedule}
                     onOpen={slot => setPopup({ kind: 'task', slot })}
-                    onToggle={isToday ? slot => (slot.task.status === 'done' ? undo(slot.task) : done(slot.task)) : undefined}
+                    onToggle={
+                        isToday ? slot => (slot.task.status === 'done' ? undo(slot.task) : done(slot.task)) : undefined
+                    }
                     onAnchor={() => navigation.navigate('Sleep')}
                 />
                 <Button
@@ -238,7 +243,9 @@ const DaySummary: React.FC<{ schedule: DaySchedule; tasks: PlanTask[] }> = ({ sc
         : pace.kind === 'behind'
         ? `${formatDuration(pace.minutes)} behind`
         : `${formatDuration(pace.minutes)} ahead`;
-    const ends = schedule.slots.some(s => s.task.status === 'open') ? ` · done around ${formatMinutes(schedule.end)}` : '';
+    const ends = schedule.slots.some(s => s.task.status === 'open')
+        ? ` · done around ${formatMinutes(schedule.end)}`
+        : '';
 
     return (
         <>
@@ -246,14 +253,22 @@ const DaySummary: React.FC<{ schedule: DaySchedule; tasks: PlanTask[] }> = ({ sc
                 size="small"
                 weight="medium"
                 tabular
-                color={pace?.kind === 'behind' ? 'warning' : pace?.kind === 'onTime' || pace?.kind === 'ahead' ? 'primaryGreen' : 'muted'}
+                color={
+                    pace?.kind === 'behind'
+                        ? 'warning'
+                        : pace?.kind === 'onTime' || pace?.kind === 'ahead'
+                        ? 'primaryGreen'
+                        : 'muted'
+                }
                 style={styles.summary}>
                 {status}
                 {ends}
             </ThemedText>
             {overflow.length > 0 && (
                 <ThemedText size="small" color="warning" style={styles.summary}>
-                    {`${listTitles(overflow)} won’t fit before bed at ${formatMinutes(anchors.bed)}. Skip something or make it shorter.`}
+                    {`${listTitles(overflow)} won’t fit before bed at ${formatMinutes(
+                        anchors.bed,
+                    )}. Skip something or make it shorter.`}
                 </ThemedText>
             )}
         </>

@@ -38,7 +38,9 @@ const PlanNowCard: React.FC<PlanNowCardProps> = ({ schedule, now, onDone, onLate
                     <IconTile icon="Award" size={44} tone="success" />
                     <View style={styles.headText}>
                         <ThemedText size="large" weight="bold">
-                            {done === counted.length ? 'You did everything you planned' : `${done} of ${counted.length} done`}
+                            {done === counted.length
+                                ? 'You did everything you planned'
+                                : `${done} of ${counted.length} done`}
                         </ThemedText>
                         <ThemedText size="small" color="muted" tabular>
                             Free until bed at {formatMinutes(anchors.bed)}
@@ -90,9 +92,7 @@ const PlanNowCard: React.FC<PlanNowCardProps> = ({ schedule, now, onDone, onLate
             {onDone && (
                 <View style={styles.actions}>
                     <Button label="Done" icon="Check" iconLeading compact onPress={() => onDone(task)} />
-                    {onLater && next && (
-                        <Button label="Later" variant="ghost" compact onPress={() => onLater(task)} />
-                    )}
+                    {onLater && next && <Button label="Later" variant="ghost" compact onPress={() => onLater(task)} />}
                     {onSkip && <Button label="Skip" variant="ghost" compact onPress={() => onSkip(task)} />}
                 </View>
             )}
