@@ -169,10 +169,10 @@ export const copyPlan = (previous: DayPlan, dateKey: string): DayPlan => ({
     blocks: sortBlocks(
         previous.blocks
             .filter(b => !b.once)
-            .map(({ done: _done, shift = 0, ...block }) => ({
+            .map(({ done: _done, shift = 0, cut = 0, ...block }) => ({
                 ...block,
                 start: block.start - shift,
-                end: block.end - shift,
+                end: Math.min(DAY_MINUTES, block.end - shift + cut),
             })),
     ),
 });
@@ -191,6 +191,73 @@ export const shiftRemaining = (plan: DayPlan, now: number, minutes: number): Day
         return { ...b, start: b.start + by, end: b.end + by, shift: (b.shift ?? 0) + by };
     }),
 });
+
+/** A block that `fitBlock` moved or shortened, with its times before. */
+export interface BlockChange {
+    before: PlanBlock;
+    after: PlanBlock;
+}
+
+export interface Fit {
+    /** All blocks of the plan, with `block` in place and nothing overlapping it. */
+    blocks: PlanBlock[];
+    changes: BlockChange[];
+    /** A pushed block would run past midnight; the plan can't be saved like this. */
+    overflow: PlanBlock | null;
+}
+
+/**
+ * Puts `block` into the plan so no times overlap. A block that started
+ * earlier and runs into it ends when it starts; blocks from its start on are
+ * pushed back (keeping their length) as far as needed, each one pushing the
+ * next, so free gaps absorb the delay. Blocks hidden on this day (habit not
+ * due) are left alone. When `block` is a one-off, the moves are for this day
+ * only (the next day's copy puts blocks back at their usual times).
+ */
+export const fitBlock = (plan: DayPlan, habits: Habit[], block: PlanBlock): Fit => {
+    const visible = new Set(visibleBlocks(plan, habits).map(b => b.id));
+    const others = sortBlocks(plan.blocks.filter(b => b.id !== block.id && visible.has(b.id)));
+    const changed = new Map<string, PlanBlock>();
+    let overflow: PlanBlock | null = null;
+
+    let reach = block.end;
+    for (const b of others) {
+        if (b.start < block.start && b.start + 5 <= block.start) {
+            if (b.end > block.start) {
+                const cut = b.end - block.start;
+                changed.set(b.id, {
+                    ...b,
+                    end: block.start,
+                    ...(block.once ? { cut: (b.cut ?? 0) + cut } : {}),
+                });
+            }
+            continue;
+        }
+        if (b.start >= reach) {
+            reach = b.end;
+            continue;
+        }
+        const by = reach - b.start;
+        const moved: PlanBlock = {
+            ...b,
+            start: b.start + by,
+            end: b.end + by,
+            ...(block.once ? { shift: (b.shift ?? 0) + by } : {}),
+        };
+        if (moved.end > DAY_MINUTES && !overflow) {
+            overflow = b;
+        }
+        changed.set(b.id, moved);
+        reach = moved.end;
+    }
+
+    const exists = plan.blocks.some(b => b.id === block.id);
+    const blocks = (exists ? plan.blocks : [...plan.blocks, block]).map(b =>
+        b.id === block.id ? block : changed.get(b.id) ?? b,
+    );
+    const changes = others.filter(b => changed.has(b.id)).map(b => ({ before: b, after: changed.get(b.id)! }));
+    return { blocks: sortBlocks(blocks), changes, overflow };
+};
 
 /** Blocks that haven't started by `now`, i.e. what a shift would move. */
 export const upcomingBlocks = (blocks: PlanBlock[], now: number): PlanBlock[] => blocks.filter(b => b.start >= now);

@@ -25,10 +25,10 @@ import {
     DAY_MINUTES,
     DEFAULT_BLOCK_LENGTH,
     blockTimes,
+    fitBlock,
     formatDuration,
     formatMinutes,
     newBlockId,
-    visibleBlocks,
 } from '../utils/dayPlan';
 import { isScheduled } from '../utils/habits';
 import { ensureReminderPermission } from '../utils/habitReminders';
@@ -52,6 +52,8 @@ const SUGGESTIONS: { title: string; icon: IconName; length: number }[] = [
     { title: 'Errands', icon: 'Errand', length: 60 },
     { title: 'Chores', icon: 'House', length: 30 },
     { title: 'Wind down', icon: 'Bed', length: 45 },
+    { title: 'Rest', icon: 'Rest', length: 30 },
+    { title: 'Sleep', icon: 'Moon', length: 480 },
 ];
 
 const PLAN_ICONS: IconName[] = [
@@ -78,6 +80,8 @@ const PLAN_ICONS: IconName[] = [
     'Sunrise',
     'Sun',
     'Bed',
+    'Moon',
+    'Rest',
     'Target',
 ];
 
@@ -116,6 +120,7 @@ const PlanBlockEditorScreen: React.FC = () => {
     const [endH, setEndH] = useState(split(initialEnd)[0]);
     const [endM, setEndM] = useState(split(initialEnd)[1]);
     const [popup, setPopup] = useState<Popup | null>(null);
+    const [newId] = useState(newBlockId);
 
     useEffect(() => {
         Promise.all([loadDayPlan(date), getHabits()])
@@ -158,18 +163,36 @@ const PlanBlockEditorScreen: React.FC = () => {
     const dueHabits = habits.filter(h => isScheduled(h, day));
     const linked = habits.find(h => h.id === habitId);
 
+    const block: PlanBlock | null =
+        start !== null && end !== null && end > start
+            ? {
+                  id: existing?.id ?? newId,
+                  title: trimmed,
+                  icon,
+                  start,
+                  end,
+                  ...(habitId ? { habitId } : {}),
+                  ...(repeat ? {} : { once: true }),
+                  ...(existing?.done && !habitId ? { done: true } : {}),
+                  // Kept while the times are untouched, so tomorrow still returns to the usual time.
+                  ...(existing?.shift && start === existing.start && end === existing.end
+                      ? { shift: existing.shift }
+                      : {}),
+                  ...(existing?.cut && start === existing.start && end === existing.end ? { cut: existing.cut } : {}),
+              }
+            : null;
+    // How the rest of the day moves to make room, shown before saving.
+    const fit = plan && block ? fitBlock(plan, habits, block) : null;
+
     const problem = !trimmed
         ? 'Give the block a name.'
         : start === null || end === null
         ? 'Enter a valid start and end time.'
         : end <= start
         ? 'The block has to end after it starts. Blocks past midnight belong to the next day.'
+        : fit?.overflow
+        ? `This pushes “${fit.overflow.title}” past midnight. Shorten this block or remove one later in the day.`
         : null;
-
-    const clashes =
-        plan && start !== null && end !== null && end > start
-            ? visibleBlocks(plan, habits).filter(b => b.id !== blockId && b.start < end && start < b.end)
-            : [];
 
     const setLength = (length: number) => {
         if (start === null) {
@@ -200,25 +223,14 @@ const PlanBlockEditorScreen: React.FC = () => {
     };
 
     const save = async () => {
-        if (problem || start === null || end === null) {
+        if (problem || !block) {
             return;
         }
-        const block: PlanBlock = {
-            id: existing?.id ?? newBlockId(),
-            title: trimmed,
-            icon,
-            start,
-            end,
-            ...(habitId ? { habitId } : {}),
-            ...(repeat ? {} : { once: true }),
-            ...(existing?.done && !habitId ? { done: true } : {}),
-            // Kept while the times are untouched, so tomorrow still returns to the usual time.
-            ...(existing?.shift && start === existing.start && end === existing.end ? { shift: existing.shift } : {}),
-        };
-        await ensureReminderPermission();
         if (await upsertBlock(date, block)) {
             haptics.success();
             navigation.goBack();
+            // Asked after saving: the request can wait on a system dialog, which must never hold up the save.
+            ensureReminderPermission();
         } else {
             setPopup({ kind: 'error' });
         }
@@ -306,9 +318,17 @@ const PlanBlockEditorScreen: React.FC = () => {
                         />
                     ))}
                 </ChipGroup>
-                {clashes.length > 0 && (
-                    <ThemedText size="small" color="warning" style={styles.note}>
-                        Overlaps {clashes.map(b => `${b.title} (${blockTimes(b)})`).join(', ')}.
+                {fit && fit.changes.length > 0 && !fit.overflow && (
+                    <ThemedText size="small" color="muted" style={styles.note}>
+                        {'To make room: '}
+                        {fit.changes
+                            .map(({ before, after }) =>
+                                after.start === before.start
+                                    ? `${before.title} ends at ${formatMinutes(after.end)}`
+                                    : `${before.title} moves to ${blockTimes(after)}`,
+                            )
+                            .join(', ')}
+                        {repeat ? '.' : ' (today only).'}
                     </ThemedText>
                 )}
 

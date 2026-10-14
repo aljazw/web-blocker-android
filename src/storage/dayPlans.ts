@@ -24,6 +24,7 @@ const toPlanBlock = (v: any): PlanBlock | null => {
         ...(v.once === true ? { once: true } : {}),
         ...(v.done === true ? { done: true } : {}),
         ...(isNumber(v.shift) && v.shift !== 0 ? { shift: clampInt(v.shift, -1440, 1440, 0) } : {}),
+        ...(isNumber(v.cut) && v.cut > 0 ? { cut: clampInt(v.cut, 1, 1440, 0) } : {}),
     };
 };
 

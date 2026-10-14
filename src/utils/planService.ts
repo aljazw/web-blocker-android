@@ -7,6 +7,7 @@ import { dismissTodaysReminder } from './habitReminders';
 import {
     blockTimes,
     copyPlan,
+    fitBlock,
     formatMinutes,
     isBlockDone,
     motivationFor,
@@ -76,14 +77,15 @@ export const completeBlock = async (dateKey: string, block: PlanBlock): Promise<
     return ok;
 };
 
-/** Replaces (or adds) one block in the day's plan. */
+/**
+ * Replaces (or adds) one block in the day's plan, moving the others out of
+ * its way (see fitBlock). Resolves false if saving fails or the moved blocks
+ * would run past midnight.
+ */
 export const upsertBlock = async (dateKey: string, block: PlanBlock): Promise<boolean> => {
-    const { plan } = await loadDayPlan(dateKey);
-    const exists = plan.blocks.some(b => b.id === block.id);
-    return persistDayPlan({
-        ...plan,
-        blocks: exists ? plan.blocks.map(b => (b.id === block.id ? block : b)) : [...plan.blocks, block],
-    });
+    const [{ plan }, habits] = await Promise.all([loadDayPlan(dateKey), getHabits()]);
+    const fit = fitBlock(plan, habits, block);
+    return !fit.overflow && persistDayPlan({ ...plan, blocks: fit.blocks });
 };
 
 export const removeBlock = async (dateKey: string, blockId: string): Promise<boolean> => {

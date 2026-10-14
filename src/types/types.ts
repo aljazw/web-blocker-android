@@ -54,6 +54,8 @@ export interface PlanBlock {
     done?: boolean;
     /** Minutes this block was pushed back today ("running late"); the next day's copy undoes it. */
     shift?: number;
+    /** Minutes cut off the end today to make room for a one-off block; the next day's copy undoes it. */
+    cut?: number;
 }
 
 export interface DayPlan {

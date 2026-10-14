@@ -60,6 +60,7 @@ import {
     ShieldAlert,
     ShieldCheck,
     SkipForward,
+    Sofa,
     ShoppingCart,
     SlidersHorizontal,
     Sparkles,
@@ -176,6 +177,7 @@ const ICONS = {
     House: House,
     Errand: ShoppingCart,
     Sunrise: Sunrise,
+    Rest: Sofa,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

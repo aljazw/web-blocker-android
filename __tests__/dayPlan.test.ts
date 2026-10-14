@@ -2,6 +2,7 @@ import { DayPlan, Habit, PlanBlock } from '../src/types/types';
 import {
     copyPlan,
     findFreeSlot,
+    fitBlock,
     formatDuration,
     formatMinutes,
     gapsBetween,
@@ -198,5 +199,57 @@ describe('planHistory', () => {
 describe('motivationFor', () => {
     it('is stable for the same seed', () => {
         expect(motivationFor('2026-10-10b1')).toBe(motivationFor('2026-10-10b1'));
+    });
+});
+
+describe('fitBlock', () => {
+    const plan = (...blocks: PlanBlock[]): DayPlan => ({ date: SAT, blocks });
+    const times = (blocks: PlanBlock[]) => blocks.map(b => `${b.id} ${b.start}-${b.end}`);
+
+    it('adds a block into free time without touching the rest', () => {
+        const fit = fitBlock(plan(block('a', 480, 540), block('c', 720, 780)), [], block('b', 600, 660));
+        expect(times(fit.blocks)).toEqual(['a 480-540', 'b 600-660', 'c 720-780']);
+        expect(fit.changes).toEqual([]);
+        expect(fit.overflow).toBeNull();
+    });
+
+    it('pushes later blocks back in a chain, letting gaps absorb the delay', () => {
+        const fit = fitBlock(
+            plan(block('a', 480, 540), block('b', 540, 600), block('c', 600, 660), block('d', 720, 780)),
+            [],
+            block('a', 480, 570),
+        );
+        expect(times(fit.blocks)).toEqual(['a 480-570', 'b 570-630', 'c 630-690', 'd 720-780']);
+        expect(fit.changes.map(c => c.after.id)).toEqual(['b', 'c']);
+        expect(fit.blocks.find(b => b.id === 'b')!.shift).toBeUndefined();
+    });
+
+    it('ends an earlier block when the new one starts', () => {
+        const fit = fitBlock(plan(block('work', 540, 720)), [], block('call', 600, 630));
+        expect(times(fit.blocks)).toEqual(['work 540-600', 'call 600-630']);
+    });
+
+    it('makes a one-off block move the others for this day only', () => {
+        const fit = fitBlock(
+            plan(block('work', 540, 720), block('lunch', 720, 765)),
+            [],
+            block('dentist', 690, 750, { once: true }),
+        );
+        const next = copyPlan({ date: SAT, blocks: fit.blocks }, '2026-10-11');
+        expect(times(next.blocks)).toEqual(['work 540-720', 'lunch 720-765']);
+    });
+
+    it('reports a block pushed past midnight', () => {
+        const fit = fitBlock(plan(block('late', 1380, 1440)), [], block('new', 1350, 1410));
+        expect(fit.overflow?.id).toBe('late');
+    });
+
+    it('leaves blocks hidden on this day alone', () => {
+        const fit = fitBlock(
+            plan(block('gym', 600, 660, { habitId: 'h' })),
+            [habit('h', { days: WEEKDAYS })],
+            block('new', 600, 660),
+        );
+        expect(times(fit.blocks)).toEqual(['gym 600-660', 'new 600-660']);
     });
 });

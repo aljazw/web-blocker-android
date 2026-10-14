@@ -123,11 +123,11 @@ const DayPlanView: React.FC<DayPlanViewProps> = ({ habits, onToggleHabit }) => {
     };
 
     const applyStarter = async () => {
-        await ensureReminderPermission();
         const starter = starterPlan(dateKey, habits, await getSleepSchedule());
         animateLayout();
         if (await commit(starter)) {
             haptics.success();
+            ensureReminderPermission();
         } else {
             fail();
         }
