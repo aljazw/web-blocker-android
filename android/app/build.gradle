@@ -126,6 +126,10 @@ dependencies {
 
     implementation 'com.google.code.gson:gson:2.10.1'
 
+    // Music player: background playback with notification and lock-screen controls.
+    implementation 'androidx.media3:media3-exoplayer:1.5.1'
+    implementation 'androidx.media3:media3-session:1.5.1'
+
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {

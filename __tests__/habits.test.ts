@@ -6,6 +6,7 @@ import {
     fromDateKey,
     milestoneFor,
     recentDays,
+    routineStreak,
     toDateKey,
     toggleCompletion,
 } from '../src/utils/habits';
@@ -131,5 +132,34 @@ describe('markDone', () => {
         const once = markDone(habit(), day);
         expect(once.completions).toEqual(['2026-10-08']);
         expect(markDone(once, day).completions).toEqual(['2026-10-08']);
+    });
+});
+
+describe('routineStreak', () => {
+    const a = (completions: string[], over: Partial<Habit> = {}) => habit({ id: 'a', completions, ...over });
+    const b = (completions: string[], over: Partial<Habit> = {}) => habit({ id: 'b', completions, ...over });
+
+    it('counts days on which every due task was done', () => {
+        const habits = [a(['2026-10-05', '2026-10-06', '2026-10-07']), b(['2026-10-06', '2026-10-07'])];
+        expect(routineStreak(habits, WED)).toBe(2);
+    });
+
+    it('leaves an unfinished today pending', () => {
+        const habits = [a(['2026-10-05', '2026-10-06', '2026-10-07']), b(['2026-10-05', '2026-10-06'])];
+        expect(routineStreak(habits, WED)).toBe(2);
+    });
+
+    it('skips days a task is not due and days before it existed', () => {
+        // b is weekdays only and new since Monday; the weekend only needs a.
+        const habits = [
+            a(['2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06']),
+            b(['2026-10-05', '2026-10-06'], { days: WEEKDAYS, createdAt: '2026-10-05' }),
+        ];
+        expect(routineStreak(habits, WED)).toBe(4);
+    });
+
+    it('is zero without tracked tasks', () => {
+        expect(routineStreak([], WED)).toBe(0);
+        expect(routineStreak([a([], { days: [false, false, false, false, false, false, false] })], WED)).toBe(0);
     });
 });

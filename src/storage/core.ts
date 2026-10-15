@@ -31,7 +31,9 @@ export const KEYS = {
     days: '@days',
     routineMigrated: '@routine_migrated',
     planPrefs: '@plan_prefs',
+    dayHours: '@day_hours',
     planNudges: '@plan_nudges',
+    promiseVideoShown: '@promise_video_shown',
 } as const;
 
 // ---- Cache ------------------------------------------------------------------

@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import com.gaman.alarm.WakeAlarm
 
 /**
  * Restarts the protection layers after a reboot or an app update.
@@ -12,6 +13,7 @@ import android.net.VpnService
  *    we never nag a user who legitimately turned Gaman off.
  *  - DNS VPN: restarted only if it was on AND consent is still granted
  *    (VpnService.prepare returns null when already consented).
+ *  - Wake-up alarm: alarms don't survive a reboot, so it's armed again.
  *
  * Note: Android will NOT deliver these broadcasts after a manual "Force stop"
  * until the app is opened again — an OS guarantee no ordinary app can bypass
@@ -32,6 +34,7 @@ class BootReceiver : BroadcastReceiver() {
                 if (dnsWasEnabled(context) && VpnService.prepare(context) == null) {
                     DnsVpnService.start(context)
                 }
+                WakeAlarm.schedule(context)
             }
         }
     }

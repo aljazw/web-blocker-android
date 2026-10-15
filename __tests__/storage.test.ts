@@ -18,7 +18,7 @@ jest.mock('../src/components/Icon', () => ({ isIconName: (v: unknown) => typeof 
 
 import { Habit } from '../src/types/types';
 import { clearStorageCache, onStorageChange } from '../src/storage/core';
-import { getHabits, getSleepDismissedUntil, saveHabit, updateHabit } from '../src/storage';
+import { getDayHours, getHabits, getSleepDismissedUntil, saveHabit, setDayHours, updateHabit } from '../src/storage';
 
 const { SharedStorage } = jest.requireMock('react-native').NativeModules;
 const mockStore: Map<string, string> = SharedStorage.store;
@@ -74,4 +74,13 @@ it('always reads keys the native side writes', async () => {
 it('treats damaged data as empty', async () => {
     mockStore.set('@habits', '{not json');
     expect(await getHabits()).toEqual([]);
+});
+
+test('day hours fall back to sleep time until set, then stay separate', async () => {
+    mockStore.set('@sleep_schedule', JSON.stringify({ enabled: true, bedtime: '22:30', wake: '06:15' }));
+    expect(await getDayHours()).toEqual({ wake: '06:15', bedtime: '22:30' });
+
+    await setDayHours({ wake: '08:00', bedtime: '00:30' });
+    expect(await getDayHours()).toEqual({ wake: '08:00', bedtime: '00:30' });
+    expect(JSON.parse(mockStore.get('@sleep_schedule')!)).toMatchObject({ bedtime: '22:30', wake: '06:15' });
 });

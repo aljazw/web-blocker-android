@@ -19,8 +19,9 @@ import { useFocusData } from '../hooks/useFocusData';
 import { gutter, spacing } from '../theme';
 import DayView from './DayView';
 import { addDays, toDateKey } from '../utils/dates';
+import { playPromiseVideoOncePerDay } from '../utils/promiseVideo';
 import { minutesNow } from '../utils/dayPlan';
-import { completionRate, currentStreak } from '../utils/habits';
+import { completionRate, routineStreak } from '../utils/habits';
 import { ensureReminderPermission } from '../utils/habitReminders';
 import { DEFAULT_PLAN_PREFS, STORAGE_KEYS, getPlanPrefs, saveHabits, setPlanPrefs } from '../storage';
 import { ERRORS } from '../constants/strings';
@@ -47,6 +48,13 @@ const HabitsScreen: React.FC = () => {
             setView(route.params.view);
         }
     }, [route.params]);
+
+    // Planning tomorrow starts with the "keep your word" video, once a day.
+    useEffect(() => {
+        if (view === 'tomorrow') {
+            playPromiseVideoOncePerDay();
+        }
+    }, [view]);
 
     // Keep "now" fresh: the current task, its time left and the day rolling over.
     useEffect(() => {
@@ -99,7 +107,7 @@ const RoutineList: React.FC = () => {
     const [failed, setFailed] = useState(false);
 
     const today = new Date();
-    const topStreak = habits.reduce((max, h) => Math.max(max, currentStreak(h, today)), 0);
+    const streak = routineStreak(habits, today);
     const weekRate = completionRate(habits, 7, today);
     const open = (habit?: Habit) => navigation.navigate('TaskEditor', habit ? { habitId: habit.id } : undefined);
 
@@ -140,7 +148,7 @@ const RoutineList: React.FC = () => {
         <ScrollView contentContainerStyle={styles.scroll}>
             <FadeIn>
                 <StatRow>
-                    <StatTile label="Best streak" value={topStreak} suffix=" d" />
+                    <StatTile label="Routine streak" value={streak} suffix=" d" />
                     <StatTile label="Last 7 days" value={Math.round((weekRate ?? 0) * 100)} suffix="%" />
                     <StatTile label="Tasks" value={habits.length} />
                 </StatRow>
@@ -182,10 +190,10 @@ const RoutineList: React.FC = () => {
                     <Toggle value={prefs.nudges} onValueChange={v => changePrefs({ nudges: v })} />
                 </ListRow>
                 <ListRow
-                    icon="Moon"
+                    icon="Sunrise"
                     title="Wake-up and bedtime"
                     description="Your day runs between these"
-                    onPress={() => navigation.navigate('Sleep')}
+                    onPress={() => navigation.navigate('DayHours')}
                 />
             </ListGroup>
             <ErrorPopup {...ERRORS.saveFailed} visible={failed} onClose={() => setFailed(false)} />

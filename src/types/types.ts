@@ -27,6 +27,8 @@ export type RootStackParamList = {
     ApneaHistory: undefined;
     ApneaSettings: undefined;
     Sleep: undefined;
+    DayHours: undefined;
+    Music: undefined;
     Vacation: undefined;
     Settings: undefined;
     /** No workoutId = create a new workout. */
@@ -69,6 +71,14 @@ export interface PlanPrefs {
     reminders: boolean;
     /** Occasional in-app check-ins when a task runs long. */
     nudges: boolean;
+    /** An alarm at wake-up time; turning it off plays the motivation video. Mirrors WakeAlarm.kt. */
+    wakeAlarm: boolean;
+}
+
+/** When the day plan starts and ends, "HH:mm". Separate from sleep time, which only blocks the phone. */
+export interface DayHours {
+    wake: string;
+    bedtime: string;
 }
 
 /** Nightly sleep time; times are "HH:mm". Mirrors SleepSchedule.kt. */

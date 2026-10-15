@@ -5,6 +5,7 @@ import { checkAccessibilityEnabled } from '../utils/accessibility';
 import { scheduleDailyNotification } from '../utils/notificationService';
 import { logger } from '../utils/logger';
 import { migrateRoutine } from '../utils/planService';
+import { rescheduleWakeAlarm } from '../utils/wakeAlarm';
 
 export type AppStatus = 'loading' | 'welcome' | 'main';
 
@@ -39,6 +40,8 @@ export const useAppInitializer = () => {
 
         const initialize = async () => {
             syncAccessibilityReminder().catch(error => logger.warn('Reminder sync failed', error));
+            // Picks up settings restored from a backup or a wake time inherited from sleep time.
+            rescheduleWakeAlarm();
 
             // Before any screen reads the routine.
             await migrateRoutine();

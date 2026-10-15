@@ -40,6 +40,44 @@ export const currentStreak = (habit: Habit, today: Date = new Date()): number =>
     return streak;
 };
 
+/**
+ * The whole routine's streak: consecutive days on which every task due that
+ * day was done. Days with nothing due are skipped, and a task only counts
+ * from the day it was created. Like [currentStreak], an unfinished today is
+ * still pending and doesn't break it.
+ */
+export const routineStreak = (habits: Habit[], today: Date = new Date()): number => {
+    const tracked = habits.filter(h => h.days.some(Boolean));
+    if (tracked.length === 0) {
+        return 0;
+    }
+    const done = tracked.map(h => new Set(h.completions));
+    const start = tracked.reduce((min, h) => (h.createdAt < min ? h.createdAt : min), tracked[0].createdAt);
+    /** null: nothing due that day. */
+    const allDone = (day: Date): boolean | null => {
+        const key = toDateKey(day);
+        const due = tracked.map((h, i) => i).filter(i => tracked[i].createdAt <= key && isScheduled(tracked[i], day));
+        return due.length === 0 ? null : due.every(i => done[i].has(key));
+    };
+
+    let day = today;
+    let streak = 0;
+    if (allDone(day) === false) {
+        day = addDays(day, -1); // today is still pending
+    }
+    for (let i = 0; i < MAX_LOOKBACK_DAYS && toDateKey(day) >= start; i++, day = addDays(day, -1)) {
+        const result = allDone(day);
+        if (result === null) {
+            continue;
+        }
+        if (!result) {
+            break;
+        }
+        streak++;
+    }
+    return streak;
+};
+
 /** Longest run of completed due days since the habit was created. */
 export const bestStreak = (habit: Habit, today: Date = new Date()): number => {
     if (!habit.days.some(Boolean)) {

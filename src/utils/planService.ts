@@ -1,6 +1,6 @@
 /** Loading, changing and notifications for the day plan. Pure plan logic lives in dayPlan.ts. */
-import notifee, { AndroidImportance, TriggerType } from '@notifee/react-native';
-import { DayPlan, Habit, OneOffTask, SleepSchedule } from '../types/types';
+import notifee, { AndroidImportance, Event, EventType, TriggerType } from '@notifee/react-native';
+import { DayHours, DayPlan, Habit, OneOffTask } from '../types/types';
 import { addDays, fromDateKey, newId, toDateKey } from './dates';
 import { markDone } from './habits';
 import {
@@ -23,7 +23,7 @@ import {
     getHabits,
     getLegacyPlans,
     getPlanPrefs,
-    getSleepSchedule,
+    getDayHours,
     onStorageChange,
     saveHabits,
     updateDay,
@@ -35,12 +35,12 @@ import { logger } from './logger';
 export interface LoadedDay {
     day: DayPlan;
     habits: Habit[];
-    sleep: SleepSchedule;
+    hours: DayHours;
 }
 
 export const loadDay = async (date: string): Promise<LoadedDay> => {
-    const [day, habits, sleep] = await Promise.all([getDay(date), getHabits(), getSleepSchedule()]);
-    return { day, habits, sleep };
+    const [day, habits, hours] = await Promise.all([getDay(date), getHabits(), getDayHours()]);
+    return { day, habits, hours };
 };
 
 const without = (finished: Record<string, number>, id: string): Record<string, number> =>
@@ -156,29 +156,96 @@ export const migrateRoutine = async (): Promise<void> => {
 
 const CHANNEL_ID = 'plan';
 const ID_PREFIX = 'plan:';
+/** "Still going" follow-ups; kept across syncs while their task is still open. */
+const AGAIN_PREFIX = 'plan-again:';
+const AGAIN_AFTER = 15 * 60_000;
 
-const notification = (id: string, title: string, body: string) => ({
+const ACTION_DONE = 'plan-done';
+const ACTION_AGAIN = 'plan-again';
+
+/** The task a notification asks about: buttons check it off, or ask again later. */
+interface Asks {
+    date: string;
+    taskId: string;
+    title: string;
+}
+
+const notification = (id: string, title: string, body: string, asks?: Asks) => ({
     id,
     title,
     body,
+    data: asks ? { date: asks.date, taskId: asks.taskId, title: asks.title } : undefined,
     android: {
         channelId: CHANNEL_ID,
         smallIcon: 'ic_stat_gaman',
         pressAction: { id: 'default' },
+        // No launchActivity: the buttons work without opening the app.
+        actions: asks
+            ? [
+                  { title: `✓ ${asks.title} done`, pressAction: { id: ACTION_DONE } },
+                  { title: 'Still going', pressAction: { id: ACTION_AGAIN } },
+              ]
+            : undefined,
     },
 });
+
+const asksOf = (data: Record<string, unknown> | undefined): Asks | null =>
+    data && typeof data.date === 'string' && typeof data.taskId === 'string' && typeof data.title === 'string'
+        ? { date: data.date, taskId: data.taskId, title: data.title }
+        : null;
+
+/**
+ * Handles the buttons on plan notifications (from notifee's foreground and
+ * background events): Done checks the task off now, Still going asks again
+ * in 15 minutes. Never throws.
+ */
+export const handlePlanNotificationEvent = async ({ type, detail }: Event): Promise<void> => {
+    const action = detail.pressAction?.id;
+    const asks = asksOf(detail.notification?.data);
+    if (type !== EventType.ACTION_PRESS || !asks || (action !== ACTION_DONE && action !== ACTION_AGAIN)) {
+        return;
+    }
+    try {
+        if (detail.notification?.id) {
+            await notifee.cancelNotification(detail.notification.id);
+        }
+        const { day, habits } = await loadDay(asks.date);
+        const task = dayTasks(day, habits).find(t => t.id === asks.taskId);
+        if (!task || task.status !== 'open') {
+            return;
+        }
+        if (action === ACTION_DONE) {
+            const at = asks.date === toDateKey(new Date()) ? minutesNow(new Date()) : 24 * 60 - 1;
+            await completeTask(asks.date, task, at);
+            await syncPlanReminders();
+        } else {
+            await notifee.createTriggerNotification(
+                notification(
+                    `${AGAIN_PREFIX}${asks.date}:${task.id}`,
+                    `Still on ${task.title}?`,
+                    'Tap Done when it\'s finished, so the rest of the day moves on.',
+                    asks,
+                ),
+                { type: TriggerType.TIMESTAMP, timestamp: Date.now() + AGAIN_AFTER },
+            );
+        }
+    } catch (error) {
+        logger.warn('Could not handle a plan notification', error);
+    }
+};
 
 /** Everything the reminders are built from. */
 const REMINDER_INPUTS: string[] = [
     STORAGE_KEYS.days,
     STORAGE_KEYS.habits,
     STORAGE_KEYS.planPrefs,
+    STORAGE_KEYS.dayHours,
     STORAGE_KEYS.sleepSchedule,
 ];
 
 /**
  * Keeps plan notifications in step with the data: any change to the day,
- * the routine, plan settings or sleep time reschedules them (once per burst
+ * the routine, plan settings or day hours reschedules them (once per burst
  * of writes). Call once at startup; returns a function that stops watching.
  */
 export const watchPlanReminders = (): (() => void) => {
@@ -225,22 +292,37 @@ export const syncPlanReminders = (): Promise<void> => {
 
 const syncOnce = async (): Promise<void> => {
     try {
-        const ids = (await notifee.getTriggerNotificationIds()).filter(id => id.startsWith(ID_PREFIX));
+        const pending = await notifee.getTriggerNotificationIds();
+        const ids = pending.filter(id => id.startsWith(ID_PREFIX));
         if (ids.length > 0) {
             await notifee.cancelTriggerNotifications(ids);
         }
         const prefs = await getPlanPrefs();
+        const now = new Date();
+        const today = toDateKey(now);
+        // A "Still going" follow-up stays only while its task is still open today.
+        const followUps = pending.filter(id => id.startsWith(AGAIN_PREFIX));
+        if (followUps.length > 0) {
+            const { day, habits } = await loadDay(today);
+            const keep = new Set(
+                dayTasks(day, habits)
+                    .filter(t => t.status === 'open')
+                    .map(t => `${AGAIN_PREFIX}${today}:${t.id}`),
+            );
+            const stale = followUps.filter(id => !prefs.reminders || !keep.has(id));
+            if (stale.length > 0) {
+                await notifee.cancelTriggerNotifications(stale);
+            }
+        }
         if (!prefs.reminders) {
             return;
         }
         await notifee.createChannel({ id: CHANNEL_ID, name: 'Day plan', importance: AndroidImportance.HIGH });
 
-        const now = new Date();
-        const today = toDateKey(now);
         for (const date of [today, toDateKey(addDays(now, 1))]) {
-            const { day, habits, sleep } = await loadDay(date);
+            const { day, habits, hours } = await loadDay(date);
             const tasks = dayTasks(day, habits);
-            const { slots } = scheduleDay(tasks, anchorsOf(sleep), date === today ? minutesNow(now) : null);
+            const { slots } = scheduleDay(tasks, anchorsOf(hours), date === today ? minutesNow(now) : null);
             const open = slots.filter(s => s.task.status === 'open');
             await Promise.all(
                 open.map((slot, i) => {
@@ -260,7 +342,12 @@ const syncOnce = async (): Promise<void> => {
                         .filter(Boolean)
                         .join('\n');
                     return notifee.createTriggerNotification(
-                        notification(`${ID_PREFIX}${date}:${slot.task.id}`, title, body),
+                        notification(
+                            `${ID_PREFIX}${date}:${slot.task.id}`,
+                            title,
+                            body,
+                            previous ? { date, taskId: previous.id, title: previous.title } : undefined,
+                        ),
                         { type: TriggerType.TIMESTAMP, timestamp: at },
                     );
                 }),

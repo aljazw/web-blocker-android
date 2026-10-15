@@ -9,6 +9,8 @@ import ApneaSessionScreen from '../screens/ApneaSessionScreen';
 import ApneaHistoryScreen from '../screens/ApneaHistoryScreen';
 import ApneaSettingsScreen from '../screens/ApneaSettingsScreen';
 import SleepScreen from '../screens/SleepScreen';
+import DayHoursScreen from '../screens/DayHoursScreen';
+import MusicScreen from '../screens/MusicScreen';
 import VacationScreen from '../screens/VacationScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import WorkoutEditorScreen from '../screens/WorkoutEditorScreen';
@@ -103,6 +105,8 @@ const Navigation: React.FC = () => {
                 <Stack.Screen name="ApneaHistory" component={ApneaHistoryScreen} />
                 <Stack.Screen name="ApneaSettings" component={ApneaSettingsScreen} />
                 <Stack.Screen name="Sleep" component={SleepScreen} />
+                <Stack.Screen name="DayHours" component={DayHoursScreen} />
+                <Stack.Screen name="Music" component={MusicScreen} />
                 <Stack.Screen name="Vacation" component={VacationScreen} />
                 <Stack.Screen name="Settings" component={SettingsScreen} />
                 <Stack.Screen name="WorkoutEditor" component={WorkoutEditorScreen} />

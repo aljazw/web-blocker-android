@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import notifee from '@notifee/react-native';
 import { AppState } from 'react-native';
 import { useAppForeground } from '../hooks/useAppForeground';
 import { toDateKey } from '../utils/dates';
 import { PlanTask, anchorsOf, dayTasks, formatDuration, minutesNow, scheduleDay } from '../utils/dayPlan';
-import { completeTask, loadDay, syncPlanReminders, watchPlanReminders } from '../utils/planService';
+import {
+    completeTask,
+    handlePlanNotificationEvent,
+    loadDay,
+    syncPlanReminders,
+    watchPlanReminders,
+} from '../utils/planService';
 import { getPlanNudgeLog, getPlanPrefs, setPlanNudgeLog } from '../storage';
 import { haptics } from '../utils/haptics';
 import { logger } from '../utils/logger';
@@ -45,13 +52,13 @@ const PlanNudge: React.FC<PlanNudgeProps> = ({ canShow, onOpenPlan }) => {
             }
             const now = new Date();
             const date = toDateKey(now);
-            const [{ day, habits, sleep }, stored] = await Promise.all([loadDay(date), getPlanNudgeLog()]);
+            const [{ day, habits, hours }, stored] = await Promise.all([loadDay(date), getPlanNudgeLog()]);
             const log = stored.date === date ? stored : { date, shown: [], lastAt: 0 };
             if (Date.now() - log.lastAt < MIN_INTERVAL) {
                 return;
             }
             const nowMin = minutesNow(now);
-            const { current } = scheduleDay(dayTasks(day, habits), anchorsOf(sleep), nowMin);
+            const { current } = scheduleDay(dayTasks(day, habits), anchorsOf(hours), nowMin);
             const over = current ? nowMin - (current.start + current.task.duration) : 0;
             if (!current || over < OVER_BY || log.shown.includes(current.task.id) || !canShow()) {
                 return;
@@ -72,6 +79,7 @@ const PlanNudge: React.FC<PlanNudgeProps> = ({ canShow, onOpenPlan }) => {
     }, [check]);
     useAppForeground(onForeground);
     useEffect(watchPlanReminders, []);
+    useEffect(() => notifee.onForegroundEvent(handlePlanNotificationEvent), []);
     useEffect(() => {
         const first = setTimeout(onForeground, 1500);
         const id = setInterval(check, CHECK_EVERY);

@@ -10,6 +10,7 @@ import Card from '../components/Card';
 import Chip from '../components/Chip';
 import ChipGroup from '../components/ChipGroup';
 import DayPicker from '../components/DayPicker';
+import DurationPicker from '../components/DurationPicker';
 import Dialog, { confirmActions } from '../components/Dialog';
 import ErrorPopup from '../components/ErrorPopup';
 import { IconName } from '../components/Icon';
@@ -19,14 +20,13 @@ import SectionHeader from '../components/SectionHeader';
 import Segmented from '../components/Segmented';
 import StatRow from '../components/StatRow';
 import StatTile from '../components/StatTile';
-import Stepper from '../components/Stepper';
 import { ThemedText } from '../components/ThemedText';
 import { FadeIn, animateLayout } from '../components/Motion';
 import { persistHabit, removeHabit } from '../hooks/useHabits';
 import { gutter, spacing } from '../theme';
 import { bestStreak, currentStreak, fromDateKey, newHabitId, toDateKey } from '../utils/habits';
 import { describeHabitDays } from '../utils/habitText';
-import { DEFAULT_TASK_LENGTH, formatDuration, newTaskId } from '../utils/dayPlan';
+import { DEFAULT_TASK_LENGTH, newTaskId } from '../utils/dayPlan';
 import { promoteOneOff, removeOneOff, saveOneOff } from '../utils/planService';
 import { ensureReminderPermission } from '../utils/habitReminders';
 import { getDay, getHabits, MAX_TASK_MINUTES } from '../storage';
@@ -252,28 +252,16 @@ const TaskEditorScreen: React.FC = () => {
                 )}
 
                 <SectionHeader title="How long" />
-                <Card style={styles.lengthCard}>
-                    <ThemedText color="muted">Takes about</ThemedText>
-                    <Stepper
+                <Card>
+                    <DurationPicker
                         value={duration}
                         onChange={setDuration}
                         min={5}
                         max={MAX_TASK_MINUTES}
-                        step={5}
-                        format={formatDuration}
+                        presets={LENGTHS}
                         accessibilityLabel="Duration"
                     />
                 </Card>
-                <ChipGroup>
-                    {LENGTHS.map(length => (
-                        <Chip
-                            key={length}
-                            label={formatDuration(length)}
-                            selected={duration === length}
-                            onPress={() => setDuration(length)}
-                        />
-                    ))}
-                </ChipGroup>
 
                 <SectionHeader title="Repeats" />
                 <ChipGroup>
@@ -363,11 +351,6 @@ const TaskEditorScreen: React.FC = () => {
 const styles = StyleSheet.create({
     scroll: {
         paddingBottom: spacing.xl,
-    },
-    lengthCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
     },
     note: {
         marginHorizontal: gutter + 2,

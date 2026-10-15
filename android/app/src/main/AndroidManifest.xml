@@ -10,11 +10,18 @@
     <!-- Watchdog + anti-disable support -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Music player: reads the songs on the phone -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Lets the watchdog pop the re-enable screen from the background on every OEM -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Fallback full-screen alert when overlay permission isn't granted -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Wake-up alarm: rings exactly at the day plan's wake time -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
 
     <!-- Android 11+: lets Gaman list launchable apps so the user can choose which to block. -->
@@ -85,6 +92,25 @@
             android:windowSoftInputMode="adjustResize"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
 
+        <!-- Plays the "keep your word" video before planning tomorrow -->
+        <activity
+            android:name=".video.PromiseVideoActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
+        <!-- Wake-up alarm: rings over the lock screen, then plays the motivation video -->
+        <activity
+            android:name=".alarm.WakeAlarmActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
         <!-- Shown when the user reaches Gaman's accessibility toggle page -->
         <activity
             android:name=".GuardActivity"
@@ -142,6 +168,35 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="User-started breath-hold training timer that must keep timing and giving audio/vibration cues with the screen off." />
+        </service>
+
+        <!-- Wake-up alarm: plays the alarm sound until it's turned off on the alarm screen -->
+        <service
+            android:name=".alarm.WakeAlarmService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-set wake-up alarm that rings at the planned wake time until the user turns it off." />
+        </service>
+
+        <receiver
+            android:name=".alarm.WakeAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Music player: keeps playing with the app in the background or closed -->
+        <service
+            android:name=".music.MusicService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
         </service>
 
         <receiver

@@ -31,6 +31,7 @@ const REPLACED = {
     habits: { key: KEYS.habits, kind: 'list' },
     days: { key: KEYS.days, kind: 'list' },
     planPrefs: { key: KEYS.planPrefs, kind: 'object' },
+    dayHours: { key: KEYS.dayHours, kind: 'object' },
     workouts: { key: KEYS.workouts, kind: 'list' },
     workoutRecords: { key: KEYS.workoutRecords, kind: 'list' },
     workoutCues: { key: KEYS.workoutCues, kind: 'object' },

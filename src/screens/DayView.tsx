@@ -155,7 +155,7 @@ const DayView: React.FC<DayViewProps> = ({ dateKey, now }) => {
                     onToggle={
                         isToday ? slot => (slot.task.status === 'done' ? undo(slot.task) : done(slot.task)) : undefined
                     }
-                    onAnchor={() => navigation.navigate('Sleep')}
+                    onAnchor={() => navigation.navigate('DayHours')}
                 />
                 <Button
                     label="Add a task"

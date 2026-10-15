@@ -7,7 +7,10 @@ import com.facebook.react.uimanager.ViewManager
 import com.gaman.OverlayModule
 import com.gaman.VpnControlModule
 import com.gaman.WatchdogModule
+import com.gaman.alarm.WakeAlarmModule
 import com.gaman.apnea.ApneaModule
+import com.gaman.music.MusicModule
+import com.gaman.video.PromiseVideoModule
 
 /** Registers every native module of the app. Add new modules to this list. */
 class GamanPackage : ReactPackage {
@@ -24,6 +27,9 @@ class GamanPackage : ReactPackage {
             ApneaModule(reactContext),
             HapticsModule(reactContext),
             BackupFileModule(reactContext),
+            MusicModule(reactContext),
+            WakeAlarmModule(reactContext),
+            PromiseVideoModule(reactContext),
         )
 
     override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> = emptyList()

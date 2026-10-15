@@ -32,7 +32,7 @@ import { useAppForeground } from '../hooks/useAppForeground';
 import { gutter, spacing } from '../theme';
 import { checkAccessibilityEnabled, openAccessibilitySettings } from '../utils/accessibility';
 import { describeSchedule, isBlockActiveNow } from '../utils/schedule';
-import { currentStreak } from '../utils/habits';
+import { routineStreak } from '../utils/habits';
 import { formatClock, personalBest } from '../utils/apnea';
 import { minutesNow, scheduleDay } from '../utils/dayPlan';
 import { haptics } from '../utils/haptics';
@@ -132,7 +132,7 @@ const HomeScreen: React.FC = () => {
 
     const counted = tasks.filter(t => t.status !== 'skipped');
     const doneToday = counted.filter(t => t.status === 'done').length;
-    const habitStreak = habits.reduce((max, h) => Math.max(max, currentStreak(h, now)), 0);
+    const habitStreak = routineStreak(habits, now);
     const best = useMemo(() => personalBest(records), [records]);
 
     const goToAdd = () => navigation.navigate('BottomTabs', { screen: 'Block' });
@@ -142,7 +142,15 @@ const HomeScreen: React.FC = () => {
     return (
         <BaseScreen
             title={greeting(now)}
-            subtitle={now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}>
+            subtitle={now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+            headerRight={
+                <IconButton
+                    icon="Music"
+                    variant="outline"
+                    accessibilityLabel="Music"
+                    onPress={() => navigation.navigate('Music')}
+                />
+            }>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 {/* ---- Protection status ---- */}
                 <FadeIn>
@@ -214,7 +222,7 @@ const HomeScreen: React.FC = () => {
 
                     <StatRow>
                         <StatTile label="Done today" value={counted.length ? `${doneToday}/${counted.length}` : '—'} />
-                        <StatTile label="Best streak" value={habitStreak} suffix=" d" />
+                        <StatTile label="Routine streak" value={habitStreak} suffix=" d" />
                         <StatTile label="Apnea best" value={best ? formatClock(best.ms) : '—'} />
                     </StatRow>
                 </FadeIn>

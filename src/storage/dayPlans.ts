@@ -1,8 +1,10 @@
-import { DayPlan, OneOffTask, PlanPrefs } from '../types/types';
+import { DayHours, DayPlan, OneOffTask, PlanPrefs } from '../types/types';
 import { DEFAULT_HABIT_ICON } from '../constants/habitIcons';
 import { IconName, isIconName } from '../components/Icon';
-import { DATE_KEY, KEYS, clampInt, isNumber, isString, readList, readObject, updateList, writeJson } from './core';
+import { DATE_KEY, KEYS, clampInt, isNumber, isString, readList, readObject, readRaw, updateList, writeJson, writeRaw } from './core';
 import { DEFAULT_TASK_MINUTES, MAX_TASK_MINUTES } from './habits';
+import { getSleepSchedule } from './sleep';
+import { isValidTime } from '../utils/sleep';
 
 /** Only recent days are kept. */
 const MAX_DAYS = 60;
@@ -81,13 +83,35 @@ const toLegacyPlan = (v: any): { date: string; blocks: LegacyBlock[] } | null =>
 
 export const getLegacyPlans = () => readList(KEYS.dayPlans, toLegacyPlan);
 
-export const DEFAULT_PLAN_PREFS: PlanPrefs = { reminders: true, nudges: true };
+export const DEFAULT_PLAN_PREFS: PlanPrefs = { reminders: true, nudges: true, wakeAlarm: false };
 
-const toPlanPrefs = (v: any): PlanPrefs => ({ reminders: v.reminders !== false, nudges: v.nudges !== false });
+const toPlanPrefs = (v: any): PlanPrefs => ({
+    reminders: v.reminders !== false,
+    nudges: v.nudges !== false,
+    wakeAlarm: v.wakeAlarm === true,
+});
 
 export const getPlanPrefs = (): Promise<PlanPrefs> => readObject(KEYS.planPrefs, toPlanPrefs);
 
 export const setPlanPrefs = (prefs: PlanPrefs): Promise<boolean> => writeJson(KEYS.planPrefs, prefs);
+
+export const DEFAULT_DAY_HOURS: DayHours = { wake: '07:00', bedtime: '23:00' };
+
+const toDayHours = (v: any): Partial<DayHours> => ({
+    wake: isString(v.wake) && isValidTime(v.wake) ? v.wake : undefined,
+    bedtime: isString(v.bedtime) && isValidTime(v.bedtime) ? v.bedtime : undefined,
+});
+
+/**
+ * Wake-up and bedtime for the day plan. Until they're set here, the sleep
+ * time's hours are used, so plans made before the two were split stay put.
+ */
+export const getDayHours = async (): Promise<DayHours> => {
+    const [own, sleep] = await Promise.all([readObject(KEYS.dayHours, toDayHours), getSleepSchedule()]);
+    return { wake: own.wake ?? sleep.wake, bedtime: own.bedtime ?? sleep.bedtime };
+};
+
+export const setDayHours = (hours: DayHours): Promise<boolean> => writeJson(KEYS.dayHours, hours);
 
 /** Which in-app check-ins were already shown today, so each one appears at most once. */
 export interface PlanNudgeLog {
@@ -106,3 +130,8 @@ const toNudgeLog = (v: any): PlanNudgeLog => ({
 export const getPlanNudgeLog = (): Promise<PlanNudgeLog> => readObject(KEYS.planNudges, toNudgeLog);
 
 export const setPlanNudgeLog = (log: PlanNudgeLog): Promise<boolean> => writeJson(KEYS.planNudges, log);
+
+/** The day (date key) the "keep your word" video last played before planning tomorrow. */
+export const getPromiseVideoShown = (): Promise<string | null> => readRaw(KEYS.promiseVideoShown);
+
+export const setPromiseVideoShown = (date: string): Promise<boolean> => writeRaw(KEYS.promiseVideoShown, date);
