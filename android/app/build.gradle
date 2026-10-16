@@ -84,9 +84,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.gaman"
+    namespace "com.disciplineapp"
     defaultConfig {
-        applicationId "com.sitelock"
+        applicationId "com.disciplineapp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -125,6 +125,8 @@ dependencies {
     implementation("com.facebook.react:react-android")
 
     implementation 'com.google.code.gson:gson:2.10.1'
+
+    testImplementation 'junit:junit:4.13.2'
 
     // Music player: background playback with notification and lock-screen controls.
     implementation 'androidx.media3:media3-exoplayer:1.5.1'

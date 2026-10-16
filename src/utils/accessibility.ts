@@ -18,7 +18,7 @@ export function openAccessibilitySettings() {
         return;
     }
     try {
-        IntentLauncher.startActivity('com.gaman.OpenAccessibilityActivity');
+        IntentLauncher.startActivity('com.disciplineapp.OpenAccessibilityActivity');
     } catch (error) {
         logger.warn('Could not open Accessibility settings', error);
     }

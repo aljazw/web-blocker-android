@@ -1,8 +1,8 @@
-# Gaman
+# discipline-app
 
-**Gaman** is an Android focus and self-improvement app. It blocks the websites and apps that take your time, puts your phone to bed at night, plans your day in time windows, helps you build daily habits, guides your workouts set by set, and trains your breath-hold with freediving apnea tables. It's built with **React Native + TypeScript** and native **Kotlin** modules. Everything runs on your device: no accounts, no servers, no tracking.
+**discipline-app** is an Android focus and self-improvement app. The user-facing name (currently **Gaman**) lives in just two spots: `displayName` in `app.json` and `app_name` in `android/app/src/main/res/values/strings.xml`. It blocks the websites and apps that take your time, puts your phone to bed at night, plans your day in time windows, helps you build daily habits, guides your workouts set by set, and trains your breath-hold with freediving apnea tables. It's built with **React Native + TypeScript** and native **Kotlin** modules. Everything runs on your device: no accounts, no servers, no tracking.
 
-> **Android only.** Gaman relies on Android Accessibility Services, `VpnService`, foreground services and other Android-specific APIs.
+> **Android only.** It relies on Android Accessibility Services, `VpnService`, foreground services and other Android-specific APIs.
 
 ## Features
 
@@ -44,7 +44,7 @@
 
 ### Sleep time
 
--   **Bedtime to morning:** between the times you choose, every app opens a sleep page instead, Settings and Gaman included. Calls, the alarm clock, the home screen and the keyboard keep working.
+-   **Bedtime to morning:** between the times you choose, every app opens a sleep page instead, Settings and the app included. Calls, the alarm clock, the home screen and the keyboard keep working.
 -   **Hard to undo:** turning it off for the night means watching a short video to the end (no skip), then typing a short sentence such as *Habits are everything*. It comes back the next evening.
 
 ### Blocking
@@ -56,11 +56,11 @@
 
 ### Making it stick
 
--   **Watchdog:** a separate foreground service notices the moment the Accessibility Service is switched off and shows a full-screen prompt to turn it back on.
--   **Settings guard:** Gaman's own Accessibility toggle is guarded while protection is active.
+-   **Re-enable prompt:** when the Accessibility Service is switched off, the app notices within seconds and shows a full-screen prompt to turn it back on, repeating every minute until it is. No permanent notification is needed for this.
+-   **Settings guard:** the app's own Accessibility toggle is guarded while protection is active.
 -   **Restart after reboot:** protection layers restart after a reboot or an app update.
 -   **Passphrase protection:** removing blocks or weakening protection requires typing a long passphrase.
--   **Uninstall prevention:** Gaman registers as a device admin so it can't be removed on impulse.
+-   **Uninstall prevention:** the app registers as a device admin so it can't be removed on impulse.
 -   **Hidden blocks:** a block can be hidden so it can't be removed from inside the app.
 
 ### App
@@ -85,9 +85,9 @@ npm start
 npm run android
 ```
 
-On first launch, follow the in-app steps to enable Gaman under **Settings → Accessibility**. For the strongest protection, also open **Settings** in the app and:
+On first launch, follow the in-app steps to enable the app under **Settings → Accessibility**. For the strongest protection, also open **Settings** in the app and:
 
-1. Grant **Display over other apps**, so the watchdog can show its prompt.
+1. Grant **Display over other apps**, so the re-enable prompt can appear.
 2. Turn on **DNS blocking** and follow the guided setup.
 3. Enable **Passphrase protection** and **Uninstall prevention**.
 
@@ -100,13 +100,13 @@ A debug build loads JavaScript from Metro and is signed with a throwaway key. Fo
 1. **Generate a signing key** (once):
 
     ```bash
-    keytool -genkey -v -keystore gaman-release-key.jks -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000
+    keytool -genkey -v -keystore discipline-app-release-key.jks -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000
     ```
 
 2. Put the `.jks` file in `android/app/`, and create `android/keystore.properties`:
 
     ```
-    storeFile=gaman-release-key.jks
+    storeFile=discipline-app-release-key.jks
     storePassword=yourStorePassword
     keyAlias=my-key-alias
     keyPassword=yourKeyPassword
@@ -139,19 +139,19 @@ src/
 ├── utils/        Pure logic (plans, schedules, streaks, apnea tables and stats), native bridges
 └── constants/    UI strings, safety copy, habit icons and quick-add suggestions
 
-android/app/src/main/java/com/gaman/
+android/app/src/main/java/com/disciplineapp/
 ├── BlockAccessibilityService.kt   URL and app blocking, sleep time and settings guard
 ├── DnsVpnService.kt               On-device DNS filter
-├── WatchdogService.kt             Re-enable prompt when protection is turned off
+├── ProtectionAlerts.kt            Re-enable prompt when protection is turned off
 ├── BootReceiver.kt                Restarts layers after reboot or update
 ├── apnea/                         Session timeline, cue player and foreground service
 ├── sleep/                         Sleep schedule and the sleep page (video + passphrase)
-└── modules/ + *Module.kt          React Native bridges, all registered in modules/GamanPackage.kt
+└── modules/ + *Module.kt          React Native bridges, all registered in modules/AppPackage.kt
 ```
 
 ## Built with Claude Code
 
-Gaman (originally called SiteLock) started as a hand-written learning project. From February 2025 to September 2026 I built the core myself: the React Native UI, the Accessibility-based blocker, schedules, the passphrase, dark mode and device-admin uninstall prevention. That work runs through commit `091096d`.
+This project (first called SiteLock, then Gaman) started as a hand-written learning project. From February 2025 to September 2026 I built the core myself: the React Native UI, the Accessibility-based blocker, schedules, the passphrase, dark mode and device-admin uninstall prevention. That work runs through commit `091096d`.
 
 After that, I continued development with [Claude Code](https://claude.com/claude-code):
 

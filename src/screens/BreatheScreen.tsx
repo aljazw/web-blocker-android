@@ -5,6 +5,7 @@ import { ApneaRecord, RootStackNavigation } from '../types/types';
 import ApneaRecordRow from '../components/ApneaRecordRow';
 import ApneaSessionBanner from '../components/ApneaSessionBanner';
 import BarChart from '../components/BarChart';
+import BackButton from '../components/BackButton';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -113,6 +114,7 @@ const BreatheScreen: React.FC = () => {
         <BaseScreen
             title="Apnea"
             subtitle="Static breath-hold training"
+            headerLeft={<BackButton />}
             headerRight={
                 <IconButton
                     icon="Sliders"

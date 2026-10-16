@@ -77,7 +77,7 @@ test('import only adds blocks, never removes or un-hides them', async () => {
     store.set('@blocked_websites', JSON.stringify([site('reddit.com', false)]));
     await importBackup(
         {
-            format: 'gaman-backup',
+            format: 'discipline-app-backup',
             version: 1,
             exportedAt: NOW.toISOString(),
             data: { websites: [site('reddit.com', true), site('x.com'), { junk: 1 }] },
@@ -95,7 +95,7 @@ test('import cannot turn sleep time off or start a vacation now', async () => {
     store.set('@sleep_schedule', JSON.stringify({ enabled: true, bedtime: '23:00', wake: '07:00' }));
     const result = await importBackup(
         {
-            format: 'gaman-backup',
+            format: 'discipline-app-backup',
             version: 1,
             exportedAt: NOW.toISOString(),
             data: {
@@ -110,8 +110,40 @@ test('import cannot turn sleep time off or start a vacation now', async () => {
     expect(result.skipped).toHaveLength(2);
 });
 
-test('rejects files that are not Gaman backups', () => {
+test('rejects files that are not backups of this app', () => {
     expect(parseBackup('not json')).toHaveProperty('error');
     expect(parseBackup('{"format":"other","data":{}}')).toHaveProperty('error');
-    expect(parseBackup('{"format":"gaman-backup","version":99,"data":{}}')).toHaveProperty('error');
+    expect(parseBackup('{"format":"discipline-app-backup","version":99,"data":{}}')).toHaveProperty('error');
+    expect(parseBackup('{"format":"gaman-backup","version":1,"data":{}}')).toHaveProperty('backup');
+});
+
+test('notes travel with their encrypted key, and passphrase protection can only be turned on', async () => {
+    const vault = { v: 1, kdf: 'pbkdf2-sha256', iter: 310000, salt: 'c2FsdA==', key: 'a2V5' };
+    const notes = [
+        { id: 'n1', createdAt: 1, updatedAt: 2, title: 'Groceries', body: 'milk' },
+        { id: 'n2', createdAt: 1, updatedAt: 3, cipher: 'ZW5jcnlwdGVk' },
+    ];
+    store.set('@notes', JSON.stringify(notes));
+    store.set('@notes_vault', JSON.stringify(vault));
+    store.set('@music_folder', JSON.stringify('Music/Gym'));
+    store.set('@is_passphrase', 'true');
+
+    const text = JSON.stringify(await createBackup(NOW));
+    expect(text).not.toContain('password');
+
+    store.clear();
+    clearStorageCache();
+    const parsed = parseBackup(text);
+    if ('error' in parsed) {
+        throw new Error(parsed.error);
+    }
+    expect((await importBackup(parsed.backup, NOW)).ok).toBe(true);
+    expect(JSON.parse(store.get('@notes')!)).toEqual(notes);
+    expect(JSON.parse(store.get('@notes_vault')!)).toEqual(vault);
+    expect(JSON.parse(store.get('@music_folder')!)).toBe('Music/Gym');
+    expect(store.get('@is_passphrase')).toBe('true');
+
+    // A backup with it off leaves it on.
+    await importBackup({ ...parsed.backup, data: { ...parsed.backup.data, passphrase: false } }, NOW);
+    expect(store.get('@is_passphrase')).toBe('true');
 });

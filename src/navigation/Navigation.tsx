@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { DarkTheme, DefaultTheme, NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomTabNavigator from './BottomTabNavigator';
@@ -7,6 +7,7 @@ import TaskEditorScreen from '../screens/TaskEditorScreen';
 import ApneaTableScreen from '../screens/ApneaTableScreen';
 import ApneaSessionScreen from '../screens/ApneaSessionScreen';
 import ApneaHistoryScreen from '../screens/ApneaHistoryScreen';
+import BreatheScreen from '../screens/BreatheScreen';
 import ApneaSettingsScreen from '../screens/ApneaSettingsScreen';
 import SleepScreen from '../screens/SleepScreen';
 import DayHoursScreen from '../screens/DayHoursScreen';
@@ -15,18 +16,29 @@ import VacationScreen from '../screens/VacationScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import WorkoutEditorScreen from '../screens/WorkoutEditorScreen';
 import WorkoutSessionScreen from '../screens/WorkoutSessionScreen';
+import NotesScreen from '../screens/NotesScreen';
+import NoteEditorScreen from '../screens/NoteEditorScreen';
 import PlanNudge from '../components/PlanNudge';
 import { RootStackParamList } from '../types/types';
 import { useAppForeground } from '../hooks/useAppForeground';
 import { useTheme } from '../context/ThemeContext';
 import { apneaSession } from '../utils/apneaSession';
 import { getWorkoutSession } from '../storage';
+import { watchNotesLock } from '../utils/notes';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 /** Screens where a plan pop-up would get in the way: training and editing. */
-const NO_NUDGE: string[] = ['ApneaSession', 'WorkoutSession', 'ApneaTable', 'TaskEditor', 'WorkoutEditor', 'Schedule'];
+const NO_NUDGE: string[] = [
+    'ApneaSession',
+    'WorkoutSession',
+    'ApneaTable',
+    'TaskEditor',
+    'WorkoutEditor',
+    'Schedule',
+    'NoteEditor',
+];
 
 const canNudge = () => {
     const route = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
@@ -84,6 +96,7 @@ const Navigation: React.FC = () => {
         }
     }, []);
     useAppForeground(resumeActiveSession);
+    useEffect(watchNotesLock, []);
 
     return (
         <NavigationContainer ref={navigationRef} theme={navTheme} onReady={resumeActiveSession}>
@@ -102,6 +115,7 @@ const Navigation: React.FC = () => {
                 <Stack.Screen name="TaskEditor" component={TaskEditorScreen} />
                 <Stack.Screen name="ApneaTable" component={ApneaTableScreen} />
                 <Stack.Screen name="ApneaSession" component={ApneaSessionScreen} options={{ gestureEnabled: false }} />
+                <Stack.Screen name="Apnea" component={BreatheScreen} />
                 <Stack.Screen name="ApneaHistory" component={ApneaHistoryScreen} />
                 <Stack.Screen name="ApneaSettings" component={ApneaSettingsScreen} />
                 <Stack.Screen name="Sleep" component={SleepScreen} />
@@ -110,6 +124,8 @@ const Navigation: React.FC = () => {
                 <Stack.Screen name="Vacation" component={VacationScreen} />
                 <Stack.Screen name="Settings" component={SettingsScreen} />
                 <Stack.Screen name="WorkoutEditor" component={WorkoutEditorScreen} />
+                <Stack.Screen name="Notes" component={NotesScreen} />
+                <Stack.Screen name="NoteEditor" component={NoteEditorScreen} />
                 <Stack.Screen
                     name="WorkoutSession"
                     component={WorkoutSessionScreen}

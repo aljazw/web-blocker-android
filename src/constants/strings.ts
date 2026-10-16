@@ -1,3 +1,5 @@
+import { APP_NAME } from './brand';
+
 export const PASSPHRASE_PROTECTION = {
     title: 'Turn on passphrase protection?',
     text:
@@ -65,17 +67,17 @@ export const VACATION_MESSAGES = [
     'Before I turn off every block I have stopped and checked my reason. This is a planned break with a clear first and last day, it is not a moment of weakness, and when it is over I will welcome my limits back without a fight.',
 ];
 
-export const ACCESSIBILITY_NOTIFICATION_TEXT = `Gaman needs its Accessibility service to block sites and apps.
+export const ACCESSIBILITY_NOTIFICATION_TEXT = `${APP_NAME} needs its Accessibility service to block sites and apps.
 
 1. Tap to open Accessibility settings.
 2. Open "Installed services" (or "Downloaded services").
-3. Select Gaman and switch it on.
+3. Select ${APP_NAME} and switch it on.
 4. Confirm the prompts.`;
 
 export const ACCESSIBILITY_SETUP_STEPS = [
     'Open Accessibility settings (click below).',
     'Scroll to "Installed Services" (or "Downloaded Services").',
-    'Find & tap "Gaman".',
+    `Find & tap "${APP_NAME}".`,
     'Toggle it ON.',
     'Confirm any prompts.',
 ];

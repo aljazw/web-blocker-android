@@ -1,3 +1,4 @@
+import { APP_NAME } from '../constants/brand';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -10,6 +11,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import Dialog, { confirmActions } from '../components/Dialog';
 import PassphrasePopup from '../components/PassphrasePopup';
+import NotesPasswordDialog from '../components/NotesPasswordDialog';
 import ErrorPopup from '../components/ErrorPopup';
 import Icon from '../components/Icon';
 import DnsSetupWizard from '../components/DnsSetupWizard';
@@ -49,6 +51,8 @@ import { migrateRoutine } from '../utils/planService';
 import { isAccentName } from '../theme/accents';
 import { RootStackNavigation, SleepSchedule, Vacation } from '../types/types';
 import { vacationPhase, vacationRangeLabel } from '../utils/vacation';
+import { hasNotesPassword, lockNotes } from '../utils/notes';
+import { rescheduleWakeAlarm } from '../utils/wakeAlarm';
 
 /**
  * Exactly one popup can be open at a time, so the screen can never end up
@@ -59,6 +63,7 @@ type Dialog =
     | { kind: 'passphrase'; onConfirm: () => void | Promise<void> }
     | { kind: 'upstream' }
     | { kind: 'dnsWizard' }
+    | { kind: 'notesPassword' }
     | { kind: 'info'; title: string; text: string }
     | { kind: 'error'; title: string; text: string };
 
@@ -77,6 +82,7 @@ const upstreamLabel = (value: string) => {
 const SettingsScreen: React.FC = () => {
     const { theme, isDarkMode, toggleTheme, accent, setAccent } = useTheme();
     const { isPassphraseEnabled, togglePassphrase } = usePassphrase();
+    const [notesPassword, setNotesPassword] = useState(false);
     const { status, refresh, patch } = useProtectionStatus();
     const [dialog, setDialog] = useState<Dialog | null>(null);
     const navigation = useNavigation<RootStackNavigation>();
@@ -91,6 +97,9 @@ const SettingsScreen: React.FC = () => {
         getVacation()
             .then(setVacationState)
             .catch(() => setVacationState(null));
+        hasNotesPassword()
+            .then(setNotesPassword)
+            .catch(() => setNotesPassword(false));
     }, []);
     useFocusEffect(loadBreaks);
 
@@ -178,7 +187,7 @@ const SettingsScreen: React.FC = () => {
             title: 'Import this backup?',
             text: `${describeBackup(
                 parsed.backup,
-            )}\n\nYour routine, day plans, workouts, apnea data and appearance on this phone are replaced by the backup. Blocked sites and apps are only added: nothing on your block list is removed.`,
+            )}\n\nYour routine, day plans, workouts, apnea data, notes and appearance on this phone are replaced by the backup. Protected notes open with the notes password they had when exported. Blocked sites and apps are only added: nothing on your block list is removed.`,
             onConfirm: () => applyImport(parsed.backup),
         });
     };
@@ -187,7 +196,13 @@ const SettingsScreen: React.FC = () => {
         close();
         try {
             const result = await importBackup(backup);
+            // The notes key may have been replaced: ask for the (backup's) password again.
+            lockNotes();
             await migrateRoutine();
+            rescheduleWakeAlarm();
+            if (backup.data.passphrase === true && !isPassphraseEnabled) {
+                togglePassphrase();
+            }
             if (isAccentName(backup.data.accent)) {
                 setAccent(backup.data.accent);
             }
@@ -240,7 +255,6 @@ const SettingsScreen: React.FC = () => {
 
     const layers = [
         { label: 'Accessibility blocking', value: status.accessibility ? 'On' : 'Off', ok: status.accessibility },
-        { label: 'Re-enable watchdog', value: status.watchdog ? 'Running' : 'Off', ok: status.watchdog },
         { label: 'Display over other apps', value: status.overlay ? 'Granted' : 'Needed', ok: status.overlay },
         { label: 'DNS filter (VPN)', value: status.dns ? 'Running' : 'Off', ok: status.dns },
         { label: 'Uninstall prevention', value: status.admin ? 'On' : 'Off', ok: status.admin },
@@ -301,11 +315,11 @@ const SettingsScreen: React.FC = () => {
                                 <ThemedText size="small" color="primaryRed">
                                     Private DNS ({status.privateDnsHost}) is on, so the DNS filter is paused and lets
                                     everything through. Your internet keeps working. To filter again, use{' '}
-                                    {status.privateDnsHost} inside Gaman, then set Private DNS to Off.
+                                    {status.privateDnsHost} inside {APP_NAME}, then set Private DNS to Off.
                                 </ThemedText>
                                 {status.upstream !== status.privateDnsHost && (
                                     <Button
-                                        label={`Use ${status.privateDnsHost} in Gaman`}
+                                        label={`Use ${status.privateDnsHost} in ${APP_NAME}`}
                                         variant="secondary"
                                         compact
                                         onPress={() => pickUpstream(status.privateDnsHost ?? '')}
@@ -397,7 +411,7 @@ const SettingsScreen: React.FC = () => {
                     <ListRow
                         icon="Shield"
                         title="Uninstall prevention"
-                        description="Stops Gaman being removed on impulse">
+                        description={`Stops ${APP_NAME} being removed on impulse`}>
                         <Toggle value={status.admin} onValueChange={onUninstallSwitch} />
                     </ListRow>
                 </ListGroup>
@@ -438,8 +452,23 @@ const SettingsScreen: React.FC = () => {
                     <ListRow
                         icon="Accessibility"
                         title="Accessibility settings"
-                        description="Where the Gaman blocking service is switched on"
+                        description={`Where the ${APP_NAME} blocking service is switched on`}
                         onPress={() => openAccessibilitySettings()}
+                    />
+                </ListGroup>
+
+                {/* ---- Notes ---- */}
+                <SectionHeader title="Notes" />
+                <ListGroup>
+                    <ListRow
+                        icon="Lock"
+                        title="Notes password"
+                        description={
+                            notesPassword
+                                ? 'Change the password of protected notes'
+                                : 'Not set · set one to protect notes'
+                        }
+                        onPress={() => setDialog({ kind: 'notesPassword' })}
                     />
                 </ListGroup>
 
@@ -449,19 +478,19 @@ const SettingsScreen: React.FC = () => {
                     <ListRow
                         icon="Download"
                         title="Export data"
-                        description="Blocks, habits, plans, workouts, apnea tables and settings as a JSON file"
+                        description="Everything, as one file to move to a new phone. Protected notes stay encrypted"
                         onPress={exportData}
                     />
                     <ListRow
                         icon="Upload"
                         title="Import data"
-                        description="Restore from a Gaman backup file"
+                        description={`Restore from a ${APP_NAME} backup file`}
                         onPress={pickImport}
                     />
                 </ListGroup>
 
                 <ThemedText size="tiny" color="muted" align="center" style={styles.footer}>
-                    Gaman · everything runs on your device
+                    {APP_NAME} · everything runs on your device
                 </ThemedText>
             </ScrollView>
 
@@ -493,7 +522,7 @@ const SettingsScreen: React.FC = () => {
                 onClose={close}
                 icon="Server"
                 title="Resolver for allowed sites"
-                message="Blocked sites are always blocked. Everything else goes to the resolver below. If it can’t be reached, Gaman falls back to your network’s DNS, so the internet keeps working."
+                message={`Blocked sites are always blocked. Everything else goes to the resolver below. If it can’t be reached, ${APP_NAME} falls back to your network’s DNS, so the internet keeps working.`}
                 actions={[{ label: 'Close', onPress: close, variant: 'secondary' }]}>
                 <UpstreamOption
                     title="Automatic"
@@ -542,6 +571,21 @@ const SettingsScreen: React.FC = () => {
                     />
                 </View>
             </Dialog>
+
+            <NotesPasswordDialog
+                mode={dialog?.kind === 'notesPassword' ? (notesPassword ? 'change' : 'create') : null}
+                onClose={close}
+                onDone={() => {
+                    setNotesPassword(true);
+                    setDialog({
+                        kind: 'info',
+                        title: notesPassword ? 'Password changed' : 'Password set',
+                        text: notesPassword
+                            ? 'Protected notes now open with the new password. Backups made before today still need the old one.'
+                            : 'Protect a note with the lock button in the note.',
+                    });
+                }}
+            />
 
             <DnsSetupWizard
                 visible={dialog?.kind === 'dnsWizard'}

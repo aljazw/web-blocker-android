@@ -30,6 +30,7 @@ import {
     Dumbbell,
     EyeOff,
     Flame,
+    Folder,
     Footprints,
     Globe,
     GraduationCap,
@@ -88,6 +89,9 @@ import {
     Zap,
     Download,
     Upload,
+    Lock,
+    LockOpen,
+    NotebookPen,
 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 
@@ -96,6 +100,7 @@ const ICONS = {
     Home: LayoutDashboard,
     Habits: ListChecks,
     Breathe: Waves,
+    Tools: LayoutGrid,
     Block: CirclePlus,
     Settings: Settings,
     Workout: Dumbbell,
@@ -161,6 +166,7 @@ const ICONS = {
     Target: Target,
     Zap: Zap,
     Sound: Volume2,
+    Folder: Folder,
     Vibrate: Vibrate,
     // Habit icons
     Dumbbell: Dumbbell,
@@ -171,6 +177,9 @@ const ICONS = {
     Sun: Sun,
     Pen: PenLine,
     Music: Music,
+    Notes: NotebookPen,
+    Lock: Lock,
+    Unlock: LockOpen,
     Code: Code,
     Apple: Apple,
     Bed: BedDouble,

@@ -1,3 +1,4 @@
+import { APP_NAME } from '../constants/brand';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -114,7 +115,7 @@ const DayView: React.FC<DayViewProps> = ({ dateKey, now }) => {
             <EmptyState
                 icon="Plan"
                 title="Build your routine"
-                text="Add what you do in a day and how long each thing takes. Gaman lines it all up between waking up and bedtime, and moves the rest along when something runs long.">
+                text={`Add what you do in a day and how long each thing takes. ${APP_NAME} lines it all up between waking up and bedtime, and moves the rest along when something runs long.`}>
                 <Button label="Start from a typical day" icon="Sparkles" iconLeading onPress={startRoutine} />
                 <Button
                     label="Add a task"

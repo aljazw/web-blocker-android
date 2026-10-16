@@ -22,13 +22,22 @@ export const setThemePreference = flag(KEYS.darkMode).set;
 export const getPassphrasePreference = (): Promise<boolean | null> => readBool(KEYS.passphrase);
 export const setPassphrasePreference = flag(KEYS.passphrase).set;
 
-const toAccent = (raw: string | null): string | null => {
+const toText = (raw: string | null): string | null => {
     const value = parseJson(raw);
     return typeof value === 'string' ? value : null;
 };
 
-export const getAccentPreference = (): Promise<string | null> => readParsed(KEYS.accent, toAccent);
+export const getAccentPreference = (): Promise<string | null> => readParsed(KEYS.accent, toText);
 
 export const setAccentPreference = async (accent: string): Promise<void> => {
     await writeJson(KEYS.accent, accent);
+};
+
+const toFolder = (raw: string | null): string => toText(raw) ?? '';
+
+/** The folder the music screen plays from; "" = every song. */
+export const getMusicFolder = (): Promise<string> => readParsed(KEYS.musicFolder, toFolder);
+
+export const setMusicFolder = async (folder: string): Promise<void> => {
+    await writeJson(KEYS.musicFolder, folder);
 };

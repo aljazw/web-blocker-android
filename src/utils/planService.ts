@@ -177,7 +177,7 @@ const notification = (id: string, title: string, body: string, asks?: Asks) => (
     data: asks ? { date: asks.date, taskId: asks.taskId, title: asks.title } : undefined,
     android: {
         channelId: CHANNEL_ID,
-        smallIcon: 'ic_stat_gaman',
+        smallIcon: 'ic_stat_app',
         pressAction: { id: 'default' },
         // No launchActivity: the buttons work without opening the app.
         actions: asks

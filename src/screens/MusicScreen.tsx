@@ -1,29 +1,90 @@
+import { APP_NAME } from '../constants/brand';
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import BackButton from '../components/BackButton';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
+import Icon from '../components/Icon';
 import IconTile from '../components/IconTile';
+import ModalPanel from '../components/ModalPanel';
 import { NowPlaying } from '../components/MusicPlayer';
 import SearchBar from '../components/SearchBar';
 import { ThemedText } from '../components/ThemedText';
 import { useTheme } from '../context/ThemeContext';
-import { gutter, spacing } from '../theme';
+import { gutter, shapes, spacing } from '../theme';
 import {
     LibraryAccess,
     Track,
     checkLibraryAccess,
+    folderName,
     formatTime,
     getLibrary,
+    inFolder,
+    listFolders,
     music,
     requestLibraryAccess,
     useMusic,
 } from '../utils/music';
 import { logger } from '../utils/logger';
+import { getMusicFolder, setMusicFolder } from '../storage';
 
 const ROW_HEIGHT = 60;
+
+const count = (n: number) => `${n} ${n === 1 ? 'song' : 'songs'}`;
+
+/** Where to play from: every song, or one folder (subfolders included). */
+const FolderPicker: React.FC<{
+    visible: boolean;
+    library: Track[];
+    folder: string;
+    onPick: (folder: string) => void;
+    onClose: () => void;
+}> = ({ visible, library, folder, onPick, onClose }) => {
+    const { colors } = useTheme().theme;
+    const folders = useMemo(() => (visible ? listFolders(library) : []), [visible, library]);
+    const all = useMemo(() => library.filter(t => t.music).length, [library]);
+
+    const row = (path: string, title: string, detail: string) => {
+        const selected = path === folder;
+        return (
+            <Pressable
+                key={path || 'all'}
+                onPress={() => onPick(path)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                style={({ pressed }) => [styles.folder, pressed && { backgroundColor: colors.elevated }]}>
+                <IconTile icon={path ? 'Folder' : 'Music'} size={32} tone={selected ? 'accent' : 'neutral'} />
+                <View style={styles.rowText}>
+                    <ThemedText weight="medium" numberOfLines={1} color={selected ? 'accent' : 'text'}>
+                        {title}
+                    </ThemedText>
+                    <ThemedText size="small" color="muted" numberOfLines={1}>
+                        {detail}
+                    </ThemedText>
+                </View>
+                {selected && <Icon name="Check" size={18} tint={colors.accent} />}
+            </Pressable>
+        );
+    };
+
+    return (
+        <ModalPanel visible={visible} onClose={onClose}>
+            <ThemedText size="large" weight="bold">
+                Play from
+            </ThemedText>
+            <ThemedText size="small" color="muted" style={styles.pickerHint}>
+                A folder plays every audio file in it, subfolders included.
+            </ThemedText>
+            <ScrollView style={styles.folders}>
+                {row('', 'All songs', count(all))}
+                {folders.map(f => row(f.path, folderName(f.path), `${f.path.slice(0, -1)} · ${count(f.count)}`))}
+            </ScrollView>
+            <Button label="Close" variant="secondary" onPress={onClose} />
+        </ModalPanel>
+    );
+};
 
 const matches = (track: Track, query: string) =>
     track.title.toLowerCase().includes(query) ||
@@ -38,9 +99,12 @@ const MusicScreen: React.FC = () => {
     const [library, setLibrary] = useState<Track[]>([]);
     const [loaded, setLoaded] = useState(false);
     const [query, setQuery] = useState('');
+    const [folder, setFolder] = useState('');
+    const [picking, setPicking] = useState(false);
 
     const load = useCallback(async () => {
         try {
+            setFolder(await getMusicFolder());
             const now = await checkLibraryAccess();
             setAccess(prev => (prev === 'blocked' && now !== 'granted' ? prev : now));
             if (now === 'granted') {
@@ -72,8 +136,15 @@ const MusicScreen: React.FC = () => {
         }
     };
 
+    const pickFolder = (next: string) => {
+        setPicking(false);
+        setFolder(next);
+        setMusicFolder(next).catch(error => logger.warn('Could not save music folder', error));
+    };
+
     const q = query.trim().toLowerCase();
-    const shown = useMemo(() => (q ? library.filter(t => matches(t, q)) : library), [library, q]);
+    const songs = useMemo(() => library.filter(t => inFolder(t, folder)), [library, folder]);
+    const shown = useMemo(() => (q ? songs.filter(t => matches(t, q)) : songs), [songs, q]);
 
     const renderItem = useCallback(
         ({ item, index }: { item: Track; index: number }) => {
@@ -121,9 +192,19 @@ const MusicScreen: React.FC = () => {
                 />
             </View>
             <View style={styles.actions}>
-                <ThemedText size="small" color="muted">
-                    {q ? `${shown.length} of ${library.length} songs` : `${library.length} songs`}
-                </ThemedText>
+                <Pressable
+                    onPress={() => setPicking(true)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Playing from ${folder ? folderName(folder) : 'all songs'}. Change folder`}
+                    style={({ pressed }) => [styles.source, pressed && styles.pressed]}>
+                    <Icon name="Folder" size={16} tint={colors.muted} />
+                    <ThemedText size="small" color="muted" numberOfLines={1} style={styles.sourceText}>
+                        {folder ? folderName(folder) : 'All songs'} ·{' '}
+                        {q ? `${shown.length} of ${count(songs.length)}` : count(songs.length)}
+                    </ThemedText>
+                    <Icon name="Down" size={14} tint={colors.muted} />
+                </Pressable>
                 <Button
                     label="Shuffle"
                     icon="Shuffle"
@@ -151,7 +232,7 @@ const MusicScreen: React.FC = () => {
                     <EmptyState
                         icon="Music"
                         title="Play your music"
-                        text="Gaman plays the songs saved on this phone, and keeps playing while you train, plan or use other apps.">
+                        text={`${APP_NAME} plays the songs saved on this phone, and keeps playing while you train, plan or use other apps.`}>
                         <Button
                             label={access === 'blocked' ? 'Allow in settings' : 'Allow access to music'}
                             onPress={allow}
@@ -181,11 +262,22 @@ const MusicScreen: React.FC = () => {
                     contentContainerStyle={styles.list}
                     ListEmptyComponent={
                         <ThemedText color="muted" align="center" style={styles.none}>
-                            No songs match “{query.trim()}”
+                            {q
+                                ? `No songs match “${query.trim()}”`
+                                : folder
+                                ? 'No songs in this folder'
+                                : 'No songs found. Pick a folder above.'}
                         </ThemedText>
                     }
                 />
             )}
+            <FolderPicker
+                visible={picking}
+                library={library}
+                folder={folder}
+                onPick={pickFolder}
+                onClose={() => setPicking(false)}
+            />
         </BaseScreen>
     );
 };
@@ -224,6 +316,34 @@ const styles = StyleSheet.create({
     },
     none: {
         marginTop: spacing.xl,
+    },
+    source: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexShrink: 1,
+        gap: spacing.xs,
+        paddingVertical: spacing.xs,
+    },
+    sourceText: {
+        flexShrink: 1,
+    },
+    pressed: {
+        opacity: 0.6,
+    },
+    pickerHint: {
+        marginTop: spacing.xs,
+    },
+    folders: {
+        maxHeight: 380,
+        marginVertical: spacing.md,
+        marginHorizontal: -spacing.sm,
+    },
+    folder: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.sm,
+        borderRadius: shapes.borderRadius.medium,
     },
 });
 

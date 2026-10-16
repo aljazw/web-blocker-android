@@ -2,7 +2,7 @@ import { NativeModules } from 'react-native';
 
 const { DeviceAdminModule } = NativeModules;
 
-/** Whether Gaman is a device admin (uninstall prevention). False if it can't be checked. */
+/** Whether the app is a device admin (uninstall prevention). False if it can't be checked. */
 export async function checkAdmin(): Promise<boolean> {
     try {
         return (await DeviceAdminModule.isAdminEnabled()) === true;

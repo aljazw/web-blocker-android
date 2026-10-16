@@ -1,6 +1,6 @@
 /**
  * Low-level storage: the native "BlockedPrefs" SharedPreferences (shared with
- * BlockAccessibilityService, DnsVpnService and GamanScreen), an in-memory
+ * BlockAccessibilityService, DnsVpnService and AppScreen), an in-memory
  * cache in front of it, a write queue, and helpers for validating stored data.
  */
 import { NativeModules } from 'react-native';
@@ -34,6 +34,10 @@ export const KEYS = {
     dayHours: '@day_hours',
     planNudges: '@plan_nudges',
     promiseVideoShown: '@promise_video_shown',
+    musicFolder: '@music_folder',
+    notes: '@notes',
+    /** The protected notes' wrapped key (never the password); see NoteCryptoModule.kt. */
+    notesVault: '@notes_vault',
 } as const;
 
 // ---- Cache ------------------------------------------------------------------

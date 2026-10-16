@@ -48,12 +48,12 @@ export async function scheduleDailyNotification() {
             android: {
                 channelId: 'default',
                 showTimestamp: true,
-                smallIcon: 'ic_stat_gaman',
-                largeIcon: 'ic_stat_gaman',
+                smallIcon: 'ic_stat_app',
+                largeIcon: 'ic_stat_app',
                 style: bigTextStyle,
                 pressAction: {
                     id: 'default',
-                    launchActivity: 'com.gaman.OpenAccessibilityActivity',
+                    launchActivity: 'com.disciplineapp.OpenAccessibilityActivity',
                     launchActivityFlags: [AndroidLaunchActivityFlag.NEW_TASK],
                 },
             },

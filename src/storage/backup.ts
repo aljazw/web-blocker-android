@@ -2,25 +2,32 @@
  * Backup export / import as one JSON file.
  *
  * Export takes everything worth keeping: blocks, the routine and day plans, workouts
- * and their history, apnea tables, records and settings, sleep time,
- * vacation, appearance and the DNS resolver.
+ * and their history, apnea tables, records and settings, notes, sleep time,
+ * vacation, appearance, the music folder and the DNS resolver.
+ *
+ * Protected notes go into the file exactly as stored: encrypted, next to the
+ * key that's wrapped with the notes password. The password itself is stored
+ * nowhere, so the file opens them only for someone who knows it.
  *
  * Import restores it, with one rule: it can never weaken protection, or it
- * would be a two-tap way around Gaman.
+ * would be a two-tap way around the app.
  *  - Blocked sites and apps are only added; nothing on the list is removed.
  *  - Sleep time is taken only while it's off here.
  *  - A vacation is taken only if it hasn't started yet and none is planned.
- *  - Passphrase protection is left as it is.
+ *  - Passphrase protection can be turned on, never off.
  * Everything else replaces what's on the phone.
  */
 import { SleepSchedule, Vacation } from '../types/types';
 import { isValidVacation, vacationPhase } from '../utils/vacation';
+import { APP_NAME } from '../constants/brand';
 import { KEYS, parseJson, readRaw, serialized, writeJson, writeRaw } from './core';
 import { mergeBlockedApps, mergeBlockedWebsites } from './blockList';
 import { getSleepSchedule, setSleepSchedule } from './sleep';
 import { getVacation, setVacation } from './vacation';
 
-export const BACKUP_FORMAT = 'gaman-backup';
+export const BACKUP_FORMAT = 'discipline-app-backup';
+/** Format names written by earlier builds, still accepted on import. */
+const LEGACY_FORMATS = ['gaman-backup'];
 export const BACKUP_VERSION = 1;
 
 /** Native-only key: the resolver for allowed sites, stored as a plain string. */
@@ -40,6 +47,10 @@ const REPLACED = {
     apneaSettings: { key: KEYS.apneaSettings, kind: 'object' },
     darkMode: { key: KEYS.darkMode, kind: 'flag' },
     accent: { key: KEYS.accent, kind: 'string' },
+    musicFolder: { key: KEYS.musicFolder, kind: 'string' },
+    // The key before the notes it opens, so the two always arrive together.
+    notesVault: { key: KEYS.notesVault, kind: 'object' },
+    notes: { key: KEYS.notes, kind: 'list' },
 } as const;
 
 type ReplacedName = keyof typeof REPLACED;
@@ -50,6 +61,7 @@ export interface BackupData {
     sleepSchedule?: unknown;
     vacation?: unknown;
     dnsUpstream?: string;
+    passphrase?: boolean;
     [name: string]: unknown;
 }
 
@@ -86,6 +98,7 @@ export const createBackup = async (now: Date = new Date()): Promise<Backup> => {
     data.sleepSchedule = await read(KEYS.sleepSchedule);
     data.vacation = await read(KEYS.vacation);
     data.dnsUpstream = (await readRaw(DNS_UPSTREAM)) ?? '';
+    data.passphrase = (await read(KEYS.passphrase)) === true;
     return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: now.toISOString(), data };
 };
 
@@ -97,11 +110,11 @@ export const parseBackup = (text: string): { backup: Backup } | { error: string 
     } catch {
         return { error: 'This file isn’t valid JSON.' };
     }
-    if (!v || v.format !== BACKUP_FORMAT || !v.data || typeof v.data !== 'object') {
-        return { error: 'This isn’t a Gaman backup file.' };
+    if (!v || (v.format !== BACKUP_FORMAT && !LEGACY_FORMATS.includes(v.format)) || !v.data || typeof v.data !== 'object') {
+        return { error: `This isn’t a ${APP_NAME} backup file.` };
     }
     if (typeof v.version !== 'number' || v.version > BACKUP_VERSION) {
-        return { error: 'This backup comes from a newer version of Gaman. Update the app, then try again.' };
+        return { error: `This backup comes from a newer version of ${APP_NAME}. Update the app, then try again.` };
     }
     return { backup: v as Backup };
 };
@@ -119,6 +132,7 @@ export const describeBackup = (backup: Backup): string => {
         [count(d.workoutRecords), 'workout session'],
         [count(d.apneaTables), 'apnea table'],
         [count(d.apneaRecords), 'apnea session'],
+        [count(d.notes), 'note'],
     ] as const;
     const list = parts.filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}${n === 1 ? '' : 's'}`);
     const date = new Date(backup.exportedAt);
@@ -149,6 +163,9 @@ export const importBackup = async (backup: Backup, now: Date = new Date()): Prom
     if (Array.isArray(d.dayPlans) && d.days === undefined) {
         ok = (await serialized(() => writeJson(KEYS.dayPlans, d.dayPlans)).catch(() => false)) && ok;
         ok = (await writeRaw(KEYS.routineMigrated, 'false').catch(() => false)) && ok;
+    }
+    if (d.passphrase === true) {
+        ok = (await writeJson(KEYS.passphrase, true).catch(() => false)) && ok;
     }
     if (typeof d.dnsUpstream === 'string') {
         ok = (await writeRaw(DNS_UPSTREAM, d.dnsUpstream.trim().toLowerCase()).catch(() => false)) && ok;
@@ -189,8 +206,8 @@ export const importBackup = async (backup: Backup, now: Date = new Date()): Prom
     return { ok, skipped };
 };
 
-/** The file name an export suggests, e.g. gaman-backup-2026-10-13.json. */
+/** The file name an export suggests, e.g. discipline-app-backup-2026-10-13.json. */
 export const backupFileName = (now: Date = new Date()) => {
     const pad = (n: number) => `${n}`.padStart(2, '0');
-    return `gaman-backup-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.json`;
+    return `discipline-app-backup-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.json`;
 };

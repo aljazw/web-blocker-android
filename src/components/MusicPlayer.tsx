@@ -1,3 +1,4 @@
+import { APP_NAME } from '../constants/brand';
 import { useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
@@ -7,8 +8,10 @@ import Icon from './Icon';
 import IconTile from './IconTile';
 import IconButton from './IconButton';
 import Card from './Card';
+import Button from './Button';
+import ModalPanel from './ModalPanel';
 import { haptics } from '../utils/haptics';
-import { MusicState, formatTime, music, nextRepeat, useMusicPosition } from '../utils/music';
+import { MusicState, formatTime, music, nextRepeat, useMusicPosition, useSleepLeft } from '../utils/music';
 
 /** Round play/pause button; the one control that stands out. */
 const PlayButton: React.FC<{ state: MusicState; size: number }> = ({ state, size }) => {
@@ -92,6 +95,83 @@ const SeekBar: React.FC<{ state: MusicState }> = ({ state }) => {
     );
 };
 
+const SLEEP_MINUTES = [15, 30, 45, 60, 90];
+
+const minutesLabel = (m: number) => (m < 60 ? `${m} minutes` : m === 60 ? '1 hour' : `${m / 60} hours`);
+
+/** Stops the music after a while or at the end of this song, fading out first. Works with the app closed. */
+const SleepTimer: React.FC<{ state: MusicState }> = ({ state }) => {
+    const { colors } = useTheme().theme;
+    const [open, setOpen] = useState(false);
+    const left = useSleepLeft(state);
+    const active = left !== null || state.sleepEndOfSong;
+    const status = state.sleepEndOfSong
+        ? 'Stops after this song'
+        : left !== null
+        ? `Stops in ${formatTime(left)}`
+        : 'Sleep timer';
+
+    const pick = (minutes: number, endOfSong = false) => {
+        haptics.tap();
+        setOpen(false);
+        music.sleepTimer(minutes, endOfSong);
+    };
+
+    const option = (label: string, onPress: () => void, selected = false) => (
+        <Pressable
+            key={label}
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            style={({ pressed }) => [styles.option, pressed && { backgroundColor: colors.elevated }]}>
+            <ThemedText weight="medium" color={selected ? 'accent' : 'text'} style={styles.optionText}>
+                {label}
+            </ThemedText>
+            {selected && <Icon name="Check" size={18} tint={colors.accent} />}
+        </Pressable>
+    );
+
+    return (
+        <>
+            <View style={styles.sleep}>
+                <Pressable
+                    onPress={() => setOpen(true)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={active ? `${status}. Change sleep timer` : 'Sleep timer'}
+                    style={({ pressed }) => [styles.sleepButton, pressed && styles.pressed]}>
+                    <Icon name="Moon" size={15} tint={active ? colors.accent : colors.muted} />
+                    <ThemedText size="small" weight="medium" color={active ? 'accent' : 'muted'} tabular>
+                        {status}
+                    </ThemedText>
+                </Pressable>
+            </View>
+            <ModalPanel visible={open} onClose={() => setOpen(false)}>
+                <ThemedText size="large" weight="bold">
+                    Sleep timer
+                </ThemedText>
+                <ThemedText size="small" color="muted" style={styles.sleepHint}>
+                    The music fades out and stops, even with {APP_NAME} closed.
+                </ThemedText>
+                <View style={styles.options}>
+                    {SLEEP_MINUTES.map(m => option(minutesLabel(m), () => pick(m)))}
+                    {option('End of this song', () => pick(0, true), state.sleepEndOfSong)}
+                </View>
+                <View style={styles.sleepActions}>
+                    {active && (
+                        <View style={styles.sleepAction}>
+                            <Button label="Turn off" variant="secondary" onPress={() => pick(0)} />
+                        </View>
+                    )}
+                    <View style={styles.sleepAction}>
+                        <Button label="Close" variant={active ? 'ghost' : 'secondary'} onPress={() => setOpen(false)} />
+                    </View>
+                </View>
+            </ModalPanel>
+        </>
+    );
+};
+
 /** The full player: song, position and every control. */
 export const NowPlaying: React.FC<{ state: MusicState }> = ({ state }) => {
     const { colors } = useTheme().theme;
@@ -140,6 +220,7 @@ export const NowPlaying: React.FC<{ state: MusicState }> = ({ state }) => {
                     onPress={() => music.setRepeat(nextRepeat(state.repeat))}
                 />
             </View>
+            <SleepTimer state={state} />
         </Card>
     );
 };
@@ -180,6 +261,41 @@ export const MiniPlayer: React.FC<{ state: MusicState; onOpen: () => void }> = (
 const THUMB = 14;
 
 const styles = StyleSheet.create({
+    sleep: {
+        alignItems: 'center',
+        marginTop: spacing.sm,
+    },
+    sleepButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs + 2,
+        paddingVertical: spacing.xs,
+        paddingHorizontal: spacing.sm,
+    },
+    sleepHint: {
+        marginTop: spacing.xs,
+    },
+    options: {
+        marginVertical: spacing.md,
+        marginHorizontal: -spacing.sm,
+    },
+    option: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: spacing.sm + 2,
+        paddingHorizontal: spacing.sm,
+        borderRadius: shapes.borderRadius.medium,
+    },
+    optionText: {
+        flex: 1,
+    },
+    sleepActions: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+    },
+    sleepAction: {
+        flex: 1,
+    },
     song: {
         flexDirection: 'row',
         alignItems: 'center',

@@ -6,7 +6,8 @@ export type TabParamList = {
     /** Opens on today, tomorrow or the routine list. */
     Habits: { view?: RoutineView } | undefined;
     Workout: undefined;
-    Breathe: undefined;
+    /** Music, apnea training and notes. */
+    Tools: undefined;
     Block: undefined;
 };
 
@@ -24,6 +25,8 @@ export type RootStackParamList = {
     ApneaTable: { kind: 'co2' | 'o2' } | { kind: 'custom'; tableId?: string; name?: string; rounds?: TableRound[] };
     /** The live (or just finished) training session. */
     ApneaSession: undefined;
+    /** Apnea training home: tables, breathing exercises and history. */
+    Apnea: undefined;
     ApneaHistory: undefined;
     ApneaSettings: undefined;
     Sleep: undefined;
@@ -35,6 +38,9 @@ export type RootStackParamList = {
     WorkoutEditor: { workoutId?: string } | undefined;
     /** The live (or just finished) workout. */
     WorkoutSession: undefined;
+    Notes: undefined;
+    /** No noteId = a new note. */
+    NoteEditor: { noteId?: string } | undefined;
 };
 
 export type RoutineView = 'today' | 'tomorrow' | 'routine';
@@ -141,6 +147,34 @@ export interface Habit {
 }
 
 export type HabitLink = 'apnea' | 'workout';
+
+// ---- Notes -----------------------------------------------------------------
+
+/**
+ * A note as stored. A protected note keeps its title and text only inside
+ * `cipher` (encrypted with the notes password, see NoteCryptoModule.kt).
+ */
+export interface StoredNote {
+    id: string;
+    /** Epoch ms. */
+    createdAt: number;
+    updatedAt: number;
+    title?: string;
+    body?: string;
+    cipher?: string;
+}
+
+/** A note ready to show: protected ones carry their text only while the notes are unlocked. */
+export interface Note {
+    id: string;
+    createdAt: number;
+    updatedAt: number;
+    title: string;
+    body: string;
+    protected: boolean;
+    /** Protected and not readable right now (notes locked). */
+    locked: boolean;
+}
 
 // ---- Workouts ---------------------------------------------------------------
 

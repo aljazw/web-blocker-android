@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../components/Icon';
 import HomeScreen from '../screens/HomeScreen';
 import HabitsScreen from '../screens/HabitsScreen';
-import BreatheScreen from '../screens/BreatheScreen';
+import ToolsScreen from '../screens/ToolsScreen';
 import BlockScreen from '../screens/BlockScreen';
 import WorkoutScreen from '../screens/WorkoutScreen';
 import { useTheme } from '../context/ThemeContext';
@@ -19,7 +19,7 @@ const TAB_LABELS: Record<keyof TabParamList, string> = {
     Home: 'Overview',
     Habits: 'Routine',
     Workout: 'Workout',
-    Breathe: 'Apnea',
+    Tools: 'Tools',
     Block: 'Settings',
 };
 
@@ -83,7 +83,7 @@ const BottomTabNavigator: React.FC = () => {
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Habits" component={HabitsScreen} />
             <Tab.Screen name="Workout" component={WorkoutScreen} />
-            <Tab.Screen name="Breathe" component={BreatheScreen} />
+            <Tab.Screen name="Tools" component={ToolsScreen} />
             <Tab.Screen name="Block" component={BlockScreen} />
         </Tab.Navigator>
     );

@@ -3,14 +3,12 @@ import { checkAdmin } from '../utils/deviceAdmin';
 import { checkAccessibilityEnabled } from '../utils/accessibility';
 import { DnsStats, getDnsStats, getPrivateDnsHost, getUpstreamDns, isDnsBlockingRunning } from '../utils/dnsBlocking';
 import { canDrawOverlays } from '../utils/overlay';
-import { isWatchdogRunning } from '../utils/watchdog';
 import { getBlockedWebsites } from '../storage';
 import { ALL_DAY, FULL_WEEK } from '../utils/schedule';
 import { useAppForeground } from './useAppForeground';
 
 export interface ProtectionStatus {
     accessibility: boolean;
-    watchdog: boolean;
     overlay: boolean;
     dns: boolean;
     admin: boolean;
@@ -24,7 +22,6 @@ export interface ProtectionStatus {
 
 const INITIAL: ProtectionStatus = {
     accessibility: false,
-    watchdog: false,
     overlay: true,
     dns: false,
     admin: false,
@@ -44,7 +41,7 @@ export const useProtectionStatus = () => {
     const [status, setStatus] = useState<ProtectionStatus>(INITIAL);
 
     const refresh = useCallback(async () => {
-        const [admin, dns, overlay, accessibility, dnsStats, sites, upstream, watchdog, privateDnsHost] =
+        const [admin, dns, overlay, accessibility, dnsStats, sites, upstream, privateDnsHost] =
             await Promise.all([
                 checkAdmin(),
                 isDnsBlockingRunning(),
@@ -53,7 +50,6 @@ export const useProtectionStatus = () => {
                 getDnsStats(),
                 getBlockedWebsites().catch(() => []),
                 getUpstreamDns(),
-                isWatchdogRunning(),
                 getPrivateDnsHost(),
             ]);
         setStatus({
@@ -63,7 +59,6 @@ export const useProtectionStatus = () => {
             accessibility,
             dnsStats,
             upstream,
-            watchdog,
             privateDnsHost,
             dnsRuleCount: sites.filter(s => s.days === FULL_WEEK && s.time === ALL_DAY).length,
         });

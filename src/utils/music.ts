@@ -16,6 +16,10 @@ export interface Track {
     album: string;
     albumId: number;
     durationMs: number;
+    /** Folder on the phone, like "Music/Gym/"; "" when unknown. */
+    folder: string;
+    /** Android counts it as music (not a ringtone, notification sound or voice note). */
+    music: boolean;
 }
 
 export type RepeatMode = 'off' | 'all' | 'one';
@@ -34,6 +38,10 @@ export interface MusicState {
     count: number;
     shuffle: boolean;
     repeat: RepeatMode;
+    /** When the sleep timer stops the music (epoch millis); 0 = no timed stop. */
+    sleepAt: number;
+    /** The sleep timer stops the music when this song ends. */
+    sleepEndOfSong: boolean;
     /** When positionMs was read (epoch millis). */
     at: number;
 }
@@ -50,6 +58,8 @@ const IDLE: MusicState = {
     count: 0,
     shuffle: false,
     repeat: 'off',
+    sleepAt: 0,
+    sleepEndOfSong: false,
     at: 0,
 };
 
@@ -75,6 +85,8 @@ export const parseMusicState = (raw: unknown): MusicState => {
             count: num(v.count),
             shuffle: v.shuffle === true,
             repeat: REPEATS.includes(v.repeat) ? v.repeat : 'off',
+            sleepAt: num(v.sleepAt),
+            sleepEndOfSong: v.sleepEndOfSong === true,
             at: num(v.at) || Date.now(),
         };
     } catch {
@@ -99,6 +111,8 @@ export const parseLibrary = (raw: unknown): Track[] => {
                       album: str(t.album),
                       albumId: typeof t.albumId === 'number' ? t.albumId : -1,
                       durationMs: num(t.durationMs),
+                      folder: str(t.folder),
+                      music: t.music !== false,
                   }))
             : [];
     } catch {
@@ -176,6 +190,22 @@ export const music = {
     setShuffle: (enabled: boolean) => call(() => Music.setShuffle(enabled)),
     setRepeat: (mode: RepeatMode) => call(() => Music.setRepeat(mode)),
     stop: () => call(() => Music.stop()),
+    /** Stop after `minutes`, or at the end of this song; `sleepTimer(0)` turns it off. */
+    sleepTimer: (minutes: number, endOfSong = false) => call(() => Music.setSleepTimer(minutes, endOfSong)),
+};
+
+/** Time left on the sleep timer, ticking down each second; null when no timed stop is set. */
+export const useSleepLeft = (state: MusicState): number | null => {
+    const [now, setNow] = useState(Date.now);
+    useEffect(() => {
+        if (!state.sleepAt) {
+            return;
+        }
+        setNow(Date.now());
+        const timer = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(timer);
+    }, [state.sleepAt]);
+    return state.sleepAt ? Math.max(0, state.sleepAt - now) : null;
 };
 
 export const nextRepeat = (mode: RepeatMode): RepeatMode => REPEATS[(REPEATS.indexOf(mode) + 1) % REPEATS.length];
@@ -201,8 +231,39 @@ export const requestLibraryAccess = async (): Promise<LibraryAccess> => {
         : 'ask';
 };
 
-/** Every song on the phone, by title. */
+/** Every audio file on the phone, by title. */
 export const getLibrary = async (): Promise<Track[]> => (Music ? parseLibrary(await Music.getLibrary()) : []);
+
+// ---- Folders ----------------------------------------------------------------
+
+/** "" plays every song on the phone; a folder plays all its audio, subfolders included. */
+export const inFolder = (track: Track, folder: string) =>
+    folder ? track.folder.startsWith(folder) : track.music;
+
+export interface MusicFolder {
+    path: string;
+    /** Audio files in it, subfolders included. */
+    count: number;
+}
+
+/** Every folder holding audio, and the folders above them, by path. */
+export const listFolders = (tracks: Track[]): MusicFolder[] => {
+    const counts = new Map<string, number>();
+    tracks.forEach(t => {
+        // "Music/Gym/" counts for "Music/" and "Music/Gym/".
+        const parts = t.folder.split('/').filter(Boolean);
+        parts.forEach((_, i) => {
+            const path = `${parts.slice(0, i + 1).join('/')}/`;
+            counts.set(path, (counts.get(path) ?? 0) + 1);
+        });
+    });
+    return [...counts]
+        .map(([path, count]) => ({ path, count }))
+        .sort((a, b) => a.path.localeCompare(b.path, undefined, { sensitivity: 'base' }));
+};
+
+/** "Gym" for "Music/Gym/". */
+export const folderName = (folder: string) => folder.split('/').filter(Boolean).pop() ?? '';
 
 export const formatTime = (ms: number) => {
     const total = Math.max(0, Math.floor(ms / 1000));

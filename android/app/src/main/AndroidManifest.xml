@@ -24,7 +24,7 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
 
-    <!-- Android 11+: lets Gaman list launchable apps so the user can choose which to block. -->
+    <!-- Android 11+: lets the app list launchable apps so the user can choose which to block. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -111,7 +111,7 @@
             android:screenOrientation="portrait"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
 
-        <!-- Shown when the user reaches Gaman's accessibility toggle page -->
+        <!-- Shown when the user reaches the app's accessibility toggle page -->
         <activity
             android:name=".GuardActivity"
             android:exported="false"
@@ -134,15 +134,11 @@
                 />
         </service>
 
-        <!-- Independent watchdog: detects a disable via Settings.Secure on any OEM -->
-        <service
-            android:name=".WatchdogService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Keeps self-control website blocking active and alerts the user if the accessibility service is turned off." />
-        </service>
+        <!-- Checks a few seconds after the accessibility service is unbound
+             whether it was really switched off, and asks to turn it back on -->
+        <receiver
+            android:name=".ProtectionCheckReceiver"
+            android:exported="false" />
 
         <!-- Second layer: DNS-filtering VPN. Keeps always-blocked sites blocked
              even if the accessibility service is turned off. -->

@@ -1,3 +1,4 @@
+import { APP_NAME } from '../constants/brand';
 import React from 'react';
 import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import BaseScreen from '../components/BaseScreen';
@@ -34,16 +35,14 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
         <BaseScreen showHeader={false}>
             <ScrollView contentContainerStyle={styles.container}>
                 <FadeIn>
-                    <View
-                        style={[styles.logo, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
-                        <Image
-                            source={require('../assets/icons/ic_gaman.png')}
-                            style={styles.image}
-                            resizeMode="contain"
-                        />
-                    </View>
+                    <Image
+                        source={require('../assets/icons/ic_app.png')}
+                        style={styles.logo}
+                        resizeMode="contain"
+                        accessibilityIgnoresInvertColors
+                    />
                     <ThemedText weight="bold" size="display" style={styles.title}>
-                        Gaman
+                        {APP_NAME}
                     </ThemedText>
                     <ThemedText color="muted" size="large" style={styles.subtitle}>
                         Focus and self-improvement. Remove distractions, build routines and train your breath.
@@ -112,18 +111,10 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     logo: {
-        width: 64,
-        height: 64,
-        borderRadius: shapes.borderRadius.large,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
+        width: 72,
+        height: 72,
         marginHorizontal: gutter,
         marginBottom: spacing.lg,
-    },
-    image: {
-        width: 40,
-        height: 40,
     },
     title: {
         marginHorizontal: gutter,

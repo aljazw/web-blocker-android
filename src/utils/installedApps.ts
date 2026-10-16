@@ -10,7 +10,7 @@ export interface InstalledApp {
 let appsCache: Promise<InstalledApp[]> | null = null;
 
 /**
- * Apps the user can launch, sorted by name (Gaman itself excluded). Cached for
+ * Apps the user can launch, sorted by name (the app itself excluded). Cached for
  * the session: listing every app is slow, and installs during a session are rare.
  */
 export const getLaunchableApps = (): Promise<InstalledApp[]> => {

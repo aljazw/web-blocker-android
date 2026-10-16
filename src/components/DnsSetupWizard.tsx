@@ -1,3 +1,4 @@
+import { APP_NAME } from '../constants/brand';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import ModalPanel from './ModalPanel';
@@ -26,7 +27,7 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
     const [busy, setBusy] = useState(false);
     const [enableError, setEnableError] = useState<string | null>(null);
     // Android's Private DNS hostname, read before the user turns it off so
-    // Gaman can keep using that provider (encrypted) for allowed sites.
+    // the app can keep using that provider (encrypted) for allowed sites.
     const [privateHost, setPrivateHost] = useState<string | null>(null);
     const [hostSaved, setHostSaved] = useState(false);
 
@@ -113,8 +114,8 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
                         <>
                             <ThemedText size="small" color="accent" style={styles.body}>
                                 {hostSaved
-                                    ? `Gaman now uses ${privateHost} for allowed sites, encrypted, so its ad and tracker blocking keeps working.`
-                                    : `You use ${privateHost}. Keep it: Gaman can send allowed sites there, encrypted.`}
+                                    ? `${APP_NAME} now uses ${privateHost} for allowed sites, encrypted, so its ad and tracker blocking keeps working.`
+                                    : `You use ${privateHost}. Keep it: ${APP_NAME} can send allowed sites there, encrypted.`}
                             </ThemedText>
                             {!hostSaved && <PrimaryButton label={`Keep ${privateHost}`} onPress={keepProvider} />}
                         </>
@@ -146,7 +147,7 @@ const DnsSetupWizard: React.FC<DnsSetupWizardProps> = ({ visible, onClose, onDns
                     </ThemedText>
                     <ThemedText color="muted" style={styles.body}>
                         So it can’t be switched off in a couple of taps. In VPN settings, tap the gear next to{' '}
-                        <ThemedText weight="strong">Gaman</ThemedText>, then turn on{' '}
+                        <ThemedText weight="strong">{APP_NAME}</ThemedText>, then turn on{' '}
                         <ThemedText weight="strong">Always-on VPN</ThemedText> and{' '}
                         <ThemedText weight="strong">Block connections without VPN</ThemedText>.
                     </ThemedText>
