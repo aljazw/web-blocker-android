@@ -13,7 +13,7 @@ export interface ProtectionStatus {
     dns: boolean;
     admin: boolean;
     dnsStats: DnsStats | null;
-    /** Sites the DNS layer covers: only "every day, all day" blocks. */
+    /** Sites the DNS layer covers: only "every day, all day" blocks without a daily limit. */
     dnsRuleCount: number;
     upstream: string;
     /** Android's Private DNS hostname, when one is set. */
@@ -60,7 +60,7 @@ export const useProtectionStatus = () => {
             dnsStats,
             upstream,
             privateDnsHost,
-            dnsRuleCount: sites.filter(s => s.days === FULL_WEEK && s.time === ALL_DAY).length,
+            dnsRuleCount: sites.filter(s => s.days === FULL_WEEK && s.time === ALL_DAY && !s.limit).length,
         });
     }, []);
 

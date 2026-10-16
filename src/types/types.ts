@@ -105,6 +105,8 @@ export interface BlockedWebsitesData {
     time: string;
     websiteUrl: string;
     visible: boolean;
+    /** Minutes a day it may be used while its schedule is on; unset = blocked outright. */
+    limit?: number;
 }
 
 export interface BlockedAppData {
@@ -113,6 +115,8 @@ export interface BlockedAppData {
     packageName: string;
     appName: string;
     visible: boolean;
+    /** Minutes a day it may be used while its schedule is on; unset = blocked outright. */
+    limit?: number;
 }
 
 /** A website or app on the block list, in one shape for the UI. */
@@ -124,6 +128,7 @@ export interface BlockEntry {
     days: string;
     time: string;
     visible: boolean;
+    limit?: number;
 }
 
 /**

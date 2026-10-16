@@ -49,9 +49,23 @@ export const describeDays = (days: string): string => {
 
 export const describeTime = (time: string): string => (!time || time === ALL_DAY ? 'All day' : time);
 
-/** One-line schedule summary, e.g. "Always", "Weekdays · 09:00 - 17:00". */
-export const describeSchedule = (days: string, time: string): string => {
+/** 30 -> "30 min", 90 -> "1 h 30 min". */
+export const describeMinutes = (minutes: number): string => {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return h === 0 ? `${m} min` : m === 0 ? `${h} h` : `${h} h ${m} min`;
+};
+
+/**
+ * One-line schedule summary, e.g. "Always", "Weekdays · 09:00 - 17:00",
+ * or for a daily limit "30 min a day · Weekdays".
+ */
+export const describeSchedule = (days: string, time: string, limit?: number): string => {
     const allDay = !time || time === ALL_DAY;
+    if (limit) {
+        const when = [days === FULL_WEEK ? null : describeDays(days), allDay ? null : describeTime(time)];
+        return [`${describeMinutes(limit)} a day`, ...when].filter(Boolean).join(' · ');
+    }
     if (days === FULL_WEEK && allDay) {
         return 'Always';
     }

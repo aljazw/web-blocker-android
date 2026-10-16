@@ -38,12 +38,14 @@ export const KEYS = {
     notes: '@notes',
     /** The protected notes' wrapped key (never the password); see NoteCryptoModule.kt. */
     notesVault: '@notes_vault',
+    /** Today's time on blocks with a daily limit; written by BlockAccessibilityService (UsageLimits.kt). */
+    limitUsage: '@limit_usage',
 } as const;
 
 // ---- Cache ------------------------------------------------------------------
 
 /** Keys the native side writes too; these are always read fresh. */
-const NATIVE_WRITTEN = new Set<string>([KEYS.sleepDismissedUntil]);
+const NATIVE_WRITTEN = new Set<string>([KEYS.sleepDismissedUntil, KEYS.limitUsage]);
 
 /**
  * Raw values by key. Only JS writes the other keys, so after the first read

@@ -1,10 +1,15 @@
 package com.disciplineapp
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
 import android.provider.AlarmClock
 import android.provider.Settings
 import android.telecom.TelecomManager
@@ -27,7 +32,9 @@ class BlockAccessibilityService : AccessibilityService() {
         val days: String? = null,
         val time: String? = null,
         val websiteUrl: String? = null,
-        val visible: Boolean? = null
+        val visible: Boolean? = null,
+        /** Minutes a day it may be used during its schedule; null = blocked outright. */
+        val limit: Int? = null
     )
 
     data class BlockedApp(
@@ -35,7 +42,8 @@ class BlockAccessibilityService : AccessibilityService() {
         val time: String? = null,
         val packageName: String? = null,
         val appName: String? = null,
-        val visible: Boolean? = null
+        val visible: Boolean? = null,
+        val limit: Int? = null
     )
 
     /** A blocked site or app with its schedule parsed once, when the list is loaded. */
@@ -44,7 +52,11 @@ class BlockAccessibilityService : AccessibilityService() {
         val url: String,
         val days: Set<String>,
         val start: LocalTime?,
-        val end: LocalTime?
+        val end: LocalTime?,
+        /** Daily allowance while the schedule is on; null = always blocked then. */
+        val limitMs: Long? = null,
+        /** Where its time is counted in [UsageLimits]. */
+        val usageKey: String = ""
     ) {
         fun isActive(day: String, now: LocalTime): Boolean {
             if (day !in days) return false
@@ -76,6 +88,21 @@ class BlockAccessibilityService : AccessibilityService() {
     private var sleepAllowed: Set<String> = emptySet()
     private var sleepAllowedBuiltAt: Long = 0
 
+    /** Keyboards: they come and go over apps without the app being left. */
+    private var keyboards: Set<String> = emptySet()
+    private var keyboardsBuiltAt: Long = 0
+
+    private var usage: UsageLimits? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private val limitTick = Runnable { checkLimitedUse() }
+
+    /** Screen off: whatever was being timed isn't being used any more. */
+    private val screenOffReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            stopTiming()
+        }
+    }
+
     companion object {
         private const val TAG = "BlockedService"
         private const val PREFS_NAME = "BlockedPrefs"
@@ -90,6 +117,9 @@ class BlockAccessibilityService : AccessibilityService() {
         private const val SLEEP_ALLOWED_TTL = 60_000L
         private const val MAX_DETAIL_CLICKABLE = 3
         private const val MAX_TREE_DEPTH = 40
+        /** How often time on a limited app or site is re-checked and saved. */
+        private const val LIMIT_TICK = 15_000L
+        private const val MAX_LIMIT_MINUTES = 24 * 60
 
         private val gson = Gson()
         private val listType = object : TypeToken<List<BlockedWebsite?>>() {}.type
@@ -150,6 +180,12 @@ class BlockAccessibilityService : AccessibilityService() {
         loadBlockedApps()
         sleepSchedule = SleepSchedule.load(sharedPref)
         vacation = Vacation.load(sharedPref)
+        usage = UsageLimits(sharedPref)
+        try {
+            registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not watch screen off", e)
+        }
 
         // If a "turned off" alert was showing, the service is back: clear it.
         ProtectionAlerts.onProtectionRestored(applicationContext)
@@ -166,6 +202,11 @@ class BlockAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        handler.removeCallbacks(limitTick)
+        usage?.track(null)
+        try {
+            unregisterReceiver(screenOffReceiver)
+        } catch (_: Exception) { }
         if (::sharedPref.isInitialized) {
             sharedPref.unregisterOnSharedPreferenceChangeListener(prefsListener)
         }
@@ -187,7 +228,7 @@ class BlockAccessibilityService : AccessibilityService() {
             gson.fromJson<List<BlockedWebsite?>>(jsonData, listType)
                 ?.mapNotNull { item ->
                     if (item == null || item.websiteUrl.isNullOrBlank()) null
-                    else parseSchedule(item.days, item.time, item.websiteUrl)
+                    else parseSchedule(item.days, item.time, item.websiteUrl, item.limit, UsageLimits.siteKey(item.websiteUrl))
                 }
                 ?: emptyList()
         } catch (e: Exception) {
@@ -204,7 +245,13 @@ class BlockAccessibilityService : AccessibilityService() {
             gson.fromJson<List<BlockedApp?>>(jsonData, appListType)
                 ?.mapNotNull { item ->
                     if (item == null || item.packageName.isNullOrBlank()) null
-                    else item.packageName to parseSchedule(item.days, item.time, item.appName ?: item.packageName)
+                    else item.packageName to parseSchedule(
+                        item.days,
+                        item.time,
+                        item.appName ?: item.packageName,
+                        item.limit,
+                        UsageLimits.appKey(item.packageName),
+                    )
                 }
                 ?.toMap()
                 ?: emptyMap()
@@ -218,7 +265,13 @@ class BlockAccessibilityService : AccessibilityService() {
      * Parses one entry's schedule. Never throws: a bad time (e.g. "25:99") falls
      * back to all day, so one damaged entry can't disable every other block.
      */
-    private fun parseSchedule(daysText: String?, time: String?, label: String): ParsedBlock {
+    private fun parseSchedule(
+        daysText: String?,
+        time: String?,
+        label: String,
+        limit: Int? = null,
+        usageKey: String = "",
+    ): ParsedBlock {
         val days = when {
             daysText == null || daysText == FULL_WEEK -> ALL_DAYS
             else -> daysText.split(",").map { it.trim().trim('\'').lowercase() }.toSet()
@@ -237,7 +290,9 @@ class BlockAccessibilityService : AccessibilityService() {
                 end = null
             }
         }
-        return ParsedBlock(label, days, start, end)
+        // A limit outside 1 min..24 h is damaged data: block outright rather than allow.
+        val limitMs = limit?.takeIf { it in 1 until MAX_LIMIT_MINUTES }?.let { it * 60_000L }
+        return ParsedBlock(label, days, start, end, limitMs, usageKey)
     }
 
     private fun today(): String = LocalDate.now().dayOfWeek.name.take(3).lowercase()
@@ -259,12 +314,14 @@ class BlockAccessibilityService : AccessibilityService() {
         // On vacation nothing is blocked; only the settings guard keeps running,
         // so the blocks are still in place when the vacation ends.
         if (vacation?.isActive() == true) {
+            stopTiming()
             if (isSettingsPackage(packageName)) handleSettingsGuard()
             return
         }
 
         // Sleep time covers everything (Settings included) except the essentials.
         if (shouldCoverForSleep(packageName, event)) {
+            stopTiming()
             if (System.currentTimeMillis() - lastSleepTime > SLEEP_DEBOUNCE) {
                 lastSleepTime = System.currentTimeMillis()
                 startSleepActivity()
@@ -273,20 +330,31 @@ class BlockAccessibilityService : AccessibilityService() {
         }
 
         if (isSettingsPackage(packageName)) {
+            stopTiming()
             handleSettingsGuard()
             return
         }
 
-        // A blocked app is on screen: cover it with the block page.
+        // A blocked app is on screen: cover it with the block page,
+        // or time it when it has a daily limit that isn't used up yet.
         if (packageName != applicationContext.packageName) {
             val app = blockedApps[packageName]
             if (app != null && app.isActive(today(), LocalTime.now())) {
-                if (System.currentTimeMillis() - lastAppBlockTime > APP_BLOCK_DEBOUNCE) {
-                    lastAppBlockTime = System.currentTimeMillis()
-                    startBlockedAppActivity(packageName, app.url)
+                if (withinLimit(app)) {
+                    startTiming(app.usageKey)
+                } else {
+                    blockApp(packageName, app)
                 }
                 return
             }
+        }
+
+        // Switched to something else (a keyboard or the status bar don't count).
+        // A browser only ends a limited app's time; its own sites are checked below.
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && !isPassThrough(packageName) &&
+            (!isBrowser(packageName) || usage?.activeKey?.startsWith("app:") == true)
+        ) {
+            stopTiming()
         }
 
         // Debounce browser evaluation
@@ -295,12 +363,132 @@ class BlockAccessibilityService : AccessibilityService() {
 
         val rootNode = rootInActiveWindow ?: return
         try {
-            val blocked = findBlockedMatch(rootNode) ?: return
-            lastProcessedTime = System.currentTimeMillis()
-            startBlockedActivity(blocked.url, packageName)
+            val match = findBlockedMatch(rootNode)
+            when {
+                match == null -> if (usage?.activeKey?.startsWith("site:") == true) stopTiming()
+                withinLimit(match) -> startTiming(match.usageKey)
+                else -> {
+                    lastProcessedTime = System.currentTimeMillis()
+                    stopTiming()
+                    startBlockedActivity(match, packageName)
+                }
+            }
         } finally {
             rootNode.recycleCompat()
         }
+    }
+
+    // ---- Daily limits -------------------------------------------------------
+
+    /** Has a limit and some of it left today. */
+    private fun withinLimit(block: ParsedBlock): Boolean {
+        val limit = block.limitMs ?: return false
+        return (usage?.usedMs(block.usageKey) ?: 0L) < limit
+    }
+
+    private fun startTiming(key: String) {
+        val tracker = usage ?: return
+        if (tracker.activeKey == key) return
+        tracker.track(key)
+        scheduleLimitCheck()
+    }
+
+    private fun stopTiming() {
+        val tracker = usage ?: return
+        handler.removeCallbacks(limitTick)
+        if (tracker.activeKey != null) tracker.track(null)
+    }
+
+    /** Re-checks when the time left runs out, or sooner to save progress. */
+    private fun scheduleLimitCheck() {
+        handler.removeCallbacks(limitTick)
+        val tracker = usage ?: return
+        val key = tracker.activeKey ?: return
+        val block = blockForKey(key) ?: return
+        val left = (block.limitMs ?: 0L) - tracker.usedMs(key)
+        handler.postDelayed(limitTick, left.coerceIn(500L, LIMIT_TICK))
+    }
+
+    private fun blockForKey(key: String): ParsedBlock? =
+        if (key.startsWith("app:")) blockedApps[key.removePrefix("app:")]
+        else blockedList.firstOrNull { it.usageKey == key }
+
+    /**
+     * Runs while something limited is being timed: banks the time, makes sure
+     * it's still on screen, and puts up the block page once the limit is used up.
+     */
+    private fun checkLimitedUse() {
+        try {
+            val tracker = usage ?: return
+            val key = tracker.activeKey ?: return
+            tracker.flush()
+            val power = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val block = blockForKey(key)
+            if (power?.isInteractive == false || block == null || vacation?.isActive() == true ||
+                !block.isActive(today(), LocalTime.now())
+            ) {
+                stopTiming()
+                return
+            }
+
+            val root = rootInActiveWindow
+            val onScreen = root?.packageName?.toString()
+            try {
+                val stillThere = when {
+                    onScreen == null || isPassThrough(onScreen) -> true
+                    key.startsWith("app:") -> onScreen == key.removePrefix("app:")
+                    root != null && isBrowser(onScreen) -> findBlockedMatch(root)?.usageKey == key
+                    else -> false
+                }
+                if (!stillThere) {
+                    stopTiming()
+                    return
+                }
+                if (withinLimit(block)) {
+                    scheduleLimitCheck()
+                    return
+                }
+                stopTiming()
+                if (key.startsWith("app:")) {
+                    blockApp(key.removePrefix("app:"), block)
+                } else if (onScreen != null) {
+                    lastProcessedTime = System.currentTimeMillis()
+                    startBlockedActivity(block, onScreen)
+                }
+            } finally {
+                root?.recycleCompat()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error while checking a daily limit", e)
+        }
+    }
+
+    private fun blockApp(packageName: String, app: ParsedBlock) {
+        if (System.currentTimeMillis() - lastAppBlockTime > APP_BLOCK_DEBOUNCE) {
+            lastAppBlockTime = System.currentTimeMillis()
+            stopTiming()
+            startBlockedAppActivity(packageName, app)
+        }
+    }
+
+    /** Windows that sit on top of an app without leaving it: the status bar, keyboards. */
+    private fun isPassThrough(packageName: String): Boolean =
+        packageName == "com.android.systemui" || packageName in keyboardPackages()
+
+    private fun keyboardPackages(): Set<String> {
+        val now = System.currentTimeMillis()
+        if (now - keyboardsBuiltAt < SLEEP_ALLOWED_TTL) return keyboards
+        keyboardsBuiltAt = now
+        keyboards = try {
+            Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_INPUT_METHODS)
+                ?.split(':')
+                ?.mapNotNull { it.substringBefore('/').takeIf(String::isNotBlank) }
+                ?.toSet()
+                ?: emptySet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+        return keyboards
     }
 
     // ---- Sleep time ---------------------------------------------------------
@@ -336,12 +524,7 @@ class BlockAccessibilityService : AccessibilityService() {
             (getSystemService(Context.TELECOM_SERVICE) as? TelecomManager)?.defaultDialerPackage?.let { allowed += it }
         } catch (_: Exception) { }
         // Keyboards, so the sleep page's passphrase can be typed.
-        try {
-            Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_INPUT_METHODS)
-                ?.split(':')
-                ?.mapNotNull { it.substringBefore('/').takeIf(String::isNotBlank) }
-                ?.let { allowed += it }
-        } catch (_: Exception) { }
+        allowed += keyboardPackages()
 
         sleepAllowed = allowed
         return allowed
@@ -390,10 +573,14 @@ class BlockAccessibilityService : AccessibilityService() {
         }
     }
 
-    /** First scheduled-active blocked site whose URL is shown in an unfocused URL bar. */
+    /**
+     * The scheduled-active blocked site whose URL is shown in an unfocused URL
+     * bar. One that must be blocked now wins over one with time left today.
+     */
     private fun findBlockedMatch(root: AccessibilityNodeInfo): ParsedBlock? {
         val currentDay = today()
         val now = LocalTime.now()
+        var allowed: ParsedBlock? = null
 
         for (item in blockedList) {
             if (!item.isActive(currentDay, now)) continue
@@ -403,9 +590,11 @@ class BlockAccessibilityService : AccessibilityService() {
                 node.className == "android.widget.EditText" && !node.isFocused
             }
             matchingNodes.forEach { it.recycleCompat() }
-            if (valid) return item
+            if (!valid) continue
+            if (!withinLimit(item)) return item
+            if (allowed == null) allowed = item
         }
-        return null
+        return allowed
     }
 
     override fun onInterrupt() {
@@ -456,21 +645,23 @@ class BlockAccessibilityService : AccessibilityService() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) recycle()
     }
 
-    private fun startBlockedAppActivity(packageName: String, appName: String) {
+    private fun startBlockedAppActivity(packageName: String, app: ParsedBlock) {
         val intent = Intent()
         intent.setClassName(applicationContext.packageName, BlockedPageActivity::class.java.name)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        intent.putExtra("blocked_app_name", appName)
+        intent.putExtra("blocked_app_name", app.url)
         intent.putExtra("package_name", packageName)
+        app.limitMs?.let { intent.putExtra(BlockedPageActivity.EXTRA_LIMIT_MINUTES, (it / 60_000L).toInt()) }
         applicationContext.startActivity(intent)
     }
 
-    private fun startBlockedActivity(url: String, packageName: String) {
+    private fun startBlockedActivity(site: ParsedBlock, packageName: String) {
         val intent = Intent()
         intent.setClassName(applicationContext.packageName, BlockedPageActivity::class.java.name)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        intent.putExtra("blocked_url", url)
+        intent.putExtra("blocked_url", site.url)
         intent.putExtra("package_name", packageName)
+        site.limitMs?.let { intent.putExtra(BlockedPageActivity.EXTRA_LIMIT_MINUTES, (it / 60_000L).toInt()) }
         applicationContext.startActivity(intent)
     }
 }

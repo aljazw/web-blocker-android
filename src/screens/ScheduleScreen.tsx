@@ -13,6 +13,7 @@ import Chip from '../components/Chip';
 import ChipGroup from '../components/ChipGroup';
 import Segmented from '../components/Segmented';
 import DayPicker from '../components/DayPicker';
+import DurationPicker from '../components/DurationPicker';
 import BackButton from '../components/BackButton';
 import AppIcon from '../components/AppIcon';
 import Favicon from '../components/Favicon';
@@ -21,7 +22,7 @@ import { gutter, spacing } from '../theme';
 import { ThemedText } from '../components/ThemedText';
 import { addBlockedApp, addBlockedWebsite } from '../storage';
 import ErrorPopup from '../components/ErrorPopup';
-import { ALL_DAY, buildSchedule, describeDays } from '../utils/schedule';
+import { ALL_DAY, buildSchedule, describeDays, describeMinutes } from '../utils/schedule';
 import { ERRORS } from '../constants/strings';
 import { FadeIn, animateLayout } from '../components/Motion';
 import { haptics } from '../utils/haptics';
@@ -33,6 +34,11 @@ type Preset = {
     time: [string, string, string, string] | null; // startH, startM, endH, endM — null = all day
 };
 
+/** One-tap daily limits, in minutes. */
+const LIMITS = [15, 30, 60, 120];
+const DEFAULT_LIMIT = 30;
+/** Longest limit offered here; more than this hardly limits anything. */
+const MAX_LIMIT = 8 * 60;
 
 const PRESETS: Preset[] = [
     { label: 'Always', days: EVERY_DAY, time: null },
@@ -50,6 +56,10 @@ const ScheduleScreen: React.FC = () => {
     const { websiteUrl, app } = route.params;
     const targetLabel = app ? app.appName : websiteUrl ?? '';
 
+    /** Blocked outright during the schedule, or usable for a set time each day. */
+    const [mode, setMode] = useState<'block' | 'limit'>('block');
+    const [limit, setLimit] = useState(DEFAULT_LIMIT);
+    const limited = mode === 'limit';
     const [selectedDays, setSelectedDays] = useState<boolean[]>(EVERY_DAY);
     const [customTime, setCustomTime] = useState(false);
 
@@ -95,6 +105,7 @@ const ScheduleScreen: React.FC = () => {
     };
 
     const save = async () => {
+        const extra = limited ? { limit } : {};
         const success = app
             ? await addBlockedApp({
                   days: daysText,
@@ -102,8 +113,15 @@ const ScheduleScreen: React.FC = () => {
                   packageName: app.packageName,
                   appName: app.appName,
                   visible: true,
+                  ...extra,
               })
-            : await addBlockedWebsite({ days: daysText, time: timeText, websiteUrl: websiteUrl ?? '', visible: true });
+            : await addBlockedWebsite({
+                  days: daysText,
+                  time: timeText,
+                  websiteUrl: websiteUrl ?? '',
+                  visible: true,
+                  ...extra,
+              });
         if (success) {
             haptics.success();
             setDialog(null);
@@ -118,12 +136,22 @@ const ScheduleScreen: React.FC = () => {
         time: timeText,
         problem,
         overnight,
-    } = buildSchedule(selectedDays, customTime ? { startHour, startMinutes, endHour, endMinutes } : null);
+    } = buildSchedule(
+        selectedDays,
+        // A daily limit counts across the whole day.
+        customTime && !limited ? { startHour, startMinutes, endHour, endMinutes } : null,
+    );
 
     return (
         <BaseScreen
             title="Schedule"
-            subtitle={app ? 'When should this app be blocked?' : 'When should this site be blocked?'}
+            subtitle={
+                limited
+                    ? 'How long it may be used each day'
+                    : app
+                    ? 'When should this app be blocked?'
+                    : 'When should this site be blocked?'
+            }
             headerLeft={<BackButton />}>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 <FadeIn>
@@ -140,13 +168,50 @@ const ScheduleScreen: React.FC = () => {
                                 {targetLabel}
                             </ThemedText>
                             <ThemedText size="small" color="muted">
-                                {app ? 'New app block' : 'New website block'}
+                                {limited
+                                    ? app
+                                        ? 'New app time limit'
+                                        : 'New website time limit'
+                                    : app
+                                    ? 'New app block'
+                                    : 'New website block'}
                             </ThemedText>
                         </View>
                     </Card>
+                    <Segmented
+                        options={[
+                            { value: 'block', label: 'Block' },
+                            { value: 'limit', label: 'Time limit' },
+                        ]}
+                        value={mode}
+                        onChange={v => {
+                            animateLayout();
+                            setMode(v);
+                        }}
+                        style={styles.mode}
+                    />
                 </FadeIn>
 
-                <FadeIn delay={70}>
+                {limited && (
+                    <FadeIn delay={70}>
+                        <SectionHeader title="Daily limit" />
+                        <Card>
+                            <DurationPicker
+                                value={limit}
+                                onChange={setLimit}
+                                min={5}
+                                max={MAX_LIMIT}
+                                presets={LIMITS}
+                                accessibilityLabel="Daily limit"
+                            />
+                            <ThemedText size="small" color="muted" align="center" style={styles.cardFoot}>
+                                {`Once it’s used up, ${targetLabel} is blocked until tomorrow.`}
+                            </ThemedText>
+                        </Card>
+                    </FadeIn>
+                )}
+
+                <FadeIn delay={70} style={limited && styles.hidden}>
                     <SectionHeader title="Quick presets" />
                     <ChipGroup>
                         {PRESETS.map(preset => (
@@ -168,7 +233,7 @@ const ScheduleScreen: React.FC = () => {
                         </ThemedText>
                     </Card>
                 </FadeIn>
-                <FadeIn delay={210}>
+                <FadeIn delay={210} style={limited && styles.hidden}>
                     <SectionHeader title="Time" />
                     <Card>
                         <Segmented
@@ -211,7 +276,7 @@ const ScheduleScreen: React.FC = () => {
                     </ThemedText>
                 )}
                 <Button
-                    label="Review block"
+                    label={limited ? 'Review limit' : 'Review block'}
                     disabled={!!problem}
                     onPress={() => setDialog('review')}
                     style={styles.save}
@@ -222,14 +287,18 @@ const ScheduleScreen: React.FC = () => {
                 visible={dialog === 'review'}
                 onClose={() => setDialog(null)}
                 icon="Ban"
-                title={`Block ${targetLabel}?`}
+                title={limited ? `Limit ${targetLabel}?` : `Block ${targetLabel}?`}
                 message={
                     <View>
                         <KeyValueRow label="Days" value={describeDays(daysText)} />
-                        <KeyValueRow label="Hours" value={timeText === ALL_DAY ? 'All day' : timeText} />
+                        {limited ? (
+                            <KeyValueRow label="Daily limit" value={describeMinutes(limit)} />
+                        ) : (
+                            <KeyValueRow label="Hours" value={timeText === ALL_DAY ? 'All day' : timeText} />
+                        )}
                     </View>
                 }
-                actions={confirmActions(() => setDialog(null), 'Block', save)}
+                actions={confirmActions(() => setDialog(null), limited ? 'Set limit' : 'Block', save)}
             />
             <ErrorPopup {...ERRORS.saveFailed} visible={dialog === 'error'} onClose={() => setDialog(null)} />
         </BaseScreen>
@@ -253,6 +322,13 @@ const styles = StyleSheet.create({
     },
     cardFoot: {
         marginTop: spacing.sm,
+    },
+    mode: {
+        marginHorizontal: gutter,
+        marginTop: spacing.md,
+    },
+    hidden: {
+        display: 'none',
     },
     timeRow: {
         flexDirection: 'row',

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BlockEntry, RootStackNavigation, Vacation } from '../types/types';
 import AppIcon from '../components/AppIcon';
-import Badge from '../components/Badge';
+import Badge, { BadgeTone } from '../components/Badge';
 import BaseScreen from '../components/BaseScreen';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -32,7 +32,8 @@ import { usePreloadTabs } from '../navigation/usePreloadTabs';
 import { useAppForeground } from '../hooks/useAppForeground';
 import { gutter, spacing } from '../theme';
 import { checkAccessibilityEnabled, openAccessibilitySettings } from '../utils/accessibility';
-import { describeSchedule, isBlockActiveNow } from '../utils/schedule';
+import { describeMinutes, describeSchedule, isBlockActiveNow } from '../utils/schedule';
+import { getLimitUsage, usageKeyOf } from '../utils/limitUsage';
 import { routineStreak } from '../utils/habits';
 import { formatClock, personalBest } from '../utils/apnea';
 import { minutesNow, scheduleDay } from '../utils/dayPlan';
@@ -80,8 +81,19 @@ const HomeScreen: React.FC = () => {
     const [vacation, setVacation] = useState<Vacation | null>(null);
     const [query, setQuery] = useState('');
     const [dialog, setDialog] = useState<Dialog | null>(null);
+    /** Minutes used today on blocks with a daily limit, by usage key. */
+    const [usage, setUsage] = useState<Record<string, number>>({});
 
     const close = () => setDialog(null);
+
+    // Fresh with every tick of `now`: on focus, on return to the app, and each minute.
+    useEffect(() => {
+        let alive = true;
+        getLimitUsage().then(next => alive && setUsage(next));
+        return () => {
+            alive = false;
+        };
+    }, [now]);
 
     const refreshProtection = useCallback(() => {
         checkAccessibilityEnabled().then(setProtectionOn);
@@ -122,9 +134,15 @@ const HomeScreen: React.FC = () => {
 
     const visible = useMemo(() => entries.filter(w => w.visible), [entries]);
     const onVacation = isOnVacation(vacation, now);
+    /** On schedule now (a limited one may still have time left). */
+    const onSchedule = useCallback(
+        (entry: BlockEntry) => !onVacation && isBlockActiveNow(entry, now),
+        [onVacation, now],
+    );
+    const usedOf = useCallback((entry: BlockEntry) => usage[usageKeyOf(entry)] ?? 0, [usage]);
     const activeCount = useMemo(
-        () => (onVacation ? 0 : entries.filter(w => isBlockActiveNow(w, now)).length),
-        [entries, now, onVacation],
+        () => entries.filter(w => onSchedule(w) && (!w.limit || usedOf(w) >= w.limit)).length,
+        [entries, onSchedule, usedOf],
     );
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -273,7 +291,8 @@ const HomeScreen: React.FC = () => {
                                     <BlockRow
                                         key={`${entry.kind}:${entry.key}`}
                                         entry={entry}
-                                        active={!onVacation && isBlockActiveNow(entry, now)}
+                                        active={onSchedule(entry)}
+                                        used={usedOf(entry)}
                                         onHide={() => setDialog({ kind: 'hide', entry })}
                                         onRemove={() => setDialog({ kind: 'remove', entry })}
                                     />
@@ -342,33 +361,51 @@ const HomeScreen: React.FC = () => {
 
 interface BlockRowProps {
     entry: BlockEntry;
+    /** Its schedule is on now. */
     active: boolean;
+    /** Minutes used today, for a block with a daily limit. */
+    used: number;
     onHide: () => void;
     onRemove: () => void;
 }
 
-const BlockRow: React.FC<BlockRowProps> = ({ entry, active, onHide, onRemove }) => (
-    <View style={styles.row}>
-        <IconTile size={36}>
-            {entry.kind === 'app' ? (
-                <AppIcon packageName={entry.key} size={24} />
-            ) : (
-                <Favicon url={entry.label} size={20} />
-            )}
-        </IconTile>
-        <View style={styles.rowText}>
-            <ThemedText weight="medium" numberOfLines={1}>
-                {entry.label}
-            </ThemedText>
-            <ThemedText size="small" color="muted" numberOfLines={1}>
-                {describeSchedule(entry.days, entry.time)}
-            </ThemedText>
+const BlockRow: React.FC<BlockRowProps> = ({ entry, active, used, onHide, onRemove }) => {
+    const { limit } = entry;
+    const usedUp = !!limit && used >= limit;
+    const badge: { label: string; tone: BadgeTone } = !active
+        ? { label: 'Paused', tone: 'neutral' }
+        : !limit
+        ? { label: 'Active', tone: 'success' }
+        : usedUp
+        ? { label: 'Used up', tone: 'danger' }
+        : { label: `${limit - used} min left`, tone: 'accent' };
+    const detail =
+        limit && active
+            ? `${describeMinutes(Math.min(used, limit))} of ${describeMinutes(limit)} used today`
+            : describeSchedule(entry.days, entry.time, limit);
+    return (
+        <View style={styles.row}>
+            <IconTile size={36}>
+                {entry.kind === 'app' ? (
+                    <AppIcon packageName={entry.key} size={24} />
+                ) : (
+                    <Favicon url={entry.label} size={20} />
+                )}
+            </IconTile>
+            <View style={styles.rowText}>
+                <ThemedText weight="medium" numberOfLines={1}>
+                    {entry.label}
+                </ThemedText>
+                <ThemedText size="small" color="muted" numberOfLines={1}>
+                    {detail}
+                </ThemedText>
+            </View>
+            <Badge label={badge.label} tone={badge.tone} style={styles.rowBadge} />
+            <IconButton icon="Hide" size={34} accessibilityLabel={`Hide ${entry.label}`} onPress={onHide} />
+            <IconButton icon="Trash" size={34} accessibilityLabel={`Remove ${entry.label}`} onPress={onRemove} />
         </View>
-        <Badge label={active ? 'Active' : 'Paused'} tone={active ? 'success' : 'neutral'} style={styles.rowBadge} />
-        <IconButton icon="Hide" size={34} accessibilityLabel={`Hide ${entry.label}`} onPress={onHide} />
-        <IconButton icon="Trash" size={34} accessibilityLabel={`Remove ${entry.label}`} onPress={onRemove} />
-    </View>
-);
+    );
+};
 
 const styles = StyleSheet.create({
     scroll: {

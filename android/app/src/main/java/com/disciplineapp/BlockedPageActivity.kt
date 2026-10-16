@@ -7,6 +7,25 @@ import android.os.Bundle
 import android.provider.Browser   // for EXTRA_APPLICATION_ID
 
 class BlockedPageActivity : Activity() {
+    companion object {
+        /** Set when the block is a used-up daily limit rather than a plain block. */
+        const val EXTRA_LIMIT_MINUTES = "limit_minutes"
+    }
+
+    /** Why it's blocked: the day's allowance is gone, or it's simply on the list right now. */
+    private fun reason(what: String): String {
+        val limit = intent.getIntExtra(EXTRA_LIMIT_MINUTES, 0)
+        if (limit <= 0) return "This $what is on your block list right now."
+        val h = limit / 60
+        val m = limit % 60
+        val amount = when {
+            h == 0 -> "$m min"
+            m == 0 -> "$h h"
+            else -> "$h h $m min"
+        }
+        return "You've used your $amount for today. It opens again tomorrow."
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -26,7 +45,7 @@ class BlockedPageActivity : Activity() {
                 tone = AppScreen.Tone.DANGER,
                 eyebrow = "Blocked by $appName",
                 title = blockedUrl,
-                body = "This site is on your block list right now.",
+                body = reason("site"),
                 primaryLabel = "Go back",
                 onPrimary = { leave(packageName) },
             ),
@@ -43,7 +62,7 @@ class BlockedPageActivity : Activity() {
                 tone = AppScreen.Tone.DANGER,
                 eyebrow = "Blocked by $appName",
                 title = blockedApp,
-                body = "This app is on your block list right now.",
+                body = reason("app"),
                 primaryLabel = "Go to home screen",
                 onPrimary = { goHome() },
             ),

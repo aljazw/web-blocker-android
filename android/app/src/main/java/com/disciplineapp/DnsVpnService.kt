@@ -71,7 +71,8 @@ class DnsVpnService : VpnService() {
         val days: String? = null,
         val time: String? = null,
         val websiteUrl: String? = null,
-        val visible: Boolean? = null
+        val visible: Boolean? = null,
+        val limit: Int? = null
     )
 
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -542,6 +543,8 @@ class DnsVpnService : VpnService() {
                 .filterNotNull()
                 // DNS only for always-blocked sites (no open window), per design.
                 .filter { it.days.equals("Full Week", true) && it.time.equals("All Day Long", true) }
+                // Sites with a daily limit stay reachable until it's used up; the accessibility layer times them.
+                .filter { (it.limit ?: 0) <= 0 }
                 .mapNotNull { it.websiteUrl }
                 .map { domainOf(it) }
                 .filter { it.isNotEmpty() }

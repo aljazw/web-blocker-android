@@ -1,10 +1,17 @@
 import { BlockedAppData, BlockedWebsitesData } from '../types/types';
 import { KEYS, isString, readList, updateList } from './core';
 
+/** Longest daily limit: anything up to a full day. */
+export const MAX_LIMIT_MINUTES = 24 * 60 - 1;
+
+/** `{ limit }` when it's a usable daily limit, else nothing (blocked outright). */
+const limitOf = (v: any): { limit?: number } =>
+    Number.isInteger(v.limit) && v.limit > 0 && v.limit <= MAX_LIMIT_MINUTES ? { limit: v.limit } : {};
+
 /** Keeps only well-formed entries; fills in `visible` for old data that lacked it. */
 const toWebsite = (v: any): BlockedWebsitesData | null =>
     v && isString(v.websiteUrl) && typeof v.days === 'string' && typeof v.time === 'string'
-        ? { websiteUrl: v.websiteUrl, days: v.days, time: v.time, visible: v.visible !== false }
+        ? { websiteUrl: v.websiteUrl, days: v.days, time: v.time, visible: v.visible !== false, ...limitOf(v) }
         : null;
 
 const toApp = (v: any): BlockedAppData | null =>
@@ -15,6 +22,7 @@ const toApp = (v: any): BlockedAppData | null =>
               days: v.days,
               time: v.time,
               visible: v.visible !== false,
+              ...limitOf(v),
           }
         : null;
 

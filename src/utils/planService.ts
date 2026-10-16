@@ -87,6 +87,10 @@ export const setSkipped = (date: string, taskId: string, skipped: boolean): Prom
 export const moveLater = (date: string, tasks: PlanTask[], taskId: string): Promise<boolean> =>
     updateDay(date, day => ({ ...day, order: laterOrder(tasks, taskId) }));
 
+/** Saves the day's task order (dragging a task to a new place). */
+export const setOrder = (date: string, ids: string[]): Promise<boolean> =>
+    updateDay(date, day => ({ ...day, order: ids }));
+
 /**
  * Adds or updates a one-off task. A new one goes at the end of the day, or
  * with `upNext` right after the task on now, so it's what comes next.

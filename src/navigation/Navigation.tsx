@@ -105,9 +105,13 @@ const Navigation: React.FC = () => {
                 screenOptions={{
                     headerShown: false,
                     // Native transitions run on the UI thread, so they stay smooth while JS is busy.
-                    animation: 'slide_from_right',
+                    // The iOS-style slide keeps the screen below in view while one closes;
+                    // slide_from_right on Android 13+ draws the closing screen under the
+                    // returning one, so going back flashed an empty background.
+                    animation: 'ios_from_right',
                     animationDuration: 250,
-                    freezeOnBlur: true,
+                    // No freezeOnBlur here: a frozen screen renders empty until it thaws,
+                    // which showed as a blank page sliding in on back. Tabs still freeze.
                     contentStyle: { backgroundColor: theme.colors.background },
                 }}>
                 <Stack.Screen name="BottomTabs" component={BottomTabNavigator} />

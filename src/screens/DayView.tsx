@@ -1,10 +1,11 @@
 import { APP_NAME } from '../constants/brand';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Habit, RootStackNavigation } from '../types/types';
 import Button from '../components/Button';
 import Dialog from '../components/Dialog';
+import Icon from '../components/Icon';
 import EmptyState from '../components/EmptyState';
 import ErrorPopup from '../components/ErrorPopup';
 import PlanNowCard from '../components/PlanNowCard';
@@ -12,6 +13,7 @@ import PlanTimeline from '../components/PlanTimeline';
 import { ThemedText } from '../components/ThemedText';
 import { FadeIn, animateLayout } from '../components/Motion';
 import { useDayPlan } from '../hooks/useDayPlan';
+import { useTheme } from '../context/ThemeContext';
 import { gutter, spacing } from '../theme';
 import {
     DaySchedule,
@@ -26,7 +28,7 @@ import {
 } from '../utils/dayPlan';
 import { currentStreak, fromDateKey, milestoneFor, newHabitId } from '../utils/habits';
 import { milestoneMessage } from '../utils/habitText';
-import { completeTask, moveLater, setSkipped, undoTask } from '../utils/planService';
+import { completeTask, moveLater, setOrder, setSkipped, undoTask } from '../utils/planService';
 import { getHabits, saveHabits } from '../storage';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
@@ -48,6 +50,7 @@ const DayView: React.FC<DayViewProps> = ({ dateKey, now }) => {
     const navigation = useNavigation<RootStackNavigation>();
     const { tasks, habits, anchors, loaded } = useDayPlan(dateKey);
     const [popup, setPopup] = useState<Popup | null>(null);
+    const [dragging, setDragging] = useState(false);
     const schedule = scheduleDay(tasks, anchors, now);
     const isToday = now !== null;
     const close = () => setPopup(null);
@@ -104,6 +107,15 @@ const DayView: React.FC<DayViewProps> = ({ dateKey, now }) => {
 
     const add = () => navigation.navigate('TaskEditor', { date: dateKey });
 
+    /** A task dragged to a new place. No layout animation: the rows are already where they belong. */
+    const reorder = async (ids: string[]) => {
+        const ok = await setOrder(dateKey, ids);
+        if (!ok) {
+            setPopup({ kind: 'error' });
+        }
+        return ok;
+    };
+
     const startRoutine = async () => {
         if (await run(saveHabits(starterRoutine(new Date(), newHabitId)))) {
             haptics.success();
@@ -137,7 +149,7 @@ const DayView: React.FC<DayViewProps> = ({ dateKey, now }) => {
 
     return (
         <>
-            <ScrollView contentContainerStyle={styles.scroll}>
+            <ScrollView contentContainerStyle={styles.scroll} scrollEnabled={!dragging}>
                 {isToday && (
                     <FadeIn>
                         <PlanNowCard
@@ -157,6 +169,8 @@ const DayView: React.FC<DayViewProps> = ({ dateKey, now }) => {
                         isToday ? slot => (slot.task.status === 'done' ? undo(slot.task) : done(slot.task)) : undefined
                     }
                     onAnchor={() => navigation.navigate('DayHours')}
+                    onReorder={reorder}
+                    onDragChange={setDragging}
                 />
                 <Button
                     label="Add a task"
@@ -233,38 +247,55 @@ const taskDescription = (task: PlanTask): string => {
     return task.status === 'open' && task.habit ? `${line}\nSkipping it ends its streak.` : line;
 };
 
-/** One line on how the day is going: pace, when it ends, and what won't fit before bed. */
+/** How the day is going: total time of the tasks, pace, when it ends, and what won't fit before bed. */
 const DaySummary: React.FC<{ schedule: DaySchedule; tasks: PlanTask[] }> = ({ schedule, tasks }) => {
+    const { colors } = useTheme().theme;
     const pace = paceOf(schedule.behind);
     const { overflow, anchors } = schedule;
+    const total = plannedMinutes(tasks);
+    const left = plannedMinutes(tasks.filter(t => t.status === 'open'));
     const status = !pace
-        ? `${formatDuration(plannedMinutes(tasks))} planned`
+        ? null
         : pace.kind === 'onTime'
         ? 'On time'
         : pace.kind === 'behind'
         ? `${formatDuration(pace.minutes)} behind`
         : `${formatDuration(pace.minutes)} ahead`;
     const ends = schedule.slots.some(s => s.task.status === 'open')
-        ? ` · done around ${formatMinutes(schedule.end)}`
-        : '';
+        ? `done around ${formatMinutes(schedule.end)}`
+        : null;
+    // "Left" only once some of the day is done, otherwise it just repeats the total.
+    const remaining = left > 0 && left < total ? ` · ${formatDuration(left)} left` : '';
 
     return (
         <>
-            <ThemedText
-                size="small"
-                weight="medium"
-                tabular
-                color={
-                    pace?.kind === 'behind'
-                        ? 'warning'
-                        : pace?.kind === 'onTime' || pace?.kind === 'ahead'
-                        ? 'primaryGreen'
-                        : 'muted'
-                }
-                style={styles.summary}>
-                {status}
-                {ends}
-            </ThemedText>
+            <View style={styles.totalRow}>
+                <Icon name="Hourglass" size={14} tint={colors.muted} />
+                <ThemedText size="small" weight="medium" tabular color="muted" style={styles.totalText}>
+                    {`${formatDuration(total)} in total${remaining}`}
+                </ThemedText>
+                {tasks.filter(t => t.status !== 'done').length > 1 && (
+                    <ThemedText size="tiny" color="muted">
+                        Hold a task to move it
+                    </ThemedText>
+                )}
+            </View>
+            {(status || ends) && (
+                <ThemedText
+                    size="small"
+                    weight="medium"
+                    tabular
+                    color={
+                        pace?.kind === 'behind'
+                            ? 'warning'
+                            : pace?.kind === 'onTime' || pace?.kind === 'ahead'
+                            ? 'primaryGreen'
+                            : 'muted'
+                    }
+                    style={styles.summary}>
+                    {[status, ends].filter(Boolean).join(' · ')}
+                </ThemedText>
+            )}
             {overflow.length > 0 && (
                 <ThemedText size="small" color="warning" style={styles.summary}>
                     {`${listTitles(overflow)} won’t fit before bed at ${formatMinutes(
@@ -294,7 +325,17 @@ const styles = StyleSheet.create({
     },
     summary: {
         marginHorizontal: gutter + 2,
+        marginTop: spacing.xs,
+    },
+    totalRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: gutter + 2,
         marginTop: spacing.sm,
+    },
+    totalText: {
+        flex: 1,
+        marginLeft: spacing.xs + 2,
     },
     add: {
         alignSelf: 'flex-start',
