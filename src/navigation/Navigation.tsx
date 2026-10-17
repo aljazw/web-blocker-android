@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { DarkTheme, DefaultTheme, NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomTabNavigator from './BottomTabNavigator';
+import BlockScreen from '../screens/BlockScreen';
 import ScheduleScreen from '../screens/ScheduleScreen';
 import TaskEditorScreen from '../screens/TaskEditorScreen';
 import ApneaTableScreen from '../screens/ApneaTableScreen';
@@ -115,6 +116,7 @@ const Navigation: React.FC = () => {
                     contentStyle: { backgroundColor: theme.colors.background },
                 }}>
                 <Stack.Screen name="BottomTabs" component={BottomTabNavigator} />
+                <Stack.Screen name="AddSite" component={BlockScreen} />
                 <Stack.Screen name="Schedule" component={ScheduleScreen} />
                 <Stack.Screen name="TaskEditor" component={TaskEditorScreen} />
                 <Stack.Screen name="ApneaTable" component={ApneaTableScreen} />

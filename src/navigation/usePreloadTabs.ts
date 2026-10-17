@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { TabParamList } from '../types/types';
 
-const TABS: (keyof TabParamList)[] = ['Habits', 'Workout', 'Tools', 'Block'];
+const TABS: (keyof TabParamList)[] = ['Workout', 'Tools', 'Block'];
 /** Spacing between preloads, so each one is a short task instead of one long freeze. */
 const STEP_MS = 120;
 

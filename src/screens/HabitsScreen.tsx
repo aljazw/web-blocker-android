@@ -16,6 +16,7 @@ import StatTile from '../components/StatTile';
 import { FadeIn, animateLayout, stagger } from '../components/Motion';
 import { useHabits } from '../hooks/useHabits';
 import { useFocusData } from '../hooks/useFocusData';
+import { usePreloadTabs } from '../navigation/usePreloadTabs';
 import { gutter, spacing } from '../theme';
 import DayView from './DayView';
 import { addDays, toDateKey } from '../utils/dates';
@@ -35,14 +36,15 @@ const VIEWS: { value: RoutineView; label: string }[] = [
 const dateLabel = (date: Date) =>
     date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
-/** The routine tab: today's plan, tomorrow's, and the routine they're built from. */
+/** The plan tab, where the app opens: today's plan, tomorrow's, and the routine they're built from. */
 const HabitsScreen: React.FC = () => {
     const navigation = useNavigation<RootStackNavigation>();
     const route = useRoute<RouteProp<TabParamList, 'Habits'>>();
     const [view, setView] = useState<RoutineView>(route.params?.view ?? 'today');
     const [now, setNow] = useState(new Date());
+    usePreloadTabs();
 
-    // Opened from elsewhere (a pop-up, the overview) with a view in mind.
+    // Opened from elsewhere (a pop-up, a notification) with a view in mind.
     useEffect(() => {
         if (route.params?.view) {
             setView(route.params.view);

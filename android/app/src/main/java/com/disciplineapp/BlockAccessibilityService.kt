@@ -10,8 +10,11 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.net.Uri
 import android.provider.AlarmClock
+import android.provider.MediaStore
 import android.provider.Settings
+import android.provider.Telephony
 import android.telecom.TelecomManager
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -127,7 +130,7 @@ class BlockAccessibilityService : AccessibilityService() {
         private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         private val timePattern = Regex("""^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$""")
         private val ALL_DAYS = setOf("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-        /** Always usable during sleep: system UI, calls and emergency, alarms. */
+        /** Always usable during sleep: system UI, calls and emergency, alarms, messages, camera. */
         private val SLEEP_ALWAYS_ALLOWED = setOf(
             "android",
             "com.android.systemui",
@@ -140,6 +143,13 @@ class BlockAccessibilityService : AccessibilityService() {
             "com.android.deskclock",
             "com.sec.android.app.clockpackage",
             "com.samsung.android.incallui",
+            "com.google.android.apps.messaging",
+            "com.samsung.android.messaging",
+            "com.android.mms",
+            "com.google.android.GoogleCamera",
+            "com.sec.android.app.camera",
+            "com.android.camera",
+            "com.android.camera2",
         )
         private val BROWSER_PACKAGES = setOf(
             "com.android.chrome",
@@ -520,6 +530,12 @@ class BlockAccessibilityService : AccessibilityService() {
         add(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)) // launcher
         add(Intent(AlarmClock.ACTION_SHOW_ALARMS)) // clock
         add(Intent(Intent.ACTION_DIAL)) // dialer
+        add(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:"))) // messages
+        add(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)) // camera
+        add(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) // camera, when only capture is exposed
+        try {
+            Telephony.Sms.getDefaultSmsPackage(applicationContext)?.let { allowed += it }
+        } catch (_: Exception) { }
         try {
             (getSystemService(Context.TELECOM_SERVICE) as? TelecomManager)?.defaultDialerPackage?.let { allowed += it }
         } catch (_: Exception) { }

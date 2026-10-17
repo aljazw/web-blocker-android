@@ -16,32 +16,23 @@ import IconButton from '../components/IconButton';
 import IconTile from '../components/IconTile';
 import { ListGroup } from '../components/ListGroup';
 import PassphrasePopup from '../components/PassphrasePopup';
-import PlanNowCard from '../components/PlanNowCard';
 import SearchBar from '../components/SearchBar';
 import SectionHeader from '../components/SectionHeader';
-import StatRow from '../components/StatRow';
-import StatTile from '../components/StatTile';
 import { ThemedText } from '../components/ThemedText';
 import { FadeIn, animateLayout } from '../components/Motion';
 import { usePassphrase } from '../context/PassphraseContext';
 import { useTheme } from '../context/ThemeContext';
 import { useBlockList } from '../hooks/useBlockList';
-import { useApneaData } from '../hooks/useApneaData';
-import { useDayPlan } from '../hooks/useDayPlan';
-import { usePreloadTabs } from '../navigation/usePreloadTabs';
 import { useAppForeground } from '../hooks/useAppForeground';
 import { gutter, spacing } from '../theme';
 import { checkAccessibilityEnabled, openAccessibilitySettings } from '../utils/accessibility';
 import { describeMinutes, describeSchedule, isBlockActiveNow } from '../utils/schedule';
 import { getLimitUsage, usageKeyOf } from '../utils/limitUsage';
-import { routineStreak } from '../utils/habits';
-import { formatClock, personalBest } from '../utils/apnea';
-import { minutesNow, scheduleDay } from '../utils/dayPlan';
 import { haptics } from '../utils/haptics';
 import { ERRORS } from '../constants/strings';
 import { getVacation } from '../storage';
 import { isOnVacation, vacationRangeLabel } from '../utils/vacation';
-import { fromDateKey, shortDate, toDateKey } from '../utils/dates';
+import { fromDateKey, shortDate } from '../utils/dates';
 
 /** One dialog at a time. */
 type Dialog =
@@ -50,33 +41,16 @@ type Dialog =
     | { kind: 'passphrase'; entry: BlockEntry }
     | { kind: 'error'; title: string; text: string };
 
-const greeting = (date: Date) => {
-    const h = date.getHours();
-    if (h < 5) {
-        return 'Good night';
-    }
-    if (h < 12) {
-        return 'Good morning';
-    }
-    if (h < 18) {
-        return 'Good afternoon';
-    }
-    return 'Good evening';
-};
-
 const SEARCH_THRESHOLD = 5;
 
-const HomeScreen: React.FC = () => {
+/** The blocks tab: protection status and every blocked site and app, with Settings one tap away. */
+const BlockListScreen: React.FC = () => {
     const { theme } = useTheme();
     const navigation = useNavigation<RootStackNavigation>();
-    usePreloadTabs();
 
     const { isPassphraseEnabled } = usePassphrase();
     const { entries, loaded: listLoaded, loadFailed, remove, hide } = useBlockList();
     const [now, setNow] = useState(new Date());
-    const { tasks, habits, anchors, loaded: planLoaded } = useDayPlan(toDateKey(now));
-    // Finished sessions are left for the session screen, which shows their summary.
-    const { records } = useApneaData({ collect: false });
     const [protectionOn, setProtectionOn] = useState<boolean | null>(null);
     const [vacation, setVacation] = useState<Vacation | null>(null);
     const [query, setQuery] = useState('');
@@ -149,26 +123,28 @@ const HomeScreen: React.FC = () => {
         return q ? visible.filter(w => w.label.toLowerCase().includes(q)) : visible;
     }, [visible, query]);
 
-    const counted = tasks.filter(t => t.status !== 'skipped');
-    const doneToday = counted.filter(t => t.status === 'done').length;
-    const habitStreak = routineStreak(habits, now);
-    const best = useMemo(() => personalBest(records), [records]);
-
-    const goToAdd = () => navigation.navigate('BottomTabs', { screen: 'Block' });
-    const goToPlan = () => navigation.navigate('BottomTabs', { screen: 'Habits', params: { view: 'today' } });
-    const schedule = scheduleDay(tasks, anchors, minutesNow(now));
+    const goToAdd = () => navigation.navigate('AddSite');
 
     return (
         <BaseScreen
-            title={greeting(now)}
-            subtitle={now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+            title="Blocks"
+            subtitle="The websites and apps you keep away from"
             headerRight={
-                <IconButton
-                    icon="Music"
-                    variant="outline"
-                    accessibilityLabel="Music"
-                    onPress={() => navigation.navigate('Music')}
-                />
+                <View style={styles.headerButtons}>
+                    <IconButton
+                        icon="Settings"
+                        variant="outline"
+                        accessibilityLabel="Settings"
+                        onPress={() => navigation.navigate('Settings')}
+                    />
+                    <IconButton
+                        icon="Plus"
+                        variant="filled"
+                        accessibilityLabel="Add a block"
+                        onPress={goToAdd}
+                        style={styles.headerGap}
+                    />
+                </View>
             }>
             <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
                 {/* ---- Protection status ---- */}
@@ -221,49 +197,10 @@ const HomeScreen: React.FC = () => {
                             )}
                         </Card>
                     )}
-
-                    {tasks.length > 0 ? (
-                        <PlanNowCard schedule={schedule} now={minutesNow(now)} onPress={goToPlan} />
-                    ) : (
-                        planLoaded && (
-                            <Card onPress={goToPlan} accessibilityLabel="Plan your day" style={styles.planRow}>
-                                <IconTile icon="Plan" tone="accent" size={40} />
-                                <View style={styles.statusText}>
-                                    <ThemedText weight="strong">Plan your day</ThemedText>
-                                    <ThemedText size="small" color="muted">
-                                        Your routine, from waking up to bedtime
-                                    </ThemedText>
-                                </View>
-                                <IconTile icon="Next" size={28} />
-                            </Card>
-                        )
-                    )}
-
-                    <StatRow>
-                        <StatTile label="Done today" value={counted.length ? `${doneToday}/${counted.length}` : '—'} />
-                        <StatTile label="Routine streak" value={habitStreak} suffix=" d" />
-                        <StatTile label="Apnea best" value={best ? formatClock(best.ms) : '—'} />
-                    </StatRow>
                 </FadeIn>
 
                 {/* ---- Block list ---- */}
-                <SectionHeader
-                    title={`Block list · ${visible.length}`}
-                    right={
-                        visible.length > 0 ? (
-                            <Button
-                                label="Add"
-                                icon="Plus"
-                                iconLeading
-                                variant="ghost"
-                                compact
-                                onPress={goToAdd}
-                                style={styles.add}
-                            />
-                        ) : undefined
-                    }
-                />
-
+                <SectionHeader title={`Block list · ${visible.length}`} />
                 {!listLoaded ? null : visible.length === 0 ? (
                     <EmptyState
                         icon="Ban"
@@ -419,16 +356,14 @@ const styles = StyleSheet.create({
         flex: 1,
         marginHorizontal: spacing.sm + 2,
     },
-    planRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
     statusButton: {
         marginTop: spacing.md,
     },
-    add: {
-        marginVertical: -8,
-        marginRight: -spacing.sm,
+    headerButtons: {
+        flexDirection: 'row',
+    },
+    headerGap: {
+        marginLeft: spacing.sm,
     },
     search: {
         marginHorizontal: gutter,
@@ -457,4 +392,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default HomeScreen;
+export default BlockListScreen;

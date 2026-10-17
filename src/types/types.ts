@@ -2,17 +2,18 @@ import { NavigationProp, NavigatorScreenParams } from '@react-navigation/native'
 import type { IconName } from '../components/Icon';
 
 export type TabParamList = {
-    Home: undefined;
     /** Opens on today, tomorrow or the routine list. */
     Habits: { view?: RoutineView } | undefined;
     Workout: undefined;
     /** Music, apnea training and notes. */
     Tools: undefined;
+    /** The block list, with Settings behind a button. */
     Block: undefined;
 };
 
 export type RootStackParamList = {
     BottomTabs: NavigatorScreenParams<TabParamList> | undefined;
+    /** Pick a website or app to block. */
     AddSite: undefined;
     /** Pass websiteUrl for a site, or app for an app. */
     Schedule: { websiteUrl?: string; app?: { packageName: string; appName: string } };

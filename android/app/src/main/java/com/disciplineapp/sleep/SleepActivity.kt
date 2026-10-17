@@ -78,7 +78,7 @@ class SleepActivity : Activity() {
                 tone = AppScreen.Tone.ACCENT,
                 eyebrow = "Sleep time",
                 title = "Time to rest",
-                body = "Your phone is off-limits until $wake. Calls and alarms still work.",
+                body = "Your phone is off-limits until $wake. Calls, messages, the camera and alarms still work.",
                 quote = "Tomorrow is won tonight. Put the phone down.",
                 primaryLabel = "Go to home screen",
                 onPrimary = { goHome() },

@@ -163,7 +163,7 @@ const SleepScreen: React.FC = () => {
                 <SectionHeader title="How it works" />
                 <ThemedText size="small" color="muted" style={styles.text}>
                     During sleep time every app opens the sleep page instead, including Settings and this app. Calls,
-                    the alarm clock, the home screen and the keyboard keep working.
+                    messages, the camera, the alarm clock, the home screen and the keyboard keep working.
                 </ThemedText>
                 <ThemedText size="small" color="muted" style={styles.text}>
                     To turn it off for the night you watch a short video to the end, then type one sentence. It comes

@@ -125,7 +125,7 @@ const ScheduleScreen: React.FC = () => {
         if (success) {
             haptics.success();
             setDialog(null);
-            navigation.navigate('BottomTabs', { screen: 'Home' });
+            navigation.navigate('BottomTabs', { screen: 'Block' });
         } else {
             setDialog('error');
         }

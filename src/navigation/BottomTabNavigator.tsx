@@ -3,10 +3,9 @@ import { BottomTabBar, BottomTabBarProps, createBottomTabNavigator } from '@reac
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../components/Icon';
-import HomeScreen from '../screens/HomeScreen';
 import HabitsScreen from '../screens/HabitsScreen';
 import ToolsScreen from '../screens/ToolsScreen';
-import BlockScreen from '../screens/BlockScreen';
+import BlockListScreen from '../screens/BlockListScreen';
 import WorkoutScreen from '../screens/WorkoutScreen';
 import { useTheme } from '../context/ThemeContext';
 import { MiniPlayer } from '../components/MusicPlayer';
@@ -16,15 +15,13 @@ import { useMusic } from '../utils/music';
 const Tab = createBottomTabNavigator<TabParamList>();
 
 const TAB_LABELS: Record<keyof TabParamList, string> = {
-    Home: 'Overview',
-    Habits: 'Routine',
+    Habits: 'Plan',
     Workout: 'Workout',
     Tools: 'Tools',
-    Block: 'Settings',
+    Block: 'Blocks',
 };
 
-/** The Block tab holds the block list plus the Settings entry, so it wears the settings icon. */
-const TAB_ICONS: Partial<Record<keyof TabParamList, 'Settings'>> = { Block: 'Settings' };
+const TAB_ICONS: Partial<Record<keyof TabParamList, 'Plan' | 'Shield'>> = { Habits: 'Plan', Block: 'Shield' };
 
 /** Keeps the first and last tab clear of rounded screen corners. */
 const SIDE_INSET = 14;
@@ -80,11 +77,10 @@ const BottomTabNavigator: React.FC = () => {
                 },
                 tabBarIcon: tabIcon(route.name),
             })}>
-            <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Habits" component={HabitsScreen} />
             <Tab.Screen name="Workout" component={WorkoutScreen} />
             <Tab.Screen name="Tools" component={ToolsScreen} />
-            <Tab.Screen name="Block" component={BlockScreen} />
+            <Tab.Screen name="Block" component={BlockListScreen} />
         </Tab.Navigator>
     );
 };
